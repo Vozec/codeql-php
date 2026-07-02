@@ -468,6 +468,9 @@ private predicate structuralPropagator(AstNode e) {
   e instanceof Php::CastExpression or
   e instanceof Php::UnaryOpExpression or
   e instanceof Php::BinaryExpression or
+  // `$x .= v` / `$x += v` — the augmented expression is tainted if the old value (left) or `v` (right)
+  // is; combined with the augmented-assign read/def model in SsaImpl/DataFlowPrivate (AUDIT.md A.2).
+  e instanceof Php::AugmentedAssignmentExpression or
   e instanceof Php::ParenthesizedExpression or
   e instanceof Php::EncapsedString or
   e instanceof Php::ArrayCreationExpression or

@@ -189,11 +189,24 @@ module SsaInput implements SsaImplCommon::InputSig<Location, Cfg::BasicBlock> {
   predicate variableRead(Cfg::BasicBlock bb, int i, SourceVariable v, boolean certain) {
     exists(VariableAccess va |
       variableAccessAt(bb, i, va) and
-      not isWriteAccess(va) and
       v = MkLocalVariable(bb.getScope(), va.getName()) and
-      certain = true
+      certain = true and
+      (
+        not isWriteAccess(va)
+        or
+        // An augmented assignment `$x .= v` (`+=`, `.=`, …) is a read-modify-write: it READS the old
+        // value of `$x` before writing the combined result. The write is modelled by `variableWrite`;
+        // the shared SSA lib orders the read before the write at the same position, so this read sees
+        // the prior definition — without it, taint on the old value is dropped (AUDIT.md A.2).
+        isAugmentedAssignTarget(va)
+      )
     )
   }
+}
+
+/** Holds if `va` is the (whole-variable) target of an augmented assignment `$x .= v` / `$x += v` / … */
+predicate isAugmentedAssignTarget(VariableAccess va) {
+  exists(Php::AugmentedAssignmentExpression a | a.getLeft() = va)
 }
 
 import SsaImplCommon::Make<Location, Cfg, SsaInput> as Impl

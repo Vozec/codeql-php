@@ -273,7 +273,10 @@ predicate parameterMatch(ParameterPosition ppos, ArgumentPosition apos) { ppos =
 private predicate simpleAssignment(VariableAccess target, Expr rhs) {
   exists(AssignExpr a | a.getLhs() = target and a.getRhs() = rhs)
   or
-  exists(Php::AugmentedAssignmentExpression a | a.getLeft() = target and a.getRight() = rhs)
+  // `$x .= v` carries the value of the whole augmented expression (a read-modify-write combining the
+  // old `$x` and `v`), not just `v` — so taint on the old value propagates via `structuralPropagator`
+  // over the augmented expression into the new definition of `$x` (AUDIT.md A.2).
+  exists(Php::AugmentedAssignmentExpression a | a.getLeft() = target and rhs = a)
   or
   exists(Php::ReferenceAssignmentExpression a | a.getLeft() = target and a.getRight() = rhs)
   or

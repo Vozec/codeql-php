@@ -302,8 +302,9 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   Test `PartialUpdate` (3 BUG + 1 safe). **Conséquence assumée** : avec `$GLOBALS` field-insensitive, un
   write constant sur une clé ne peut plus strong-kill le taint d'une autre clé → 1 FP toléré
   (`Globals` ligne 6, annoté ; correctif précis = content par `(var,clé)`, item B.6). Suite 47/47.
-- `A.2` ◐ **augmented-assign lu** (`$x .= …`) — LHS = read (ancienne valeur) + write ; valeur du def = expr
-  augmentée ; `AugmentedAssignmentExpression` au `structuralPropagator`. Test `AugmentedAssign` (FN = ligne 8).
+- `A.2` ☑ **augmented-assign lu** (`$x .= …`) — LHS marqué **read** (ancienne valeur, read-before-write) +
+  write ; valeur du def = l'expr augmentée ; `AugmentedAssignmentExpression` ajouté au `structuralPropagator`
+  (taint des 2 opérandes). Test `AugmentedAssign` (ligne 8 = le FN corrigé, + ligne 13, safe ligne 18). Suite 47/47.
 - `A.3` ☐ `for` / `foreach` — Trees avec back-edge (foreach binding déjà côté SSA). Tests taint-through.
 - `A.4` ☐ `switch` / `match` — arêtes de cas, isolation, pas de fall-through match. Tests FP inter-case.
 - `A.5` ☐ Court-circuit `&& || ??` — arêtes booléennes.
