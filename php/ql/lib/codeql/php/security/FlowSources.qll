@@ -236,6 +236,9 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   or
   exists(EchoStmt e | n.asExpr() = e.getAnOperand() and kind = "reflected XSS")
   or
+  // `print $x` / `print($x)` is a language construct (PrintIntrinsic), not a function call.
+  exists(Php::PrintIntrinsic p | n.asExpr() = p.getChild() and kind = "reflected XSS")
+  or
   // Dynamic callable injection: if the *callee* itself is attacker-controlled, the attacker can
   // invoke an arbitrary function/method (`$fn($x)`, `$arr[0]()`, `$o->$m()`) — arbitrary code exec.
   exists(Php::FunctionCallExpression c |
