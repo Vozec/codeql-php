@@ -167,10 +167,13 @@ DataFlowCallable viableCallable(DataFlowCall call) {
   // Precise: type-based static-method dispatch (`C::m`, `self::`, `static::`, `parent::`).
   result = call.getStaticTypedCallee()
   or
-  // Fallback by name — for functions, and for calls whose class is unknown.
+  // Fallback by name — for functions, and for calls where TYPE-based dispatch resolved no callee
+  // (unknown receiver class, OR a class that lacks a matching method: trait/mixin/`__call`, or an
+  // under-approximated type). Gating on "no typed callee was found" (not merely "no type was inferred")
+  // keeps this recall-first — an inferred-but-methodless receiver must not silently drop the edge (B.4).
   call.getName() = result.getName() and
-  not call.hasTypedReceiver() and
-  not call.hasStaticTypedTarget()
+  not exists(call.getTypedCallee()) and
+  not exists(call.getStaticTypedCallee())
   or
   result = call.getInlineCallee()
   or
