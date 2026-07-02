@@ -456,6 +456,18 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = pRead
     )
     or
+    // Argument unpacking / spread `f(...$args)`: the unpacked array reaches the callee's parameters
+    // (element→position is not tracked, so — recall-first — the whole array reaches every parameter).
+    // Works for functions and methods (callee resolved by name / inferred type).
+    exists(Call call, Php::VariadicUnpacking vu, AstNode callee, VariableAccess pRead |
+      vu = callArgumentNode(call).getChild() and
+      resolvesToCallee(call, callee) and
+      pRead.getName() = calleeParam(callee, _).getName().getChild().getValue() and
+      pRead.(Php::AstNode).getParent+() = calleeBody(callee) and
+      nodeFrom.asExpr() = vu.getChild() and
+      nodeTo.asExpr() = pRead
+    )
+    or
     // Array higher-order functions preserve taint from the DATA array to the RESULT (the callback
     // transforms each element; taint flows through), for string / variable / inline callbacks alike —
     // this complements the inline-closure step above, which routes data into the callback body. The
