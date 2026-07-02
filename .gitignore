@@ -79,3 +79,6 @@ node_modules/
 
 # Mergetool files
 *.orig
+
+# Local CodeQL CLI (audit tooling, not part of the pack)
+/.tooling/
