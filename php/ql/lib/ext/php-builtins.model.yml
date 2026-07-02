@@ -164,3 +164,9 @@ extensions:
       - ["function", "utf8_encode", -1, -1]
       - ["function", "hex2bin", -1, -1]
       - ["function", "quotemeta", -1, -1]
+      # Array higher-order: the data array (any argument) flows to the result. The callback transforms
+      # each element; taint is preserved regardless of callback kind (string / variable / inline).
+      - ["function", "array_map", -1, -1]
+      - ["function", "array_filter", -1, -1]
+      - ["function", "array_walk", -1, -1]
+      - ["function", "array_reduce", -1, -1]
