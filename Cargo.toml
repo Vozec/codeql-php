@@ -6,6 +6,7 @@ members = [
     "shared/tree-sitter-extractor",
     "shared/yeast",
     "shared/yeast-macros",
+    "php/extractor",
     "ruby/extractor",
     "unified/extractor",
     "unified/extractor/tree-sitter-swift",
