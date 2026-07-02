@@ -53,6 +53,33 @@ private AstNode enclosingCallableBody(AstNode n) {
 cached
 private Php::ClassDeclaration enclosingClassDecl(AstNode n) { n.(Php::AstNode).getParent+() = result }
 
+/** Gets the `i`th formal parameter of a function or method `callee`. */
+private Php::SimpleParameter calleeParam(AstNode callee, int i) {
+  result = callee.(Php::FunctionDefinition).getParameters().getChild(i) or
+  result = callee.(Php::MethodDeclaration).getParameters().getChild(i)
+}
+
+/** Gets the body of a function or method `callee`. */
+private AstNode calleeBody(AstNode callee) {
+  result = callee.(Php::FunctionDefinition).getBody() or
+  result = callee.(Php::MethodDeclaration).getBody()
+}
+
+/**
+ * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
+ * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
+ * "no inferred receiver" (as in `viableCallable`) avoids matching a same-named method on an unrelated
+ * class (which would leak that class's by-ref writes into this call — a false positive).
+ */
+private predicate resolvesToCallee(Call call, AstNode callee) {
+  callee.(Php::FunctionDefinition).getName().getValue() = call.(FunctionCall).getName()
+  or
+  callee = TI::inferredMethod(call)
+  or
+  callee.(Php::MethodDeclaration).getName().getValue() = call.(MethodCall).getMethodName() and
+  not TI::hasInferredReceiver(call)
+}
+
 /**
  * Holds if `a` and `b` are in the same scope: the same enclosing callable, or both at file top level
  * (no enclosing callable) in the same file.
@@ -245,17 +272,19 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = foreachBindingVar(fe.getChild(i))
     )
     or
-    // By-reference output parameter: `function w(&$r){ $r = x; } w($z);` taints later reads of `$z`.
+    // By-reference output parameter, for FUNCTIONS and METHODS alike: `f(&$r){ $r = x; } … f($z);`
+    // or `$o->m($z)` where `m(&$r){ $r = x; }` — a write to the by-ref parameter taints later reads of
+    // the corresponding call argument variable. Resolution is by name (functions) or type/name (methods).
     exists(
-      Php::FunctionDefinition f, Php::SimpleParameter p, int i, AssignExpr innerWrite,
-      VariableAccess pWrite, FunctionCall call, VariableAccess callArg, VariableAccess argRead
+      AstNode callee, Php::SimpleParameter p, int i, AssignExpr innerWrite, VariableAccess pWrite,
+      Call call, VariableAccess callArg, VariableAccess argRead
     |
-      p = f.getParameters().getChild(i) and
+      p = calleeParam(callee, i) and
       exists(p.getReferenceModifier()) and
       innerWrite.getLhs() = pWrite and
       pWrite.getName() = p.getName().getChild().getValue() and
-      pWrite.(Php::AstNode).getParent+() = f.getBody() and
-      call.getName() = f.getName().getValue() and
+      pWrite.(Php::AstNode).getParent+() = calleeBody(callee) and
+      resolvesToCallee(call, callee) and
       callArg = call.getArgument(i) and
       argRead.getName() = callArg.getName() and
       argRead != callArg and
