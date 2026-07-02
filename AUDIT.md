@@ -373,10 +373,10 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   5. Idem pour les args par référence `&$r` : PostUpdate de l'argument ← écritures du param dans le corps.
   Puis **retirer** les steps setter/by-ref/parse_str hardcodés. Tests : mutation via setter (déjà
   `SetterMutation`), mutation par `&`-ref sur méthode, chaîne `$a->setB($t); $c=$a->getB(); sink($c)`.
-- `B.2` ◐ `lambdaCreation`/`lambdaCall` (closures + arrow-fns via `$cb(...)`, test `LambdaCall`) **+
-  string-callables** `$fn='func'; $fn(...)` (`getStringNamedCallee`, test `StringCallable`). Reste :
-  `call_user_func`/`array_map` avec callable **variable** (encore via le step HO inline) → généraliser puis
-  retirer la liste HO hardcodée.
+- `B.2` ◐ `lambdaCreation`/`lambdaCall` (closures + arrow-fns via `$cb(...)`, `LambdaCall`) **+
+  string-callables** `$fn='func'; $fn(...)` (`getStringNamedCallee`, `StringCallable`) **+ array-HO
+  data→résultat** (`array_map`/`array_filter`/… avec callback string/variable/inline, `ArrayHigherOrder`).
+  Reste : `call_user_func($cb, …)` avec `$cb` variable ; puis retirer les listes HO hardcodées (Phase C MAD).
 - `B.3` ☑ **Named-args méthodes** — le step named→param par nom marche pour fonctions ET méthodes
   (`resolvesToCallee`/`calleeParam`/`callArgumentNode`, résolution par type). Test `NamedArgsMethod`.
   (Reste : le mapping dans la couche *dataflow pur* — actuellement taint-step ; cf. B.3 original.)

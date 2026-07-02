@@ -1,0 +1,16 @@
+edges
+| test.php:5:30:5:34 | VariableName | test.php:6:8:6:12 | SubscriptExpression | provenance |  |
+| test.php:10:21:10:25 | VariableName | test.php:11:8:11:12 | SubscriptExpression | provenance |  |
+| test.php:14:19:14:23 | VariableName | test.php:15:8:15:12 | SubscriptExpression | provenance |  |
+nodes
+| test.php:5:30:5:34 | VariableName | semmle.label | VariableName |
+| test.php:6:8:6:12 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:10:21:10:25 | VariableName | semmle.label | VariableName |
+| test.php:11:8:11:12 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:14:19:14:23 | VariableName | semmle.label | VariableName |
+| test.php:15:8:15:12 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:6:8:6:12 | SubscriptExpression | test.php:5:30:5:34 | VariableName | test.php:6:8:6:12 | SubscriptExpression | This shell command depends on a $@. | test.php:5:30:5:34 | VariableName | user-provided value |
+| test.php:11:8:11:12 | SubscriptExpression | test.php:10:21:10:25 | VariableName | test.php:11:8:11:12 | SubscriptExpression | This shell command depends on a $@. | test.php:10:21:10:25 | VariableName | user-provided value |
+| test.php:15:8:15:12 | SubscriptExpression | test.php:14:19:14:23 | VariableName | test.php:15:8:15:12 | SubscriptExpression | This shell command depends on a $@. | test.php:14:19:14:23 | VariableName | user-provided value |

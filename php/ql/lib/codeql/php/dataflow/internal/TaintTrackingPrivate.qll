@@ -456,6 +456,20 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = pRead
     )
     or
+    // Array higher-order functions preserve taint from the DATA array to the RESULT (the callback
+    // transforms each element; taint flows through), for string / variable / inline callbacks alike —
+    // this complements the inline-closure step above, which routes data into the callback body. The
+    // data-array positions are per-function DATA (migrate to MAD in Phase C).
+    exists(FunctionCall c, int i |
+      (
+        c.getName() = "array_map" and i >= 1
+        or
+        c.getName() = ["array_filter", "array_walk", "array_reduce"] and i = 0
+      ) and
+      nodeFrom.asExpr() = c.getArgument(i) and
+      nodeTo.asExpr() = c
+    )
+    or
     // `parse_str($tainted, $out)` / `mb_parse_str`: the by-ref output array is populated from the
     // tainted input string, so reads of `$out` in the same scope are tainted.
     exists(FunctionCall c, VariableAccess outArg, VariableAccess outRead |
