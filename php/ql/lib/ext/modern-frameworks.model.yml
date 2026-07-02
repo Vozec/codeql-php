@@ -20,6 +20,15 @@ extensions:
       # HTTPlug / PSR-18 sendRequest builds from a request object; the URI factory is the boundary.
       - ["method", "createRequest", 1, "server-side request forgery"]
       - ["method", "createUri", 0, "server-side request forgery"]
+      # SQL: raw query methods (PDO / mysqli / Doctrine). NB `prepare` is SAFE (parameterised).
+      - ["method", "query", -1, "SQL injection"]
+      - ["method", "exec", -1, "SQL injection"]
+      - ["method", "unbuffered_query", -1, "SQL injection"]
+      - ["method", "real_query", -1, "SQL injection"]
+      - ["method", "createQuery", -1, "SQL injection"]
+      - ["method", "executeQuery", -1, "SQL injection"]
+      - ["method", "executeStatement", -1, "SQL injection"]
+      - ["method", "getResult", -1, "SQL injection"]
 
   # ---- Sources: modern request objects / PSR-7 / framework globals ----------------------------
   - addsTo:
@@ -43,3 +52,17 @@ extensions:
       - ["method", "getInt", "remote"]
       - ["method", "getAlpha", "remote"]
       - ["method", "getDigits", "remote"]
+      # Laravel / generic request object accessors (matched by method name, framework-agnostic)
+      - ["function", "request", "remote"]
+      - ["function", "wp_unslash", "remote"]
+      - ["method", "input", "remote"]
+      - ["method", "query", "remote"]
+      - ["method", "post", "remote"]
+      - ["method", "get", "remote"]
+      - ["method", "all", "remote"]
+      - ["method", "cookie", "remote"]
+      - ["method", "header", "remote"]
+      - ["method", "json", "remote"]
+      - ["method", "fetch", "remote"]
+      - ["method", "fetchAll", "remote"]
+      - ["method", "getClientOriginalName", "remote"]

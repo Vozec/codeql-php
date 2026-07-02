@@ -14,21 +14,11 @@ predicate isRemoteSource(DataFlow::Node n) {
   or
   // NOTE: built-in request/env source functions (getenv, filter_input, apache_request_headers, …) are
   // DATA — `sourceModel` rows in `ext/php-builtins.model.yml`, applied by `DataRemoteSource` (Phase C).
-  // Framework request helpers (Laravel `request()`, WordPress, etc.).
-  exists(FunctionCall c | c.getName() = ["request", "wp_unslash"] and n.asExpr() = c)
-  or
-  // Framework request objects: `$request->input()`, `Request::get()`, `Input::all()`, Symfony
-  // `$request->query->get()`, `$request->getContent()`, PSR-7 `getQueryParams()`, …
-  exists(MethodCall c |
-    c.getMethodName() =
-      [
-        "input", "query", "post", "get", "all", "cookie", "header", "getContent", "json",
-        "getQueryParams", "getParsedBody", "getUri", "getRequestUri", "getPathInfo", "fetch",
-        "fetchAll", "getClientOriginalName"
-      ] and
-    n.asExpr() = c
-  )
-  or
+  // NOTE: framework request helpers (`request()`, `wp_unslash`) and request-object accessor METHODS
+  // (`input`/`query`/`getContent`/`getQueryParams`/…) are DATA — `sourceModel` rows in the framework
+  // `ext/*.model.yml` (Phase C), applied by `DataRemoteSource`.
+  // Static request facades keep a TARGET-CLASS restriction (`Request::get`, `Input::all`) that the
+  // by-name MAD lookup cannot express, so they stay structural here:
   exists(StaticMethodCall c |
     c.getTargetName() = ["Request", "Input"] and
     c.getMethodName() = ["input", "get", "all", "post", "query", "cookie"] and
@@ -176,17 +166,9 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     n.asExpr() = c.getArgument(1)
   )
   or
-  exists(MethodCall c |
-    c.getMethodName() =
-      [
-        "query", "exec", "unbuffered_query", "real_query", // PDO / mysqli (NB: `prepare` is SAFE)
-        "whereRaw", "orWhereRaw", "havingRaw", "selectRaw", "raw", "statement", // Laravel
-        "createQuery", "executeQuery", "executeStatement", "getResult" // Doctrine
-      ] and
-    n.asExpr() = c.getAnArgument() and
-    kind = "SQL injection"
-  )
-  or
+  // NOTE: raw SQL query METHODS (PDO/mysqli `query`/`exec`, Laravel `whereRaw`, Doctrine
+  // `executeQuery`, …) are DATA — `sinkModel` method rows in the framework `ext/*.model.yml`
+  // (Phase C), applied by `DataSink`.
   exists(EchoStmt e | n.asExpr() = e.getAnOperand() and kind = "reflected XSS")
   or
   // `print $x` / `print($x)` is a language construct (PrintIntrinsic), not a function call.
