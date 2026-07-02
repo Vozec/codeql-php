@@ -11,7 +11,6 @@
  */
 
 import codeql.php.AST
-import codeql.php.ast.internal.TreeSitter
 
 /** A function whose result is a hash/digest that must be compared in constant time / strictly. */
 private predicate hashFunction(string name) {
@@ -23,19 +22,15 @@ private predicate sensitive(Expr e) {
   exists(FunctionCall c | c = e and hashFunction(c.getName()))
   or
   exists(string n |
-    n =
-      [
-        e.(VariableAccess).getName(),
-        e.(Php::MemberAccessExpression).getName().(Php::Name).getValue()
-      ] and
+    n = [e.(VariableAccess).getName(), e.(FieldAccess).getFieldName()] and
     n.toLowerCase().regexpMatch(".*(pass|pwd|hash|token|secret|signature|hmac|digest|nonce).*")
   )
 }
 
-from Php::BinaryExpression b
+from ComparisonExpr b
 where
   b.getOperator() = ["==", "!="] and
-  (sensitive(b.getLeft()) or sensitive(b.getRight()))
+  (sensitive(b.getLeftOperand()) or sensitive(b.getRightOperand()))
 select b,
   "Loose comparison ('" + b.getOperator() +
     "') of a hash/secret is subject to type juggling; use '===' or hash_equals()."

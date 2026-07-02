@@ -36,6 +36,20 @@ class StringLiteral extends Literal {
 
   /** Holds if this string contains interpolation, e.g. `"hi $name"`. */
   predicate isInterpolated() { this instanceof Php::EncapsedString }
+
+  /** Holds if this string has literal text content (is non-empty). */
+  predicate hasContent() {
+    exists(this.(Php::String).getChild(_).(Php::StringContent)) or
+    exists(this.(Php::EncapsedString).getChild(_).(Php::StringContent))
+  }
+
+  /** Holds if this string is a compile-time constant (no interpolated variables). */
+  predicate isConstant() {
+    this instanceof Php::String
+    or
+    this instanceof Php::EncapsedString and
+    not this.(Php::EncapsedString).getChild(_) instanceof Php::VariableName
+  }
 }
 
 /** A binary operation, e.g. `$a . $b` or `$x == $y`. */
@@ -82,6 +96,15 @@ class ArrayAccess extends Expr instanceof Php::SubscriptExpression {
 
   /** Gets the index expression, if present. */
   Expr getIndex() { result = super.getChild(1) }
+}
+
+/** A field / property access, `$obj->field`. */
+class FieldAccess extends Expr instanceof Php::MemberAccessExpression {
+  /** Gets the object whose field is accessed. */
+  Expr getObject() { result = super.getObject() }
+
+  /** Gets the accessed field name, e.g. `"field"` in `$obj->field`. */
+  string getFieldName() { result = super.getName().(Php::Name).getValue() }
 }
 
 /** A cast expression, e.g. `(int) $x`. */

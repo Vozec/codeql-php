@@ -13,18 +13,12 @@ import codeql.php.DataFlow
 import codeql.php.TaintTracking
 import codeql.php.Concepts
 import codeql.php.security.FlowSources
-import codeql.php.ast.internal.TreeSitter
+import codeql.php.AST
 
 module Cfg implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node n) {
-    // A non-empty string literal constant (single- or double-quoted, without interpolation).
-    exists(Php::String s | n.asExpr() = s and exists(s.getChild(_).(Php::StringContent)))
-    or
-    exists(Php::EncapsedString s |
-      n.asExpr() = s and
-      exists(s.getChild(_).(Php::StringContent)) and
-      not s.getChild(_) instanceof Php::VariableName
-    )
+    // A non-empty constant string literal (single- or double-quoted, without interpolated variables).
+    exists(StringLiteral s | n.asExpr() = s and s.hasContent() and s.isConstant())
   }
 
   predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "hardcoded-crypto-key" }
