@@ -296,9 +296,14 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 
 ## Phase A — CFG complet & correct (débloque le retrait du hack ; cœur soundness)
 > Méthode test-first, un Tree branchant par construction, calqué sur ruby.
-- `A.1` ☐ **Bug strong-update élément/propriété** (`SsaImpl.qll:70-91,116-118`) — `$a[k]=v` doit être
-  weak-write (read+partial-def), pas kill. Test rouge : `$a=$_GET;$a['x']='safe';sink($a['y'])` (FN actuel).
-- `A.2` ☐ **augmented-assign lu** (`$x .= …`) — LHS = read+write. Test rouge dédié.
+- `A.1` ☑ **Bug strong-update élément/propriété** — `$a[k]=v` / `$o->p=v` sont désormais des **weak
+  writes** (`SsaImpl.variableWrite`: `isPartialUpdate → certain=false`) et `definitionReachingValue`
+  (`DataFlowPrivate`) suit `uncertainWriteDefinitionInput` pour que le def antérieur (teinté) traverse.
+  Test `PartialUpdate` (3 BUG + 1 safe). **Conséquence assumée** : avec `$GLOBALS` field-insensitive, un
+  write constant sur une clé ne peut plus strong-kill le taint d'une autre clé → 1 FP toléré
+  (`Globals` ligne 6, annoté ; correctif précis = content par `(var,clé)`, item B.6). Suite 47/47.
+- `A.2` ◐ **augmented-assign lu** (`$x .= …`) — LHS = read (ancienne valeur) + write ; valeur du def = expr
+  augmentée ; `AugmentedAssignmentExpression` au `structuralPropagator`. Test `AugmentedAssign` (FN = ligne 8).
 - `A.3` ☐ `for` / `foreach` — Trees avec back-edge (foreach binding déjà côté SSA). Tests taint-through.
 - `A.4` ☐ `switch` / `match` — arêtes de cas, isolation, pas de fall-through match. Tests FP inter-case.
 - `A.5` ☐ Court-circuit `&& || ??` — arêtes booléennes.

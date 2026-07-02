@@ -312,6 +312,13 @@ private Expr definitionReachingValue(Ssa::Definition def) {
   exists(Ssa::Definition inp |
     Ssa::Impl::phiHasInputFromBlock(def, inp, _) and result = definitionReachingValue(inp)
   )
+  or
+  // A weak (uncertain) write — a partial update `$x[k]=v` / `$x->p=v` — does not overwrite the whole
+  // variable: the prior definition's value may still be present, so it also reaches. Following this
+  // input is what lets taint survive an unrelated element/property assignment (AUDIT.md A.1).
+  exists(Ssa::Definition inp |
+    Ssa::Impl::uncertainWriteDefinitionInput(def, inp) and result = definitionReachingValue(inp)
+  )
 }
 
 /** Value-preserving local step: an SSA definition's value flows to every read it reaches. */
