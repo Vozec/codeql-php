@@ -121,6 +121,26 @@ class DataFlowCall instanceof Cfg::CfgNode {
     exists(StaticMethodCall sc | sc = c and TI::hasInferredStaticTarget(sc))
   }
 
+  /**
+   * Gets the function invoked by `$fn(...)` when `$fn` resolves (via SSA) to a constant string function
+   * name — a string-callable, e.g. `$fn = 'strtoupper'; $fn($x)`. Dispatch by name (like a plain call).
+   */
+  DataFlowCallable getStringNamedCallee() {
+    exists(
+      VariableAccess fnvar, VariableAccess w, AssignExpr a, string fname, Ssa::LocalVariable v,
+      Ssa::Definition def, Ssa::Cfg::BasicBlock bbw, int iw, Ssa::Cfg::BasicBlock bbr, int ir
+    |
+      c.(Php::FunctionCallExpression).getFunction() = fnvar and
+      Ssa::variableAccessAt(bbr, ir, fnvar) and
+      Ssa::Impl::ssaDefReachesRead(v, def, bbr, ir) and
+      def.definesAt(v, bbw, iw) and
+      Ssa::variableAccessAt(bbw, iw, w) and
+      a.getLhs() = w and
+      fname = a.getRhs().(Php::String).getChild(_).(Php::StringContent).getValue() and
+      result.getName() = fname
+    )
+  }
+
   /** Gets the `__invoke` method invoked by `$obj(...)` when `$obj` resolves (via SSA) to `new C()`. */
   DataFlowCallable getInvokeCallee() {
     exists(
@@ -181,6 +201,8 @@ DataFlowCallable viableCallable(DataFlowCall call) {
   result = call.getInlineCallee()
   or
   result = call.getInvokeCallee()
+  or
+  result = call.getStringNamedCallee()
   or
   result = call.getConstructCallee()
 }
