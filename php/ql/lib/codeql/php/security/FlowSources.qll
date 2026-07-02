@@ -66,10 +66,44 @@ predicate isSanitizerFunction(string name) {
       "intval", "floatval", "doubleval", "abs", "count", "settype",
       // Path
       "basename", "realpath",
-      // Validation/encoding
-      "filter_var", "ctype_alnum", "ctype_digit", "preg_quote", "urlencode", "rawurlencode",
+      // Validation/encoding — NOTE: `ctype_*`/`is_numeric` are NOT here; they return a boolean, not a
+      // sanitized value, so they are modelled as branch GUARDS (`isSanitizerGuardFunction`), not as
+      // value-sanitizers.
+      "filter_var", "preg_quote", "urlencode", "rawurlencode",
       "base64_encode", "bin2hex", "md5", "sha1", "hash"
     ]
+}
+
+/**
+ * Validator functions used as branch GUARDS: `if (g($x)) { … }` establishes that `$x` is safe on the
+ * branch the guard controls (its result is a boolean, not a sanitized value). The NAMES are data (to be
+ * migrated to MAD in Phase C); the barrier STRUCTURE (`isGuardedRead`) is general.
+ */
+predicate isSanitizerGuardFunction(string name) {
+  name =
+    [
+      "ctype_alnum", "ctype_digit", "ctype_alpha", "ctype_xdigit", "ctype_upper", "ctype_lower",
+      "is_numeric", "is_int", "is_integer", "is_float", "is_double", "in_array", "array_key_exists",
+      "preg_match"
+    ]
+}
+
+/**
+ * Holds if `n` is a read of a variable validated by a sanitizer guard on the branch it controls, e.g.
+ * `if (ctype_alnum($x)) { … $x … }`. v1 scope: the positive (then) branch of an `if` whose condition is
+ * (or contains) the guard call; dominance-based guards (early-return `if(!g($x))return;`, the `else`
+ * branch, `&&` chains) are a future refinement. A CUSTOM/unknown guard is NOT matched, so its path is
+ * still reported (recall-first) — modelling it is a one-row data addition, no engine change.
+ */
+predicate isGuardedRead(DataFlow::Node n) {
+  exists(Php::IfStatement ifs, FunctionCall g, VariableAccess checked, VariableAccess use |
+    g.(Php::AstNode).getParent*() = ifs.getCondition() and
+    isSanitizerGuardFunction(g.getName()) and
+    checked = g.getAnArgument() and
+    use.(Php::AstNode).getParent*() = ifs.getBody() and
+    use.getName() = checked.getName() and
+    n.asExpr() = use
+  )
 }
 
 /** Holds if `n` is the result of a sanitizer call (a taint barrier). */
@@ -239,4 +273,9 @@ private class BuiltinSink extends Sink {
 /** The built-in sanitizer results become `Sanitizer` instances (extensible via QL/data). */
 private class BuiltinSanitizer extends Sanitizer {
   BuiltinSanitizer() { isSanitizer(this) }
+}
+
+/** A read of a variable validated by a sanitizer guard on its branch becomes a `Sanitizer` (barrier). */
+private class GuardBarrier extends Sanitizer {
+  GuardBarrier() { isGuardedRead(this) }
 }
