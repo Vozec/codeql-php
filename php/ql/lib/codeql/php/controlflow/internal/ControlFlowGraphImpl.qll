@@ -72,6 +72,10 @@ module Completion {
       e = any(Php::DoStatement d).getCondition()
       or
       e = any(Php::ForStatement f).getCondition()
+      or
+      // The left operand of a short-circuit `&&`/`||` (and their low-precedence `and`/`or` forms)
+      // completes true/false, routing to the right operand (evaluated) or the result (short-circuit).
+      exists(Php::BinaryExpression b | b.getOperator() = ["&&", "||", "and", "or"] and e = b.getLeft())
     }
 
     override BooleanSuccessor getAMatchingSuccessorType() { result.getValue() = value }
@@ -468,12 +472,83 @@ private class ForeachTree extends PostOrderTree instanceof Php::ForeachStatement
   }
 }
 
+/** Holds if `e` is a short-circuit binary operator (`&&`/`||`/`and`/`or`/`??`), modelled as a branch. */
+private predicate isShortCircuit(AstNode e) {
+  e.(Php::BinaryExpression).getOperator() = ["&&", "||", "and", "or", "??"]
+}
+
+/**
+ * A short-circuit `&&` / `and`: the left operand is evaluated; false short-circuits to the result
+ * (right not evaluated), true evaluates the right operand; both meet at the operation node (post-order
+ * root) ⇒ a real branch/join. Taint through either operand is carried by `structuralPropagator`.
+ */
+private class LogicalAndTree extends PostOrderTree instanceof Php::BinaryExpression {
+  LogicalAndTree() { this.(Php::BinaryExpression).getOperator() = ["&&", "and"] }
+
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::BinaryExpression).getLeft(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::BinaryExpression b | b = this |
+      last(b.getLeft(), pred, c) and c.(BooleanCompletion).getValue() = true and first(b.getRight(), succ)
+      or
+      last(b.getLeft(), pred, c) and c.(BooleanCompletion).getValue() = false and succ = this
+      or
+      last(b.getRight(), pred, c) and c instanceof NormalCompletion and succ = this
+    )
+  }
+}
+
+/** A short-circuit `||` / `or`: left true short-circuits to the result; left false evaluates the right. */
+private class LogicalOrTree extends PostOrderTree instanceof Php::BinaryExpression {
+  LogicalOrTree() { this.(Php::BinaryExpression).getOperator() = ["||", "or"] }
+
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::BinaryExpression).getLeft(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::BinaryExpression b | b = this |
+      last(b.getLeft(), pred, c) and c.(BooleanCompletion).getValue() = false and first(b.getRight(), succ)
+      or
+      last(b.getLeft(), pred, c) and c.(BooleanCompletion).getValue() = true and succ = this
+      or
+      last(b.getRight(), pred, c) and c instanceof NormalCompletion and succ = this
+    )
+  }
+}
+
+/**
+ * A null-coalescing `??`: the left operand is evaluated; if non-null it IS the result (short-circuit),
+ * if null the right operand is evaluated. `??` tests null-ness, not a boolean, so — lacking a nullness
+ * completion — the branch is modelled non-deterministically (both edges from the left), a sound
+ * over-approximation. Taint through either operand is carried by `structuralPropagator`.
+ */
+private class NullCoalesceTree extends PostOrderTree instanceof Php::BinaryExpression {
+  NullCoalesceTree() { this.(Php::BinaryExpression).getOperator() = "??" }
+
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::BinaryExpression).getLeft(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::BinaryExpression b | b = this |
+      last(b.getLeft(), pred, c) and c instanceof NormalCompletion and
+      (succ = this or first(b.getRight(), succ))
+      or
+      last(b.getRight(), pred, c) and c instanceof NormalCompletion and succ = this
+    )
+  }
+}
+
 /**
  * An expression, evaluated in post-order: its operands are visited first, then the expression
- * node itself. Childless expressions (variables, literals, names) behave as leaves.
+ * node itself. Childless expressions (variables, literals, names) behave as leaves. Short-circuit
+ * binary operators are excluded — they branch instead (`LogicalAndTree`/`LogicalOrTree`/`NullCoalesceTree`).
  */
 private class ExprTree extends StandardPostOrderTree instanceof Php::Expression {
-  ExprTree() { not isCallable(this) }
+  ExprTree() { not isCallable(this) and not isShortCircuit(this) }
 
   override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
 }

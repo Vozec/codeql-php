@@ -309,10 +309,10 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   init→cond→body→update→cond (φ à la condition, condition du `for` ajoutée aux `BooleanCompletion`) ;
   `foreach` = collection→header(binding)→body→header (φ au binding). Discriminant testé = taint
   **loop-carried** (use-before-assign dans le corps, FN sur CFG linéarisé). Tests `ForLoopTaint`/`ForeachTaint`.
-- `A.5` ☐ **Court-circuit `&& || ??`** (indépendant, propre) — arêtes booléennes : `&&` faux court-circuite,
-  `||` vrai court-circuite, `??` non-null court-circuite. Le taint via les opérandes est déjà couvert
-  (`structuralPropagator` sur `BinaryExpression`) ; l'intérêt CFG est surtout d'habiliter `SanitizerGuard`
-  (B.5) et d'éviter d'évaluer la RHS. **Recommandé AVANT A.4** (pas d'entrelacement).
+- `A.5` ☑ **Court-circuit `&& || ??`** — `LogicalAndTree`/`LogicalOrTree`/`NullCoalesceTree` (PostOrderTree).
+  `&&`/`and` : gauche vrai→droite, faux→résultat ; `||`/`or` : gauche faux→droite, vrai→résultat (BooleanCompletion
+  sur l'opérande gauche) ; `??` : branche non-déterministe (pas de nullness completion). Exclus du `ExprTree`.
+  Taint via opérandes inchangé (`structuralPropagator`). Test `CfgShortCircuit` (expected vide = tout branche).
 - `A.4` ☐ **`switch` / `match`** — ⚠️ **entrelacé avec A.6** : sans modéliser `break`, le fall-through de
   `switch` relie tous les cases (fuite inter-case) — l'isolation de case n'a de sens qu'avec la complétion
   `break`. `match` (expression, sans fall-through) est plus simple et peut se faire seul. → faire `match`
