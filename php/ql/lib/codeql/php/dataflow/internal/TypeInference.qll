@@ -150,6 +150,16 @@ Method inferredMethod(MethodCall mc) {
     result = c.getAMethod() and
     result.getName() = mc.getMethodName()
   )
+  or
+  // Virtual dispatch: the receiver's inferred type is a base class or interface (e.g. a parameter typed
+  // `I $o`), but the concrete implementation lives on a subtype/implementor. Dispatch to any subtype's
+  // declared method of that name (recall-first — the runtime object may be any implementor).
+  exists(ClassLike base, ClassLike sub |
+    base = exprClass(mc.getReceiver()) and
+    base = sub.getAnAncestor() and
+    result = sub.getADeclaredMethod() and
+    result.getName() = mc.getMethodName()
+  )
 }
 
 /** Holds if the receiver type of method call `mc` is known (so name-based fallback is unnecessary). */
