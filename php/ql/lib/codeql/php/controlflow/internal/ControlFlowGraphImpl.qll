@@ -734,10 +734,48 @@ private class ExprTree extends StandardPostOrderTree instanceof Php::Expression 
     not isShortCircuit(this) and
     not this instanceof Php::MatchExpression and
     not this instanceof Php::ThrowExpression and
-    not this instanceof Php::ConditionalExpression
+    not this instanceof Php::ConditionalExpression and
+    not isAssignment(this)
   }
 
   override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
+}
+
+/** Holds if `n` is an assignment (`=`, augmented `.=`/`+=`/…, or reference `=&`). */
+private predicate isAssignment(AstNode n) {
+  n instanceof Php::AssignmentExpression or
+  n instanceof Php::AugmentedAssignmentExpression or
+  n instanceof Php::ReferenceAssignmentExpression
+}
+
+/** Gets the left-hand (target) side of an assignment `n`. */
+private AstNode assignLhs(AstNode n) {
+  result = n.(Php::AssignmentExpression).getLeft() or
+  result = n.(Php::AugmentedAssignmentExpression).getLeft() or
+  result = n.(Php::ReferenceAssignmentExpression).getLeft()
+}
+
+/** Gets the right-hand (value) side of an assignment `n`. */
+private AstNode assignRhs(AstNode n) {
+  result = n.(Php::AssignmentExpression).getRight() or
+  result = n.(Php::AugmentedAssignmentExpression).getRight() or
+  result = n.(Php::ReferenceAssignmentExpression).getRight()
+}
+
+/**
+ * An assignment `$lhs = rhs` (or `.=`/`+=`/… / `=&`): the RHS is evaluated BEFORE the target is written,
+ * regardless of source position. Ordering the target last is what makes a self-referential assignment
+ * `$a = f($a)` correct — the read of `$a` inside the RHS sees the PRIOR definition, not the one being
+ * written (a textual left-to-right order would create a spurious SSA self-cycle and drop the taint).
+ */
+private class AssignmentTree extends StandardPostOrderTree instanceof AstNode {
+  AssignmentTree() { isAssignment(this) }
+
+  override ControlFlowTree getChildNode(int i) {
+    result = assignRhs(this) and i = 0
+    or
+    result = assignLhs(this) and i = 1
+  }
 }
 
 /**

@@ -4,12 +4,12 @@
 | 2 | SimpleParameter | 2 | Name |
 | 2 | VariableName | 2 | CompoundStatement |
 | 3 | AssignmentExpression | 4 | EchoStatement |
-| 3 | BinaryExpression | 3 | AssignmentExpression |
+| 3 | BinaryExpression | 3 | Name |
 | 3 | EncapsedString | 3 | BinaryExpression |
 | 3 | ExpressionStatement | 3 | Name |
 | 3 | Name | 3 | VariableName |
+| 3 | VariableName | 3 | AssignmentExpression |
 | 3 | VariableName | 3 | EncapsedString |
-| 3 | VariableName | 3 | Name |
 | 4 | EchoStatement | 4 | Name |
 | 4 | Name | 4 | VariableName |
 | 4 | VariableName | 5 | Name |
