@@ -1,0 +1,67 @@
+edges
+| test.php:3:13:3:14 | VariableName | test.php:3:26:3:27 | VariableName | provenance |  |
+| test.php:4:13:4:14 | VariableName | test.php:4:22:4:23 | VariableName | provenance |  |
+| test.php:4:22:4:23 | VariableName | test.php:3:13:3:14 | VariableName | provenance |  |
+| test.php:5:13:5:14 | VariableName | test.php:5:22:5:23 | VariableName | provenance |  |
+| test.php:5:22:5:23 | VariableName | test.php:4:13:4:14 | VariableName | provenance |  |
+| test.php:6:13:6:14 | VariableName | test.php:6:22:6:23 | VariableName | provenance |  |
+| test.php:6:22:6:23 | VariableName | test.php:5:13:5:14 | VariableName | provenance |  |
+| test.php:7:13:7:14 | VariableName | test.php:7:22:7:23 | VariableName | provenance |  |
+| test.php:7:22:7:23 | VariableName | test.php:6:13:6:14 | VariableName | provenance |  |
+| test.php:8:23:8:27 | VariableName | test.php:8:23:8:32 | SubscriptExpression | provenance |  |
+| test.php:8:23:8:32 | SubscriptExpression | test.php:7:13:7:14 | VariableName | provenance |  |
+| test.php:11:25:11:26 | VariableName | test.php:11:38:11:39 | VariableName | provenance |  |
+| test.php:12:28:12:29 | VariableName | test.php:12:55:12:66 | MemberCallExpression | provenance |  |
+| test.php:12:28:12:29 | VariableName | test.php:12:64:12:65 | VariableName | provenance |  |
+| test.php:12:64:12:65 | VariableName | test.php:11:25:11:26 | VariableName | provenance |  |
+| test.php:12:64:12:65 | VariableName | test.php:12:55:12:66 | MemberCallExpression | provenance |  |
+| test.php:15:10:15:32 | MemberCallExpression | test.php:16:12:16:13 | VariableName | provenance |  |
+| test.php:15:22:15:26 | VariableName | test.php:15:22:15:31 | SubscriptExpression | provenance |  |
+| test.php:15:22:15:26 | VariableName | test.php:16:12:16:13 | VariableName | provenance |  |
+| test.php:15:22:15:31 | SubscriptExpression | test.php:12:28:12:29 | VariableName | provenance |  |
+| test.php:15:22:15:31 | SubscriptExpression | test.php:15:10:15:32 | MemberCallExpression | provenance |  |
+| test.php:20:17:20:18 | VariableName | test.php:20:30:20:61 | FunctionCallExpression | provenance |  |
+| test.php:22:10:22:35 | FunctionCallExpression | test.php:23:12:23:13 | VariableName | provenance |  |
+| test.php:22:17:22:34 | FunctionCallExpression | test.php:20:17:20:18 | VariableName | provenance |  |
+| test.php:22:17:22:34 | FunctionCallExpression | test.php:22:10:22:35 | FunctionCallExpression | provenance |  |
+| test.php:22:24:22:28 | VariableName | test.php:22:24:22:33 | SubscriptExpression | provenance |  |
+| test.php:22:24:22:33 | SubscriptExpression | test.php:20:17:20:18 | VariableName | provenance |  |
+| test.php:22:24:22:33 | SubscriptExpression | test.php:22:17:22:34 | FunctionCallExpression | provenance |  |
+nodes
+| test.php:3:13:3:14 | VariableName | semmle.label | VariableName |
+| test.php:3:26:3:27 | VariableName | semmle.label | VariableName |
+| test.php:4:13:4:14 | VariableName | semmle.label | VariableName |
+| test.php:4:22:4:23 | VariableName | semmle.label | VariableName |
+| test.php:5:13:5:14 | VariableName | semmle.label | VariableName |
+| test.php:5:22:5:23 | VariableName | semmle.label | VariableName |
+| test.php:6:13:6:14 | VariableName | semmle.label | VariableName |
+| test.php:6:22:6:23 | VariableName | semmle.label | VariableName |
+| test.php:7:13:7:14 | VariableName | semmle.label | VariableName |
+| test.php:7:22:7:23 | VariableName | semmle.label | VariableName |
+| test.php:8:23:8:27 | VariableName | semmle.label | VariableName |
+| test.php:8:23:8:32 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:11:25:11:26 | VariableName | semmle.label | VariableName |
+| test.php:11:38:11:39 | VariableName | semmle.label | VariableName |
+| test.php:12:28:12:29 | VariableName | semmle.label | VariableName |
+| test.php:12:55:12:66 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:12:64:12:65 | VariableName | semmle.label | VariableName |
+| test.php:15:10:15:32 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:15:22:15:26 | VariableName | semmle.label | VariableName |
+| test.php:15:22:15:31 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:16:12:16:13 | VariableName | semmle.label | VariableName |
+| test.php:20:17:20:18 | VariableName | semmle.label | VariableName |
+| test.php:20:30:20:61 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:22:10:22:35 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:22:17:22:34 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:22:24:22:28 | VariableName | semmle.label | VariableName |
+| test.php:22:24:22:33 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:23:12:23:13 | VariableName | semmle.label | VariableName |
+subpaths
+| test.php:12:64:12:65 | VariableName | test.php:11:25:11:26 | VariableName | test.php:11:38:11:39 | VariableName | test.php:12:55:12:66 | MemberCallExpression |
+| test.php:15:22:15:31 | SubscriptExpression | test.php:12:28:12:29 | VariableName | test.php:12:55:12:66 | MemberCallExpression | test.php:15:10:15:32 | MemberCallExpression |
+| test.php:22:17:22:34 | FunctionCallExpression | test.php:20:17:20:18 | VariableName | test.php:20:30:20:61 | FunctionCallExpression | test.php:22:10:22:35 | FunctionCallExpression |
+| test.php:22:24:22:33 | SubscriptExpression | test.php:20:17:20:18 | VariableName | test.php:20:30:20:61 | FunctionCallExpression | test.php:22:17:22:34 | FunctionCallExpression |
+#select
+| test.php:3:26:3:27 | VariableName | test.php:8:23:8:27 | VariableName | test.php:3:26:3:27 | VariableName | This shell command depends on a $@. | test.php:8:23:8:27 | VariableName | user-provided value |
+| test.php:16:12:16:13 | VariableName | test.php:15:22:15:26 | VariableName | test.php:16:12:16:13 | VariableName | This shell command depends on a $@. | test.php:15:22:15:26 | VariableName | user-provided value |
+| test.php:23:12:23:13 | VariableName | test.php:22:24:22:28 | VariableName | test.php:23:12:23:13 | VariableName | This shell command depends on a $@. | test.php:22:24:22:28 | VariableName | user-provided value |
