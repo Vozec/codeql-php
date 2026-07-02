@@ -4,7 +4,8 @@ groups:
   - php
   - queries
 suites: codeql-suites
-defaultSuiteFile: codeql-suites/php-security.qls
+defaultSuiteFile: codeql-suites/php-code-scanning.qls
 dependencies:
   codeql/php-all: ${workspace}
+  codeql/suite-helpers: ${workspace}
 warnOnImplicitThis: true
