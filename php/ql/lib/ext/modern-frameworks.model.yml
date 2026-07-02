@@ -1,0 +1,45 @@
+# Modern PHP framework / library coverage as Models-as-Data: HTTP clients (SSRF), request objects
+# (sources), and ORMs. All COVERAGE (names) — the engine (dispatch, flow) is language-general QL.
+# Columns:  sinkModel  : subjectKind, name, argIndex(-1=any), vulnKind
+#           sourceModel: subjectKind, name, sourceType
+
+extensions:
+  # ---- SSRF: HTTP client request methods (the URL argument) -----------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sinkModel
+    data:
+      # Guzzle / Symfony HttpClient / PSR-18: request($method, $uri, …) — the URI is arg 1
+      - ["method", "request", 1, "server-side request forgery"]
+      - ["method", "requestAsync", 1, "server-side request forgery"]
+      # Guzzle shorthand verbs: get/post/put/… ($uri, …) — the URI is arg 0
+      - ["method", "getAsync", 0, "server-side request forgery"]
+      - ["method", "postAsync", 0, "server-side request forgery"]
+      - ["method", "putAsync", 0, "server-side request forgery"]
+      - ["method", "deleteAsync", 0, "server-side request forgery"]
+      # HTTPlug / PSR-18 sendRequest builds from a request object; the URI factory is the boundary.
+      - ["method", "createRequest", 1, "server-side request forgery"]
+      - ["method", "createUri", 0, "server-side request forgery"]
+
+  # ---- Sources: modern request objects / PSR-7 / framework globals ----------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sourceModel
+    data:
+      # Symfony HttpFoundation
+      - ["method", "getContent", "remote"]
+      - ["method", "getUri", "remote"]
+      - ["method", "getRequestUri", "remote"]
+      - ["method", "getPathInfo", "remote"]
+      # PSR-7 ServerRequest
+      - ["method", "getQueryParams", "remote"]
+      - ["method", "getParsedBody", "remote"]
+      - ["method", "getServerParams", "remote"]
+      - ["method", "getCookieParams", "remote"]
+      - ["method", "getUploadedFiles", "remote"]
+      - ["method", "getHeaderLine", "remote"]
+      # Symfony ParameterBag / InputBag (`$request->query->get(...)`, `$request->request->all()`)
+      - ["method", "getBoolean", "remote"]
+      - ["method", "getInt", "remote"]
+      - ["method", "getAlpha", "remote"]
+      - ["method", "getDigits", "remote"]

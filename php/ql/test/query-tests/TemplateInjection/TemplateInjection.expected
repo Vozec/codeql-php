@@ -1,0 +1,16 @@
+edges
+| test.php:6:12:6:16 | VariableName | test.php:7:27:7:30 | VariableName | provenance |  |
+| test.php:12:32:12:36 | VariableName | test.php:12:20:12:41 | BinaryExpression | provenance |  |
+| test.php:17:19:17:24 | VariableName | test.php:17:19:17:31 | SubscriptExpression | provenance |  |
+nodes
+| test.php:6:12:6:16 | VariableName | semmle.label | VariableName |
+| test.php:7:27:7:30 | VariableName | semmle.label | VariableName |
+| test.php:12:20:12:41 | BinaryExpression | semmle.label | BinaryExpression |
+| test.php:12:32:12:36 | VariableName | semmle.label | VariableName |
+| test.php:17:19:17:24 | VariableName | semmle.label | VariableName |
+| test.php:17:19:17:31 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:7:27:7:30 | VariableName | test.php:6:12:6:16 | VariableName | test.php:7:27:7:30 | VariableName | This template depends on a $@. | test.php:6:12:6:16 | VariableName | user-provided value |
+| test.php:12:20:12:41 | BinaryExpression | test.php:12:32:12:36 | VariableName | test.php:12:20:12:41 | BinaryExpression | This template depends on a $@. | test.php:12:32:12:36 | VariableName | user-provided value |
+| test.php:17:19:17:31 | SubscriptExpression | test.php:17:19:17:24 | VariableName | test.php:17:19:17:31 | SubscriptExpression | This template depends on a $@. | test.php:17:19:17:24 | VariableName | user-provided value |

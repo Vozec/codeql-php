@@ -1,0 +1,35 @@
+# Server-side template injection (SSTI) and template-output sinks for modern PHP template engines,
+# as Models-as-Data. When a user-controlled TEMPLATE (not just template data) reaches a render/eval
+# call, the engine compiles and executes it → code execution. The template argument is the sink.
+#
+# Recall-first: a filesystem template name reaching `render` is usually safe, but a string/`eval:`
+# template is not; we flag the template argument and rely on sanitizers/allow-lists to cut safe paths.
+# Columns:  sinkModel : subjectKind, name, argIndex(-1=any), vulnKind
+#           sourceModel: subjectKind, name, sourceType
+
+extensions:
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sinkModel
+    data:
+      # Twig — string loader / dynamic template compilation
+      - ["method", "createTemplate", 0, "template injection"]      # Twig\Environment::createTemplate($source)
+      - ["method", "render", 0, "template injection"]              # Twig / Blade / Latte / Plates ::render($tpl, ...)
+      - ["method", "renderToString", 0, "template injection"]      # Latte
+      # Smarty — fetch/display with `string:` / `eval:` resource
+      - ["method", "fetch", 0, "template injection"]               # Smarty::fetch($template)
+      - ["method", "display", 0, "template injection"]             # Smarty::display($template)
+      # Blade (Laravel) — render a raw template string
+      - ["staticmethod", "render", 0, "template injection"]        # Blade::render($template, $data)
+      - ["staticmethod", "compileString", 0, "template injection"] # Blade::compileString($template)
+      # Mustache / generic
+      - ["method", "loadTemplate", 0, "template injection"]
+      - ["method", "compile", 0, "template injection"]
+
+  # Template CONTEXT (data) coming back from a rendered template is not a source; but user-controlled
+  # template *variables* fetched from the engine can be. (Extend here as needed.)
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sourceModel
+    data:
+      - ["method", "getTemplateVars", "remote"]   # Smarty::getTemplateVars()
