@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Using untrusted data as a redirect target lets an attacker send victims to a malicious site (open redirect), aiding phishing and OAuth token theft.</p>
+</overview>
+<recommendation>
+<p>Redirect only to a fixed allow-list of URLs or relative paths. Reject absolute URLs to other hosts.</p>
+</recommendation>
+<references>
+<li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html">OWASP: Unvalidated Redirects</a></li>
+</references>
+</qhelp>

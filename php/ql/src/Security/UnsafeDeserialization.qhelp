@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Deserializing untrusted data with <code>unserialize()</code> lets an attacker instantiate arbitrary objects and trigger magic methods (POP chains), often leading to remote code execution.</p>
+</overview>
+<recommendation>
+<p>Do not unserialize untrusted input. Use a safe format such as JSON (<code>json_decode</code>), or restrict allowed classes via the <code>allowed_classes</code> option.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/vulnerabilities/PHP_Object_Injection">OWASP: Deserialization</a></li>
+</references>
+</qhelp>

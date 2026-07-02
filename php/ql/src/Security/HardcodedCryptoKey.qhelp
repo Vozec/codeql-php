@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Using a hard-coded constant as a cryptographic key, salt or password means anyone with the source can compromise the protected data.</p>
+</overview>
+<recommendation>
+<p>Load secrets from configuration or a secrets manager at runtime; never commit them. Rotate any key that has been hard-coded.</p>
+</recommendation>
+<references>
+<li><a href="https://cwe.mitre.org/data/definitions/798.html">OWASP: Use of Hard-coded Credentials</a></li>
+</references>
+</qhelp>

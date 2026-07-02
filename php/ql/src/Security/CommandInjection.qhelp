@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Passing untrusted data to a shell command lets an attacker execute arbitrary operating-system commands (command injection).</p>
+</overview>
+<recommendation>
+<p>Never build shell commands from user input. Use APIs that pass arguments as an array, or escape every argument with <code>escapeshellarg()</code>. Prefer safe library functions over shelling out.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/Command_Injection">OWASP: Command Injection</a></li>
+</references>
+</qhelp>

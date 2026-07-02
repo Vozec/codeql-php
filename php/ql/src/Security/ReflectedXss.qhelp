@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Writing untrusted data into an HTML response without escaping enables cross-site scripting (XSS), letting an attacker run script in victims' browsers.</p>
+</overview>
+<recommendation>
+<p>Contextually encode all user data on output with <code>htmlspecialchars()</code> (or a templating engine that auto-escapes). Set a Content-Security-Policy.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/xss/">OWASP: Cross Site Scripting</a></li>
+</references>
+</qhelp>

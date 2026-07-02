@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Building an LDAP filter from untrusted data lets an attacker alter the directory query (LDAP injection), bypassing authentication or reading data.</p>
+</overview>
+<recommendation>
+<p>Escape all user input placed in an LDAP filter with <code>ldap_escape()</code>, and validate against an allow-list.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/LDAP_Injection">OWASP: LDAP Injection</a></li>
+</references>
+</qhelp>

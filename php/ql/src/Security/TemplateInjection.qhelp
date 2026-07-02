@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Using untrusted data as a template (rather than as template data) lets the template engine compile and execute attacker-controlled code (server-side template injection).</p>
+</overview>
+<recommendation>
+<p>Never pass user input as the template. Render fixed templates and pass user data only as bound variables. If dynamic templates are unavoidable, use a sandboxed engine with a strict allow-list.</p>
+</recommendation>
+<references>
+<li><a href="https://portswigger.net/web-security/server-side-template-injection">PortSwigger: SSTI</a></li>
+</references>
+</qhelp>

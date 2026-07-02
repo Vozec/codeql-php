@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Passing untrusted data to a code-evaluation construct such as <code>eval()</code> lets an attacker execute arbitrary PHP (code injection).</p>
+</overview>
+<recommendation>
+<p>Do not evaluate user input as code. Redesign to avoid dynamic code; if unavoidable, use a strict allow-list of safe values.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/Code_Injection">OWASP: Code Injection</a></li>
+</references>
+</qhelp>

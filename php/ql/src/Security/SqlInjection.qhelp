@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Building a SQL query from untrusted data allows an attacker to alter the query and read, modify or destroy data (SQL injection).</p>
+</overview>
+<recommendation>
+<p>Use parameterised queries / prepared statements (PDO with bound parameters), or a query builder that parameterises. Never concatenate user input into SQL.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/SQL_Injection">OWASP: SQL Injection</a></li>
+</references>
+</qhelp>

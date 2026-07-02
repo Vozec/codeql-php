@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Using untrusted data in a filesystem path lets an attacker escape the intended directory and read or write arbitrary files (path traversal).</p>
+</overview>
+<recommendation>
+<p>Validate paths against an allow-list, resolve with <code>realpath()</code> and verify the result stays within a permitted base directory. Reject <code>..</code> sequences.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/Path_Traversal">OWASP: Path Traversal</a></li>
+</references>
+</qhelp>

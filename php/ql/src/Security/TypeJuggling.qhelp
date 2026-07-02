@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Comparing a hash or secret with the loose <code>==</code>/<code>!=</code> operators is subject to PHP type juggling (e.g. <code>"0e1" == "0e2"</code> is true), enabling authentication bypass.</p>
+</overview>
+<recommendation>
+<p>Compare secrets with the strict <code>===</code>/<code>!==</code> operators, or use <code>hash_equals()</code> for constant-time comparison.</p>
+</recommendation>
+<references>
+<li><a href="https://www.whitehatsec.com/blog/magic-hashes/">OWASP: PHP Magic Hashes</a></li>
+</references>
+</qhelp>

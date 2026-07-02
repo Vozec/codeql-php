@@ -1,0 +1,12 @@
+<!DOCTYPE qhelp PUBLIC "-//Semmle//qhelp//EN" "qhelp.dtd">
+<qhelp>
+<overview>
+<p>Fetching a user-controlled URL lets an attacker make the server issue requests to internal services (server-side request forgery), reaching cloud metadata or internal APIs.</p>
+</overview>
+<recommendation>
+<p>Validate the destination against an allow-list of hosts and schemes, resolve DNS and block private/link-local ranges, and disable redirects to untrusted hosts.</p>
+</recommendation>
+<references>
+<li><a href="https://owasp.org/www-community/attacks/Server_Side_Request_Forgery">OWASP: SSRF</a></li>
+</references>
+</qhelp>
