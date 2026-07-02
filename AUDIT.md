@@ -363,7 +363,9 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   gardée ; noms de guards en DATA (`isSanitizerGuardFunction`), structure générale ; guard inconnu → chemin
   montré (recall-first). `ctype_*`/`is_numeric` retirés des value-sanitizers (renvoient un bool). Test
   `GuardBarrier`. v1 = branche `then` d'un `if` ; dominance (early-return/else/`&&`) = raffinement futur.
-- `B.6` ☐ Content par `(classe, champ)` quand type inféré ; `$GLOBALS`/`=&` cross-file en jump-steps.
+- `B.6` ◐ **`$GLOBALS['k']` cross-file** = jumpStep (superglobale) → FN cross-fichier corrigé, taint-step
+  same-file retiré. Test `GlobalsSuperCrossFile`. Reste : content par `(classe, champ)` quand type inféré ;
+  `=&` reste scope-local (défendable).
 
 **Bugs moteur trouvés & corrigés hors-audit initial** (via questions utilisateur sur la reachability) :
 - `fix(cfg)` ☑ **Ordre d'évaluation des assignations** : le LHS était écrit AVANT le RHS (ordre position

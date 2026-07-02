@@ -366,21 +366,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = outerRead
     )
     or
-    // Superglobal `$GLOBALS['k'] = v` taints reads of `$GLOBALS['k']` with the same key (same file).
-    exists(
-      AssignExpr a, Php::SubscriptExpression w, Php::SubscriptExpression r, string key
-    |
-      a.getLhs() = w and
-      w.getChild(0).(VariableAccess).getName() = "GLOBALS" and
-      r.getChild(0).(VariableAccess).getName() = "GLOBALS" and
-      key = resolvedStringOf(w.getChild(1)) and
-      key = resolvedStringOf(r.getChild(1)) and
-      w != r and
-      w.getLocation().getFile() = r.getLocation().getFile() and
-      nodeFrom.asExpr() = a.getRhs() and
-      nodeTo.asExpr() = r
-    )
-    or
+    // NOTE: `$GLOBALS['k']` is handled cross-file as a value-preserving `jumpStep` in DataFlowPrivate
+    // (a genuine superglobal), so no same-file taint step is needed here (B.6).
+
     // Reference alias `$b =& $a`: assigning to one alias taints reads of the other (same file).
     exists(
       Php::ReferenceAssignmentExpression ra, AssignExpr av, VariableAccess aw, VariableAccess br,

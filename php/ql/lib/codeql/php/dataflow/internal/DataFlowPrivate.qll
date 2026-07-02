@@ -345,6 +345,12 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
 
 predicate localFlowStep(Node node1, Node node2) { simpleLocalFlowStep(node1, node2, _) }
 
+/** Gets the constant string key of a `$GLOBALS['k']` subscript. */
+private string globalsKey(Php::SubscriptExpression sub) {
+  sub.getChild(0).(VariableAccess).getName() = "GLOBALS" and
+  result = sub.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue()
+}
+
 predicate jumpStep(Node node1, Node node2) {
   // Global variables (`global $g`) alias a single cross-scope value: assigning `$g` in one scope
   // flows to reads of `$g` in another. Modelled as a jump step (non-local, value-preserving), so it
@@ -355,6 +361,17 @@ predicate jumpStep(Node node1, Node node2) {
     w.getName() = gname and
     r.getName() = gname and
     r != w and
+    node1.asExpr() = a.getRhs() and
+    node2.asExpr() = r
+  )
+  or
+  // The `$GLOBALS['k']` superglobal is a genuine global: assigning a key in one scope/file flows to
+  // reads of the same key anywhere. A jump step (cross-file), unlike a scope-local `=&` alias. (B.6)
+  exists(AssignExpr a, Php::SubscriptExpression w, Php::SubscriptExpression r, string key |
+    a.getLhs() = w and
+    key = globalsKey(w) and
+    key = globalsKey(r) and
+    w != r and
     node1.asExpr() = a.getRhs() and
     node2.asExpr() = r
   )
