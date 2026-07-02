@@ -59,6 +59,9 @@ class DataFlowCall instanceof Cfg::CfgNode {
 
   DataFlowCall() { c = super.getAstNode() }
 
+  /** Gets the underlying call expression. */
+  Call getCall() { result = c }
+
   string toString() { result = super.toString() }
 
   Location getLocation() { result = super.getLocation() }
@@ -424,9 +427,32 @@ private newtype TLambdaCallKind = TNoLambda()
 
 class LambdaCallKind = TLambdaCallKind;
 
-predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c) { none() }
+/**
+ * Holds if `creation` creates a first-class callable (a closure or arrow function) whose body is the
+ * callable `c`. The closure value flows (via ordinary data flow) to wherever it is invoked, where
+ * `lambdaCall` picks it up — so a closure stored in a variable and called later is handled generally,
+ * without enumerating higher-order built-ins (B.2).
+ */
+predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c) {
+  kind = TNoLambda() and
+  c = creation.asExpr() and
+  (creation.asExpr() instanceof Php::AnonymousFunction or creation.asExpr() instanceof Php::ArrowFunction)
+}
 
-predicate lambdaCall(DataFlowCall call, LambdaCallKind kind, Node receiver) { none() }
+/**
+ * Holds if `call` invokes a value through `receiver`: a dynamic call `$cb(...)` where the callee is an
+ * expression (a variable/field holding a closure), not a static function name. The engine connects a
+ * closure that flows to `receiver` with this call, mapping arguments to the closure's parameters and its
+ * return to the call result.
+ */
+predicate lambdaCall(DataFlowCall call, LambdaCallKind kind, Node receiver) {
+  kind = TNoLambda() and
+  exists(FunctionCall fc |
+    fc = call.getCall() and
+    fc.isDynamic() and
+    receiver.asExpr() = fc.(Php::FunctionCallExpression).getFunction()
+  )
+}
 
 predicate additionalLambdaFlowStep(Node nodeFrom, Node nodeTo, boolean preservesValue) { none() }
 

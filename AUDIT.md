@@ -352,12 +352,25 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 ## Phase B — Moteur dataflow complet (retire les patches par-pattern)
 - `B.1` ☐ `PostUpdateNode`/`getPreUpdateNode` généraux (receveurs + `&`-args, méthodes incluses) →
   retirer les taint-steps setter/by-ref/parse_str par-pattern.
-- `B.2` ☐ `lambdaCreation`/`lambdaCall` (closures, `__invoke`, first-class callables) → retirer la liste
-  HO hardcodée.
+- `B.2` ◐ `lambdaCreation`/`lambdaCall` **implémentés** (closures + arrow-fns stockés en variable et
+  appelés via `$cb(...)`) → flux lambda général par le moteur, plus de FN sur les callbacks stockés. Test
+  `LambdaCall`. Reste : string-callables (`$cb='foo'`) + `call_user_func`/`array_map` avec callable variable
+  (encore via le step HO inline) → à généraliser, puis retirer la liste HO hardcodée.
 - `B.3` ☐ Named-args mappés named→positional dans la couche arg (tous types d'appel, dataflow+taint).
-- `B.4` ☐ `viableCallable` : fallback gated sur « callee typé trouvé », pas sur « type existe ».
-- `B.5` ☐ `SanitizerGuard` : câbler guard→barrier (BooleanCompletion du CFG A) **ou** retirer proprement.
+- `B.4` ☑ `viableCallable` : fallback gated sur « callee typé trouvé » (`not exists(getTypedCallee())`),
+  pas sur « type existe ». Test `DispatchFallback` (receveur typé sans méthode → fallback par nom). 
+- `B.5` ☑ `SanitizerGuard` : `GuardBarrier extends Sanitizer` — `if (guard($x)) {…$x…}` barre la lecture
+  gardée ; noms de guards en DATA (`isSanitizerGuardFunction`), structure générale ; guard inconnu → chemin
+  montré (recall-first). `ctype_*`/`is_numeric` retirés des value-sanitizers (renvoient un bool). Test
+  `GuardBarrier`. v1 = branche `then` d'un `if` ; dominance (early-return/else/`&&`) = raffinement futur.
 - `B.6` ☐ Content par `(classe, champ)` quand type inféré ; `$GLOBALS`/`=&` cross-file en jump-steps.
+
+**Bugs moteur trouvés & corrigés hors-audit initial** (via questions utilisateur sur la reachability) :
+- `fix(cfg)` ☑ **Ordre d'évaluation des assignations** : le LHS était écrit AVANT le RHS (ordre position
+  source) → `$a = f($a)` (réassignation self) perdait le taint (faux cycle SSA). `AssignmentTree` ordonne
+  RHS→LHS. Test `TransformChain` (pipeline de transforms + réassignations). **FN majeur en code réel.**
+- Récursivité **vérifiée** : chaîne interprocédurale 6-hops + dispatch méthode + return + imbrication, tout
+  traversé (moteur `shared/dataflow`, pas de limite de profondeur). Test `DeepChain`.
 
 ## Phase C — Migration DATA (le « pas de cas-par-cas », gros bloc)
 - `C.1` ☐ `ext/php-builtins.model.yml` : migrer sources/sinks/sanitizers/steps de `FlowSources.qll` &
