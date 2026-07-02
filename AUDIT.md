@@ -309,13 +309,23 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   init→cond→body→update→cond (φ à la condition, condition du `for` ajoutée aux `BooleanCompletion`) ;
   `foreach` = collection→header(binding)→body→header (φ au binding). Discriminant testé = taint
   **loop-carried** (use-before-assign dans le corps, FN sur CFG linéarisé). Tests `ForLoopTaint`/`ForeachTaint`.
-- `A.4` ☐ `switch` / `match` — arêtes de cas, isolation, pas de fall-through match. Tests FP inter-case.
-- `A.5` ☐ Court-circuit `&& || ??` — arêtes booléennes.
+- `A.5` ☐ **Court-circuit `&& || ??`** (indépendant, propre) — arêtes booléennes : `&&` faux court-circuite,
+  `||` vrai court-circuite, `??` non-null court-circuite. Le taint via les opérandes est déjà couvert
+  (`structuralPropagator` sur `BinaryExpression`) ; l'intérêt CFG est surtout d'habiliter `SanitizerGuard`
+  (B.5) et d'éviter d'évaluer la RHS. **Recommandé AVANT A.4** (pas d'entrelacement).
+- `A.4` ☐ **`switch` / `match`** — ⚠️ **entrelacé avec A.6** : sans modéliser `break`, le fall-through de
+  `switch` relie tous les cases (fuite inter-case) — l'isolation de case n'a de sens qu'avec la complétion
+  `break`. `match` (expression, sans fall-through) est plus simple et peut se faire seul. → faire `match`
+  d'abord, puis **`switch` + `break` ensemble** (A.4∧A.6). Tests : FP inter-case (switch), arme exclusive (match).
 - `A.6` ☐ Complétions anormales `break`/`continue`/`return`/`throw`→`catch`, `try/catch/finally` ;
   produire réellement `ReturnCompletion` (code mort actuel). Tests : catch-param taint (FN), code-mort (FP).
-- `A.7` ☐ **Retirer le hack uncertain-writes** (`SsaImpl.qll:155-177`) : tous writes `certain=true`,
-  supprimer `inConditionalBranch`. **Gated sur A.3–A.6.** Test rouge du FP intra-branche (P0 doit l'avoir
-  ajouté). Re-valider toute la suite.
+  **`break`/`continue` à co-livrer avec `switch` et à re-vérifier sur les boucles A.3 (sortie/continuation).**
+- `A.7` ☐ **Retirer le hack uncertain-writes** (`SsaImpl.qll:155-177`) : `isPartialUpdate` reste uncertain
+  (A.1), mais retirer `inConditionalBranch` (tous les autres writes `certain=true`). **Gated sur A.4–A.6**
+  (déjà OK pour if/while/do/for/foreach). Test rouge du FP intra-branche (`$y=t;$y="safe";sink($y)` — cf.
+  §3 BLOQUANT). Re-valider toute la suite.
+
+> **État Phase A (checkpoint)** : A.1 ☑ A.2 ☑ A.3 ☑ ; reste A.5 (propre, next), A.4+A.6 (entrelacés), A.7 (final).
 
 ## Phase B — Moteur dataflow complet (retire les patches par-pattern)
 - `B.1` ☐ `PostUpdateNode`/`getPreUpdateNode` généraux (receveurs + `&`-args, méthodes incluses) →
