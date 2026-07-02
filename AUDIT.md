@@ -317,54 +317,35 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   `MatchBlock` exclu de `StructuralTree` pour ne pas linéariser les bras) + **taint-step** retour de bras →
   résultat (le vrai FN : le résultat ne portait aucun taint). Test `MatchTaint` (retours teintés flaggés,
   subject teinté seul = safe).
-- `A.4b`+`A.6` ☐ **`switch` + `break`/`continue`/`return`/`throw`/`try-catch`** — bloc « complétions
-  anormales », nécessite une **infrastructure** (notes d'implémentation ci-dessous, tout vérifié).
+- `A.6`+`A.4b` ☑ **Complétions anormales + `switch` + `try/catch`** — infrastructure complète :
+  - **Types** : `Break`/`Continue`/`Return`/`RaiseCompletion` (classe `AbnormalCompletion`, non-normales)
+    → successor-types partagés `Break`/`Continue`/`Return`/`ExceptionSuccessor`. Producteurs :
+    `AbnormalProducerTree` (break/continue/return/throw évaluent leur opérande puis complètent anormalement,
+    **pas de fall-through**).
+  - **Propagation** : `IfElseTree`/`MatchTree` (et `TernaryTree`/`TryTree`) `propagatesAbnormal` leurs corps ;
+    les boucles/switch **attrapent** break/continue et **ré-émettent** return/raise (`loopReEmit`, override `last`).
+  - **Boucles** : break→sortie, continue→tête (for : →update ; do : →condition).
+  - **`switch`** (`SwitchTree`) : subject→bras non-det, **fall-through** sur complétion normale,
+    **`break`→sortie = seule isolation** (fixe le FP inter-case). `continue` ré-émis vers la boucle.
+  - **`try/catch/finally`** (`TryTree`) : body→catch sur `throw`, `finally` toujours. Fixe le FN
+    `throw new E($taint)` → `$e->getMessage()`.
+  - **Tests batteries** : `LoopBreakContinue` (break/continue loop-carried), `SwitchTaint` (fall-through=BUG,
+    isolation break=safe, après-switch=BUG), `TryCatchTaint` (reflection getMessage, finally), `CfgAbnormal`
+    (no-fall-through structurel), `CfgCoverage` (**tous les constructs, 0 angle mort — lock de régression**).
+  - **Limite v1 documentée** : seul un `throw` explicite atteint le catch ; « tout appel peut throw » différé
+    (FN annoté dans `TryCatchTaint::through`).
+- `A.4c` ☑ **Ternaire `c ? a : b` / elvis `c ?: b`** — `TernaryTree` (BooleanCompletion sur la condition,
+  comme `IfElseTree`). Exclu de `ExprTree`. Taint-step des branches déjà présent.
+- `CfgConsistency` durci : exclut le **code mort** prouvable (statements après un producteur anormal) —
+  sinon `return`/`break` bien modélisés le faisaient sur-signaler.
 
-  **Infra à ajouter (module `Completion` de `ControlFlowGraphImpl.qll`)** :
-  1. `newtype TCompletion` : ajouter `TBreakCompletion()`, `TContinueCompletion()`, `TThrowCompletion()`
-     (garder `TReturnCompletion` déjà présent mais **jamais produit** — le câbler).
-  2. Classes `BreakCompletion`/`ContinueCompletion`/`ThrowCompletion` — **PAS** `NormalCompletion`
-     (donc anormales → propagées par `last(...)` via `propagatesAbnormal` tant que non attrapées).
-  3. `getAMatchingSuccessorType()` : la lib partagée expose déjà `BreakSuccessor`/`ContinueSuccessor`
-     (`shared/controlflow/…/SuccessorType.qll:72-73`) + `AbruptSuccessor` pour return/throw. (Bonus :
-     `NullnessSuccessor` existe → pourrait remplacer la branche non-déterministe de `??` en A.5.)
-  4. `completionIsValidFor(c, e)` : Break valide pour `Php::BreakStatement`, Continue pour
-     `Php::ContinueStatement`, Return pour `Php::ReturnStatement`, Throw pour `Php::ThrowExpression`.
+- `A.7` ☐ **Retirer le hack uncertain-writes** (`SsaImpl.qll` `variableWrite`) : `isPartialUpdate` reste
+  uncertain (A.1), retirer `inConditionalBranch` (autres writes `certain=true`). **Débloqué** : TOUS les
+  constructs branchent (if/while/do/for/foreach/switch/match/ternaire/court-circuit). Test rouge du FP
+  intra-branche (`$y=$_GET['x']; $y="safe"; sink($y)` ne doit PAS être flaggé). Re-valider toute la suite.
 
-  **Statements producteurs** (nouveaux trees) : `BreakStatement`/`ContinueStatement`/`ReturnStatement`/
-  `ThrowExpression` = trees qui `last(this, BreakCompletion/…)`. (Aujourd'hui ils sont linéarisés.)
-
-  **Propagation** : `StandardTree.propagatesAbnormal(child)=child=getChildNode(_)` → `StructuralTree`
-  (blocs) et `IfTree` propagent déjà. ⚠️ **`IfElseTree` et les 5 loop-trees + `MatchTree` ont
-  `propagatesAbnormal{none()}`** → les faire propager les complétions anormales de leurs corps (sinon un
-  `break`/`return` dans un `if/else` ou une boucle ne remonte pas). Modèle : `propagatesAbnormal(child){
-  child = <body/branches> }`.
-
-  **Consommation** :
-  - **Boucles** (while/do/for/foreach) : `last(body, pred, BreakCompletion)` → `succ = this` (sortie) ;
-    `last(body, pred, ContinueCompletion)` → back-edge (tête/update). Retirer ces complétions de la
-    propagation (les boucles les attrapent).
-  - **`switch`** (`SwitchTree`, à écrire) : structure = `getBody()` (SwitchBlock, **à exclure de
-    StructuralTree**) → `getChild(i)` = `CaseStatement`/`DefaultStatement` (accès `getValue()` / `getChild(i)`
-    corps). Modèle sound : subject → first(chaque case body) [non-det, any match] ; case body i → case body
-    i+1 [**fall-through** si complétion normale] ; `last(caseBody, BreakCompletion)` → `succ = this` (sortie,
-    **isolation**) ; dernier case normal → sortie. `continue` dans switch : propager à la boucle englobante.
-  - **`return`/`throw`** : `ReturnCompletion`/`ThrowCompletion` propagées jusqu'au scope (callable) → sortie ;
-    `throw` → `catch` de `try/catch/finally` (nouveau `TryTree` : body → catch sur Throw, finally toujours).
-
-  **Tests** : `SwitchTaint` (case avec `break` = isolé/safe ; fall-through sans break = BUG inter-case),
-  `LoopBreakContinue` (code après `break` = mort ; `continue` saute la fin du corps), `TryCatchTaint`
-  (`throw new E($taint)` → `$e->getMessage()` dans catch = BUG), `ReturnCompletion` (code après `return` = mort).
-
-- `A.7` ☐ **Retirer le hack uncertain-writes** (`SsaImpl.qll:155-177`) : `isPartialUpdate` reste uncertain
-  (A.1), mais retirer `inConditionalBranch` (tous les autres writes `certain=true`). **Gated sur A.4b/A.6**
-  (déjà OK pour if/while/do/for/foreach/match). Test rouge du FP intra-branche (`$y=t;$y="safe";sink($y)` —
-  cf. §3 BLOQUANT). Re-valider toute la suite.
-
-> **État Phase A (checkpoint 2)** : A.1 ☑ A.2 ☑ A.3 ☑ A.5 ☑ A.4a ☑ (match). Reste **A.4b/A.6** (switch +
-> complétions anormales — infra ci-dessus, tout scoped/vérifié) puis **A.7** (retrait du hack, gated).
-> Suite verte à 51/51. Boucles/court-circuit/match branchent ; `CfgConsistency` ne signale plus que
-> `switch`/`ternaire` (attendu, non encore branchés).
+> **État Phase A** : A.1–A.6 ☑ (tout le contrôle de flux branche, complétions anormales incluses).
+> Reste **A.7** (retrait du hack, maintenant débloqué). `CfgConsistency`/`CfgCoverage` : 0 angle mort.
 
 ## Phase B — Moteur dataflow complet (retire les patches par-pattern)
 - `B.1` ☐ `PostUpdateNode`/`getPreUpdateNode` généraux (receveurs + `&`-args, méthodes incluses) →

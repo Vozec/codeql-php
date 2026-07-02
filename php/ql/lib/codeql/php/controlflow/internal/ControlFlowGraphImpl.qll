@@ -23,7 +23,10 @@ module Completion {
   private newtype TCompletion =
     TSimpleCompletion() or
     TBooleanCompletion(boolean b) { b in [false, true] } or
-    TReturnCompletion()
+    TReturnCompletion() or
+    TBreakCompletion() or
+    TContinueCompletion() or
+    TRaiseCompletion()
 
   abstract class Completion extends TCompletion {
     abstract string toString();
@@ -76,6 +79,9 @@ module Completion {
       // The left operand of a short-circuit `&&`/`||` (and their low-precedence `and`/`or` forms)
       // completes true/false, routing to the right operand (evaluated) or the result (short-circuit).
       exists(Php::BinaryExpression b | b.getOperator() = ["&&", "||", "and", "or"] and e = b.getLeft())
+      or
+      // The condition of a ternary `c ? a : b` (or elvis `c ?: b`) routes to the chosen branch.
+      e = any(Php::ConditionalExpression ce).getCondition()
     }
 
     override BooleanSuccessor getAMatchingSuccessorType() { result.getValue() = value }
@@ -83,10 +89,44 @@ module Completion {
     final boolean getValue() { result = value }
   }
 
-  class ReturnCompletion extends Completion, TReturnCompletion {
+  /**
+   * An abnormal completion that transfers control out of the normal sequential flow: `return`,
+   * `break`, `continue`, or `throw`. Being non-normal, it is propagated upwards by `last(...)` through
+   * every enclosing tree whose `propagatesAbnormal` holds, until a construct consumes it (a loop/switch
+   * for break/continue, a `try`/callable scope for raise/return).
+   */
+  abstract class AbnormalCompletion extends Completion { }
+
+  class ReturnCompletion extends AbnormalCompletion, TReturnCompletion {
     override string toString() { result = "ReturnCompletion" }
 
+    override predicate isValidForSpecific(AstNode e) { e instanceof Php::ReturnStatement }
+
     override ReturnSuccessor getAMatchingSuccessorType() { any() }
+  }
+
+  class BreakCompletion extends AbnormalCompletion, TBreakCompletion {
+    override string toString() { result = "BreakCompletion" }
+
+    override predicate isValidForSpecific(AstNode e) { e instanceof Php::BreakStatement }
+
+    override BreakSuccessor getAMatchingSuccessorType() { any() }
+  }
+
+  class ContinueCompletion extends AbnormalCompletion, TContinueCompletion {
+    override string toString() { result = "ContinueCompletion" }
+
+    override predicate isValidForSpecific(AstNode e) { e instanceof Php::ContinueStatement }
+
+    override ContinueSuccessor getAMatchingSuccessorType() { any() }
+  }
+
+  class RaiseCompletion extends AbnormalCompletion, TRaiseCompletion {
+    override string toString() { result = "RaiseCompletion" }
+
+    override predicate isValidForSpecific(AstNode e) { e instanceof Php::ThrowExpression }
+
+    override ExceptionSuccessor getAMatchingSuccessorType() { any() }
   }
 }
 
@@ -248,6 +288,13 @@ private class StructuralTree extends StandardPreOrderTree instanceof Php::AstNod
     // The `match` block is not a CFG node: `MatchTree` routes the subject directly to the arms, so the
     // block must not also linearise them here.
     not this instanceof Php::MatchBlock and
+    // Abnormal-completion producers and the constructs that consume them get dedicated trees.
+    not this instanceof Php::BreakStatement and
+    not this instanceof Php::ContinueStatement and
+    not this instanceof Php::ReturnStatement and
+    not this instanceof Php::SwitchStatement and
+    not this instanceof Php::SwitchBlock and
+    not this instanceof Php::TryStatement and
     not isCallable(this) and
     not isTypeDeclaration(this)
   }
@@ -306,7 +353,11 @@ private class IfTree extends StandardPreOrderTree instanceof Php::IfStatement {
 private class IfElseTree extends PostOrderTree instanceof Php::IfStatement {
   IfElseTree() { ifHasElse(this) }
 
-  final override predicate propagatesAbnormal(AstNode child) { none() }
+  // Abnormal completions (break/continue/return/throw) from either branch propagate to the enclosing
+  // loop/switch/try/callable; only NORMAL branch completions rejoin at the `if` node.
+  final override predicate propagatesAbnormal(AstNode child) {
+    child = ifThenBodyOf(this) or child = ifElseClauseOf(this)
+  }
 
   final override predicate first(AstNode f) { first(ifConditionOf(this), f) }
 
@@ -324,10 +375,19 @@ private class IfElseTree extends PostOrderTree instanceof Php::IfStatement {
 }
 
 /**
+ * Holds if a `return`/`throw` occurs at `last` within a loop `body`: such an abnormal completion is
+ * NOT consumed by the loop (only `break`/`continue` are), so the loop re-emits it as its own last,
+ * letting it propagate out to an enclosing `try` or the callable scope.
+ */
+private predicate loopReEmit(AstNode body, AstNode last, Completion c) {
+  last(body, last, c) and (c instanceof ReturnCompletion or c instanceof RaiseCompletion)
+}
+
+/**
  * A `while` loop as a real branch with a back-edge: `first` is the condition; condition-true enters
  * the body, the body loops back to the condition (back-edge ⇒ a φ at the loop header, which
  * `definitionReachingValue` lets taint cross), and condition-false exits at the `while` node.
- * `break`/`continue` are (conservatively) left to normal sequencing for now.
+ * `break` in the body exits the loop; `continue` re-checks the condition; `return`/`throw` propagate out.
  */
 private class WhileTree extends PostOrderTree instanceof Php::WhileStatement {
   final override predicate propagatesAbnormal(AstNode child) { none() }
@@ -336,21 +396,26 @@ private class WhileTree extends PostOrderTree instanceof Php::WhileStatement {
     first(this.(Php::WhileStatement).getCondition(), f)
   }
 
+  final override predicate last(AstNode last, Completion c) {
+    super.last(last, c) or loopReEmit(this.(Php::WhileStatement).getBody(), last, c)
+  }
+
   final override predicate succ(AstNode pred, AstNode succ, Completion c) {
-    // condition true -> body
-    last(this.(Php::WhileStatement).getCondition(), pred, c) and
-    c.(BooleanCompletion).getValue() = true and
-    first(this.(Php::WhileStatement).getBody(), succ)
-    or
-    // body -> condition (back-edge)
-    last(this.(Php::WhileStatement).getBody(), pred, c) and
-    first(this.(Php::WhileStatement).getCondition(), succ) and
-    c instanceof NormalCompletion
-    or
-    // condition false -> exit
-    last(this.(Php::WhileStatement).getCondition(), pred, c) and
-    c.(BooleanCompletion).getValue() = false and
-    succ = this
+    exists(Php::WhileStatement s | s = this |
+      // condition true -> body
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = true and first(s.getBody(), succ)
+      or
+      // body ends normally, or with `continue` -> condition (back-edge / re-check)
+      last(s.getBody(), pred, c) and
+      (c instanceof NormalCompletion or c instanceof ContinueCompletion) and
+      first(s.getCondition(), succ)
+      or
+      // body `break` -> exit
+      last(s.getBody(), pred, c) and c instanceof BreakCompletion and succ = this
+      or
+      // condition false -> exit
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = false and succ = this
+    )
   }
 }
 
@@ -363,21 +428,26 @@ private class DoTree extends PostOrderTree instanceof Php::DoStatement {
 
   final override predicate first(AstNode f) { first(this.(Php::DoStatement).getBody(), f) }
 
+  final override predicate last(AstNode last, Completion c) {
+    super.last(last, c) or loopReEmit(this.(Php::DoStatement).getBody(), last, c)
+  }
+
   final override predicate succ(AstNode pred, AstNode succ, Completion c) {
-    // body -> condition
-    last(this.(Php::DoStatement).getBody(), pred, c) and
-    first(this.(Php::DoStatement).getCondition(), succ) and
-    c instanceof NormalCompletion
-    or
-    // condition true -> body (back-edge)
-    last(this.(Php::DoStatement).getCondition(), pred, c) and
-    c.(BooleanCompletion).getValue() = true and
-    first(this.(Php::DoStatement).getBody(), succ)
-    or
-    // condition false -> exit
-    last(this.(Php::DoStatement).getCondition(), pred, c) and
-    c.(BooleanCompletion).getValue() = false and
-    succ = this
+    exists(Php::DoStatement s | s = this |
+      // body ends normally, or with `continue` -> condition
+      last(s.getBody(), pred, c) and
+      (c instanceof NormalCompletion or c instanceof ContinueCompletion) and
+      first(s.getCondition(), succ)
+      or
+      // body `break` -> exit
+      last(s.getBody(), pred, c) and c instanceof BreakCompletion and succ = this
+      or
+      // condition true -> body (back-edge)
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = true and first(s.getBody(), succ)
+      or
+      // condition false -> exit
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = false and succ = this
+    )
   }
 }
 
@@ -408,6 +478,10 @@ private class ForTree extends PostOrderTree instanceof Php::ForStatement {
     )
   }
 
+  final override predicate last(AstNode last, Completion c) {
+    super.last(last, c) or loopReEmit(this.(Php::ForStatement).getBody(_), last, c)
+  }
+
   final override predicate succ(AstNode pred, AstNode succ, Completion c) {
     exists(Php::ForStatement s | s = this |
       // init -> loop head (condition, or body if there is no condition)
@@ -424,7 +498,7 @@ private class ForTree extends PostOrderTree instanceof Php::ForStatement {
         last(s.getBody(i), pred, c) and c instanceof NormalCompletion and first(s.getBody(i + 1), succ)
       )
       or
-      // last body statement -> update (or straight back to the head if there is no update)
+      // last body statement (normal) -> update (or head if no update)
       exists(int i |
         last(s.getBody(i), pred, c) and not exists(s.getBody(i + 1)) and c instanceof NormalCompletion
       |
@@ -432,6 +506,14 @@ private class ForTree extends PostOrderTree instanceof Php::ForStatement {
         or
         not exists(s.getUpdate()) and forToHead(s, succ)
       )
+      or
+      // body `continue` -> update (or head if no update)
+      last(s.getBody(_), pred, c) and
+      c instanceof ContinueCompletion and
+      (first(s.getUpdate(), succ) or not exists(s.getUpdate()) and forToHead(s, succ))
+      or
+      // body `break` -> exit
+      last(s.getBody(_), pred, c) and c instanceof BreakCompletion and succ = this
       or
       // update -> condition (the back-edge; or body head if there is no condition)
       last(s.getUpdate(), pred, c) and c instanceof NormalCompletion and forToHead(s, succ)
@@ -456,6 +538,10 @@ private class ForeachTree extends PostOrderTree instanceof Php::ForeachStatement
 
   final override predicate first(AstNode f) { first(this.(Php::ForeachStatement).getChild(0), f) }
 
+  final override predicate last(AstNode last, Completion c) {
+    super.last(last, c) or loopReEmit(this.(Php::ForeachStatement).getBody(), last, c)
+  }
+
   final override predicate succ(AstNode pred, AstNode succ, Completion c) {
     exists(Php::ForeachStatement s | s = this |
       // collection -> header (bind first element)
@@ -464,13 +550,105 @@ private class ForeachTree extends PostOrderTree instanceof Php::ForeachStatement
       // header (element bound) -> body
       last(foreachBinding(s), pred, c) and c instanceof NormalCompletion and first(s.getBody(), succ)
       or
-      // body -> header (back-edge: bind the next element)
-      last(s.getBody(), pred, c) and c instanceof NormalCompletion and first(foreachBinding(s), succ)
+      // body ends normally or with `continue` -> header (back-edge: bind the next element)
+      last(s.getBody(), pred, c) and
+      (c instanceof NormalCompletion or c instanceof ContinueCompletion) and
+      first(foreachBinding(s), succ)
+      or
+      // body `break` -> exit
+      last(s.getBody(), pred, c) and c instanceof BreakCompletion and succ = this
       or
       // exit: no more elements (from the header) or an empty collection (from the collection)
       (last(foreachBinding(s), pred, c) or last(s.getChild(0), pred, c)) and
       c instanceof NormalCompletion and
       succ = this
+    )
+  }
+}
+
+/** Gets the `i`th case/default arm of a `switch`, in source order. */
+private AstNode switchCase(Php::SwitchStatement s, int i) { result = s.getBody().getChild(i) }
+
+/**
+ * A `switch ($subject) { case v: … case w: … default: … }`. The subject is evaluated, then routed to
+ * any arm (non-deterministic — no per-case value splitting). Arms FALL THROUGH to the next arm on a
+ * normal completion; a `break` in an arm exits the switch (this is the ONLY way to isolate arms, exactly
+ * as in PHP). `continue`/`return`/`throw` are re-emitted so they reach the enclosing loop / callable.
+ */
+private class SwitchTree extends PostOrderTree instanceof Php::SwitchStatement {
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::SwitchStatement).getCondition(), f) }
+
+  final override predicate last(AstNode last, Completion c) {
+    super.last(last, c)
+    or
+    // everything abnormal EXCEPT `break` (which the switch consumes) propagates out.
+    last(switchCase(this, _), last, c) and
+    (c instanceof ContinueCompletion or c instanceof ReturnCompletion or c instanceof RaiseCompletion)
+  }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::SwitchStatement s | s = this |
+      // subject -> any arm
+      last(s.getCondition(), pred, c) and c instanceof NormalCompletion and first(switchCase(s, _), succ)
+      or
+      // arm i falls through to arm i+1 on a normal completion
+      exists(int i |
+        last(switchCase(s, i), pred, c) and c instanceof NormalCompletion and first(switchCase(s, i + 1), succ)
+      )
+      or
+      // last arm falls out of the switch
+      exists(int i |
+        last(switchCase(s, i), pred, c) and c instanceof NormalCompletion and not exists(switchCase(s, i + 1))
+      ) and
+      succ = this
+      or
+      // `break` in any arm exits the switch (arm isolation)
+      last(switchCase(s, _), pred, c) and c instanceof BreakCompletion and succ = this
+    )
+  }
+}
+
+/** Gets a `catch` clause of a `try`. */
+private Php::CatchClause tryCatch(Php::TryStatement t) { result = t.getChild(_) }
+
+/** Gets the `finally` clause of a `try`, if any. */
+private Php::FinallyClause tryFinally(Php::TryStatement t) { result = t.getChild(_) }
+
+/** The point a `try`/`catch` body flows to after completing normally: the `finally`, else the try node. */
+private predicate tryToFinallyOrExit(Php::TryStatement t, AstNode succ) {
+  first(tryFinally(t).getBody(), succ)
+  or
+  not exists(tryFinally(t)) and succ = t
+}
+
+/**
+ * A `try { … } catch (E $e) { … } finally { … }`. The try body runs; on a `throw` it routes to a catch
+ * clause (any — no exception-type matching in v1, a sound over-approximation), which binds `$e` and runs
+ * its body; normal completion of the try or a catch flows through `finally` (if present) to the exit.
+ * `return`/uncaught `throw`/`break`/`continue` from the try or catch bodies propagate out.
+ */
+private class TryTree extends PostOrderTree instanceof Php::TryStatement {
+  final override predicate propagatesAbnormal(AstNode child) {
+    child = this.(Php::TryStatement).getBody() or child = tryCatch(this).getBody()
+  }
+
+  final override predicate first(AstNode f) { first(this.(Php::TryStatement).getBody(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::TryStatement t | t = this |
+      // try body throws -> a catch clause (any)
+      last(t.getBody(), pred, c) and c instanceof RaiseCompletion and first(tryCatch(t), succ)
+      or
+      // try body completes normally -> finally / exit
+      last(t.getBody(), pred, c) and c instanceof NormalCompletion and tryToFinallyOrExit(t, succ)
+      or
+      // a catch clause completes normally -> finally / exit
+      last(tryCatch(t), pred, c) and c instanceof NormalCompletion and tryToFinallyOrExit(t, succ)
+      or
+      // finally completes -> exit
+      last(tryFinally(t).getBody(), pred, c) and c instanceof NormalCompletion and succ = this
     )
   }
 }
@@ -552,7 +730,60 @@ private class NullCoalesceTree extends PostOrderTree instanceof Php::BinaryExpre
  */
 private class ExprTree extends StandardPostOrderTree instanceof Php::Expression {
   ExprTree() {
-    not isCallable(this) and not isShortCircuit(this) and not this instanceof Php::MatchExpression
+    not isCallable(this) and
+    not isShortCircuit(this) and
+    not this instanceof Php::MatchExpression and
+    not this instanceof Php::ThrowExpression and
+    not this instanceof Php::ConditionalExpression
+  }
+
+  override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
+}
+
+/**
+ * A ternary `c ? a : b` (or elvis `c ?: b`): the condition routes true→`a` / false→`b`, both meeting at
+ * the conditional node (post-order root) ⇒ a real branch/join. For elvis, a true condition IS the value,
+ * so it flows straight to the result. Taint through the branches is carried by `defaultAdditionalTaintStep`.
+ */
+private class TernaryTree extends PostOrderTree instanceof Php::ConditionalExpression {
+  final override predicate propagatesAbnormal(AstNode child) {
+    child = this.(Php::ConditionalExpression).getBody() or
+    child = this.(Php::ConditionalExpression).getAlternative()
+  }
+
+  final override predicate first(AstNode f) { first(this.(Php::ConditionalExpression).getCondition(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::ConditionalExpression ce | ce = this |
+      // condition true -> `a` (or, for elvis `c ?: b`, straight to the result)
+      last(ce.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = true and
+      (first(ce.getBody(), succ) or not exists(ce.getBody()) and succ = this)
+      or
+      // condition false -> `b`
+      last(ce.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = false and
+      first(ce.getAlternative(), succ)
+      or
+      // a branch completes -> the ternary result
+      (last(ce.getBody(), pred, c) or last(ce.getAlternative(), pred, c)) and
+      c instanceof NormalCompletion and
+      succ = this
+    )
+  }
+}
+
+/**
+ * An abnormal-completion producer: `break`/`continue`/`return`/`throw`. Its operand (a break/continue
+ * level, a return value, a thrown expression — if any) is evaluated first, then the statement itself
+ * completes with the matching abnormal completion (`BreakCompletion`/…) and has NO normal successor, so
+ * it does not fall through to the next statement. The completion propagates up until a construct
+ * consumes it (`ClosingTree` in loops/switch, `TryTree`, or the callable scope for return/throw).
+ */
+private class AbnormalProducerTree extends StandardPostOrderTree instanceof AstNode {
+  AbnormalProducerTree() {
+    this instanceof Php::BreakStatement or
+    this instanceof Php::ContinueStatement or
+    this instanceof Php::ReturnStatement or
+    this instanceof Php::ThrowExpression
   }
 
   override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
@@ -566,7 +797,9 @@ private class ExprTree extends StandardPostOrderTree instanceof Php::Expression 
  * (`defaultAdditionalTaintStep`); here we only wire control flow.
  */
 private class MatchTree extends PostOrderTree instanceof Php::MatchExpression {
-  final override predicate propagatesAbnormal(AstNode child) { none() }
+  final override predicate propagatesAbnormal(AstNode child) {
+    child = this.(Php::MatchExpression).getBody().getChild(_)
+  }
 
   final override predicate first(AstNode f) { first(this.(Php::MatchExpression).getCondition(), f) }
 

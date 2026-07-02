@@ -26,11 +26,31 @@ predicate inNonRuntimePosition(AstNode n) {
   n.getParent*() instanceof Php::EnumCase
 }
 
+/** Holds if `s` is an abnormal-completion producer (`return`/`break`/`continue`/`throw`). */
+private predicate abnormalProducer(Php::AstNode s) {
+  s instanceof Php::ReturnStatement or
+  s instanceof Php::BreakStatement or
+  s instanceof Php::ContinueStatement or
+  s instanceof Php::ThrowExpression
+}
+
+/**
+ * Holds if `n` is (inside) a block statement that follows an abnormal-completion producer in the same
+ * block — i.e. provably-dead, unreachable code. Such nodes are legitimately absent from the CFG (which
+ * only includes nodes reachable from entry) and must NOT be reported as coverage blind spots.
+ */
+predicate unreachableAfterAbnormal(AstNode n) {
+  exists(Php::CompoundStatement blk, int i, int j |
+    abnormalProducer(blk.getChild(i)) and n.getParent*() = blk.getChild(j) and j > i
+  )
+}
+
 /** A node whose value is not covered by any control-flow node. */
 predicate uncoveredNode(AstNode n) {
   (n instanceof Php::Statement or n instanceof Php::Expression) and
   not exists(CfgNode c | c.getAstNode() = n) and
   not inNonRuntimePosition(n) and
+  not unreachableAfterAbnormal(n) and
   // callables are represented in their enclosing scope by a single node (they have their own scope)
   not n instanceof Php::AnonymousFunction and
   not n instanceof Php::ArrowFunction and

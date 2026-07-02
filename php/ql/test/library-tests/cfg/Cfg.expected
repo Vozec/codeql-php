@@ -12,6 +12,6 @@
 | 3 | VariableName | 3 | Name |
 | 4 | EchoStatement | 4 | Name |
 | 4 | Name | 4 | VariableName |
-| 4 | VariableName | 5 | ReturnStatement |
+| 4 | VariableName | 5 | Name |
 | 5 | Name | 5 | VariableName |
-| 5 | ReturnStatement | 5 | Name |
+| 5 | VariableName | 5 | ReturnStatement |
