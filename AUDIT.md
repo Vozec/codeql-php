@@ -373,10 +373,10 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   5. Idem pour les args par référence `&$r` : PostUpdate de l'argument ← écritures du param dans le corps.
   Puis **retirer** les steps setter/by-ref/parse_str hardcodés. Tests : mutation via setter (déjà
   `SetterMutation`), mutation par `&`-ref sur méthode, chaîne `$a->setB($t); $c=$a->getB(); sink($c)`.
-- `B.2` ◐ `lambdaCreation`/`lambdaCall` **implémentés** (closures + arrow-fns stockés en variable et
-  appelés via `$cb(...)`) → flux lambda général par le moteur, plus de FN sur les callbacks stockés. Test
-  `LambdaCall`. Reste : string-callables (`$cb='foo'`) + `call_user_func`/`array_map` avec callable variable
-  (encore via le step HO inline) → à généraliser, puis retirer la liste HO hardcodée.
+- `B.2` ◐ `lambdaCreation`/`lambdaCall` (closures + arrow-fns via `$cb(...)`, test `LambdaCall`) **+
+  string-callables** `$fn='func'; $fn(...)` (`getStringNamedCallee`, test `StringCallable`). Reste :
+  `call_user_func`/`array_map` avec callable **variable** (encore via le step HO inline) → généraliser puis
+  retirer la liste HO hardcodée.
 - `B.3` ☐ Named-args mappés named→positional dans la couche arg (tous types d'appel, dataflow+taint).
 - `B.4` ☑ `viableCallable` : fallback gated sur « callee typé trouvé » (`not exists(getTypedCallee())`),
   pas sur « type existe ». Test `DispatchFallback` (receveur typé sans méthode → fallback par nom). 
