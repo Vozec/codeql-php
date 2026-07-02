@@ -284,6 +284,16 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 > **Règle** : chaque item = *test qui échoue (rouge) → fix général → suite verte → commit*. Jamais de
 > patch cas-par-cas. Statuts : ☐ TODO · ◐ WIP · ☑ DONE.
 
+> ### Journal de progression (handoff)
+> **Fait & poussé** : P0 (P0.1–P0.5), **Phase A COMPLÈTE (A.1–A.7)** — tout le flux de contrôle branche,
+> hack retiré ; **B.2** (lambdas), **B.4** (dispatch fallback), **B.5** (barrier guards),
+> **B.6 partiel** (`$GLOBALS` cross-file) ; **fix ordre d'assignation** `$a=f($a)` (trouvé via question
+> reachability) ; **récursivité vérifiée** (`DeepChain`). Suite : **63 tests verts** (départ ~45).
+> **Prochain** : **B.1** (PostUpdateNode, notes ci-dessous) · **B.6 fin** (content par `(classe,champ)`) ·
+> **B.2 fin** (string-callables, `call_user_func`/`array_map` variable) · **B.3** (named-args méthodes).
+> Puis **Phase C** (migration MAD — le gros bloc « pas de cas-par-cas »), **D/E/F** (AST, requêtes, Bazel/CI).
+> Baseline & commandes : `DEV.md` + §7. CLI local : `.tooling/codeql/codeql` (2.25.6, git-ignoré).
+
 ## Phase 0 — Vérité de base & filet (rapide, non-risqué)  — ☑ FAIT (45/45 verts, sans warning)
 - `P0.1` ☑ DEV.md réparé (chemins réels + note CLI + commande de test) ; compteurs corrigés (tests=45)
   dans PROJECT_STATUS/README/IMPROVEMENTS ; while/do marqués faits ; piège `r&d`-quoting retiré.
@@ -351,7 +361,18 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 
 ## Phase B — Moteur dataflow complet (retire les patches par-pattern)
 - `B.1` ☐ `PostUpdateNode`/`getPreUpdateNode` généraux (receveurs + `&`-args, méthodes incluses) →
-  retirer les taint-steps setter/by-ref/parse_str par-pattern.
+  retirer les taint-steps setter/by-ref/parse_str par-pattern. **État** : le step setter par-pattern
+  (`TaintTrackingPrivate` ~347) couvre le cas courant `$o->set($x); …$o->f` (test `SetterMutation` vert) ;
+  B.1 le généralise. **Notes d'implémentation (vérifiées)** :
+  1. Nouveau variant `TNode` : `TPostUpdateNode(Cfg::CfgNode arg)` pour chaque nœud argument/receveur mutable.
+  2. `PostUpdateNode.getPreUpdateNode()` = le nœud pré-appel (l'expression argument/receveur).
+  3. **Receveur comme paramètre** : modéliser `$this` comme `ParameterPosition(-1)` et le receveur d'un
+     `MethodCall` comme `ArgumentPosition(-1)` → le moteur relie `$this` ↔ receveur.
+  4. `storeStep` : `$this->f = $arg` (dans la méthode) stocke dans le content `f` du PostUpdate de `$this` ;
+     le PostUpdate du receveur côté appelant lit ce content → mutation propagée par le moteur.
+  5. Idem pour les args par référence `&$r` : PostUpdate de l'argument ← écritures du param dans le corps.
+  Puis **retirer** les steps setter/by-ref/parse_str hardcodés. Tests : mutation via setter (déjà
+  `SetterMutation`), mutation par `&`-ref sur méthode, chaîne `$a->setB($t); $c=$a->getB(); sink($c)`.
 - `B.2` ◐ `lambdaCreation`/`lambdaCall` **implémentés** (closures + arrow-fns stockés en variable et
   appelés via `$cb(...)`) → flux lambda général par le moteur, plus de FN sur les callbacks stockés. Test
   `LambdaCall`. Reste : string-callables (`$cb='foo'`) + `call_user_func`/`array_map` avec callable variable
