@@ -82,3 +82,6 @@ node_modules/
 
 # Local CodeQL CLI (audit tooling, not part of the pack)
 /.tooling/
+
+# Built PHP extractor binary (produced by the build, not committed)
+php/tools/*/extractor

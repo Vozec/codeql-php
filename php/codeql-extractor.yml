@@ -32,6 +32,6 @@ options:
         title: Controls compression for the TRAP files written by the extractor.
         description: >
           This option is only intended for use in debugging the extractor. Accepted
-          values are 'gzip' (the default), 'brotli', and 'none'.
+          values are 'gzip' (the default), 'zstd', and 'none'.
         type: string
-        pattern: "^(none|gzip|brotli)$"
+        pattern: "^(none|gzip|zstd)$"
