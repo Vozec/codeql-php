@@ -1,0 +1,8 @@
+edges
+| test.php:5:9:5:13 | VariableName | test.php:6:8:6:12 | MemberAccessExpression | provenance |  |
+nodes
+| test.php:5:9:5:13 | VariableName | semmle.label | VariableName |
+| test.php:6:8:6:12 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+subpaths
+#select
+| test.php:6:8:6:12 | MemberAccessExpression | test.php:5:9:5:13 | VariableName | test.php:6:8:6:12 | MemberAccessExpression | This shell command depends on a $@. | test.php:5:9:5:13 | VariableName | user-provided value |

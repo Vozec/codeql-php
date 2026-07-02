@@ -1,0 +1,16 @@
+# TYPO3 Models-as-Data.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["staticmethod", "_GP", "typo3-request"]
+      - ["staticmethod", "_GET", "typo3-request"]
+      - ["staticmethod", "_POST", "typo3-request"]
+      - ["staticmethod", "getIndpEnv", "typo3-request"]
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "sql_query", -1, "SQL injection"]
+      - ["method", "exec_SELECTquery", -1, "SQL injection"]
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "quoteStr"]
+      - ["method", "fullQuoteStr"]

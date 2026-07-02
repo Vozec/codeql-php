@@ -1,0 +1,8 @@
+- description: "PHP security queries"
+- queries: .
+  from: codeql/php-queries
+- include:
+    kind:
+      - problem
+      - path-problem
+    tags contain: security

@@ -1,0 +1,12 @@
+edges
+| test.php:2:31:2:35 | VariableName | test.php:2:31:2:42 | SubscriptExpression | provenance |  |
+| test.php:3:11:3:16 | VariableName | test.php:3:11:3:24 | SubscriptExpression | provenance |  |
+nodes
+| test.php:2:31:2:35 | VariableName | semmle.label | VariableName |
+| test.php:2:31:2:42 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:3:11:3:16 | VariableName | semmle.label | VariableName |
+| test.php:3:11:3:24 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:2:31:2:42 | SubscriptExpression | test.php:2:31:2:35 | VariableName | test.php:2:31:2:42 | SubscriptExpression | This outbound request depends on a $@. | test.php:2:31:2:35 | VariableName | user-provided value |
+| test.php:3:11:3:24 | SubscriptExpression | test.php:3:11:3:16 | VariableName | test.php:3:11:3:24 | SubscriptExpression | This outbound request depends on a $@. | test.php:3:11:3:16 | VariableName | user-provided value |

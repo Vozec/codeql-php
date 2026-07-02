@@ -1,0 +1,7 @@
+| 2 | command injection | 2 |
+| 4 | command injection | 3 |
+| 6 | SQL injection | 5 |
+| 8 | reflected XSS | 7 |
+| 12 | command injection | 12 |
+| 13 | code injection | 13 |
+| 18 | SQL injection | 21 |

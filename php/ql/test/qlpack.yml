@@ -1,0 +1,7 @@
+name: codeql/php-tests
+version: 0.0.1-dev
+dependencies:
+  codeql/php-all: ${workspace}
+  codeql/php-queries: ${workspace}
+extractor: php
+tests: .

@@ -1,0 +1,12 @@
+functionCalls
+| 4 | system | 1 |
+| 5 | eval | 1 |
+methodCalls
+| 7 | greet |
+| 9 | query |
+staticCalls
+| 8 | Greeter | make |
+newExprs
+| 6 | Greeter |
+concats
+| 3 |

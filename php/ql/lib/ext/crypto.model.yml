@@ -1,0 +1,11 @@
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "openssl_encrypt", 2, "hardcoded-crypto-key"]     # passphrase (0-based)
+      - ["function", "openssl_decrypt", 2, "hardcoded-crypto-key"]
+      - ["function", "hash_hmac", 2, "hardcoded-crypto-key"]           # key
+      - ["function", "hash_pbkdf2", 1, "hardcoded-crypto-key"]         # password
+      - ["function", "crypt", 1, "hardcoded-crypto-key"]               # salt
+      - ["function", "mcrypt_encrypt", 1, "hardcoded-crypto-key"]      # key
+      - ["function", "sodium_crypto_secretbox", 2, "hardcoded-crypto-key"]  # key
+      - ["method", "encrypt", -1, "hardcoded-crypto-key"]

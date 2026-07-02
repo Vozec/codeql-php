@@ -1,0 +1,10 @@
+edges
+| test.php:4:41:4:45 | VariableName | test.php:4:41:4:50 | SubscriptExpression | provenance |  |
+| test.php:4:41:4:50 | SubscriptExpression | test.php:5:34:5:44 | MemberAccessExpression | provenance |  |
+nodes
+| test.php:4:41:4:45 | VariableName | semmle.label | VariableName |
+| test.php:4:41:4:50 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:5:34:5:44 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+subpaths
+#select
+| test.php:5:34:5:44 | MemberAccessExpression | test.php:4:41:4:45 | VariableName | test.php:5:34:5:44 | MemberAccessExpression | This shell command depends on a $@. | test.php:4:41:4:45 | VariableName | user-provided value |

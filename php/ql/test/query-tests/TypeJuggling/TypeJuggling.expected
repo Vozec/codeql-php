@@ -1,0 +1,3 @@
+| test.php:2:5:2:26 | BinaryExpression | Loose comparison ('==') of a hash/secret is subject to type juggling; use '===' or hash_equals(). |
+| test.php:3:5:3:34 | BinaryExpression | Loose comparison ('==') of a hash/secret is subject to type juggling; use '===' or hash_equals(). |
+| test.php:4:5:4:29 | BinaryExpression | Loose comparison ('!=') of a hash/secret is subject to type juggling; use '===' or hash_equals(). |

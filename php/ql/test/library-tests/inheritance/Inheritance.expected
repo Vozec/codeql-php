@@ -1,0 +1,4 @@
+| Animal |  |  | speak |
+| Dog | Animal, Pet | Loggable | __call, __construct, create, log, speak |
+| Loggable |  |  | log |
+| Pet | Animal | Loggable | __construct, create, log, speak |

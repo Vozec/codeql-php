@@ -1,0 +1,3 @@
+| 2 | SubscriptExpression | 3 | VariableName |
+| 4 | SubscriptExpression | 5 | VariableName |
+| 5 | BinaryExpression | 6 | VariableName |

@@ -1,0 +1,89 @@
+# Laravel core Models-as-Data.
+#
+# Lets taint flow *through* the Laravel framework without extracting `vendor/`: request helpers are
+# sources, Eloquent/DB raw APIs are sinks, Str/Arr/Collection helpers propagate taint, and the
+# validation/escaping helpers are sanitizers. Add a row to extend — no QL, no engine change.
+#
+#   sourceModel    : subjectKind, name, sourceType
+#   sinkModel      : subjectKind, name, argIndex(-1=any), vulnKind
+#   stepModel      : subjectKind, name, fromArg, toArg(-1=return)
+#   sanitizerModel : subjectKind, name
+
+extensions:
+  # ---- Sources: request input --------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "request", "laravel-request"]
+      - ["function", "old", "laravel-request"]                 # form repopulation
+      - ["method", "input", "laravel-request"]
+      - ["method", "query", "laravel-request"]
+      - ["method", "post", "laravel-request"]
+      - ["method", "all", "laravel-request"]
+      - ["method", "only", "laravel-request"]
+      - ["method", "except", "laravel-request"]
+      - ["method", "json", "laravel-request"]
+      - ["method", "string", "laravel-request"]
+      - ["method", "getContent", "laravel-request"]
+      - ["method", "route", "laravel-route-parameter"]         # $request->route('id')
+      - ["staticmethod", "input", "laravel-request"]           # Request::input()
+      - ["staticmethod", "all", "laravel-request"]
+      - ["staticmethod", "get", "laravel-request"]
+
+  # ---- Sinks: Eloquent / DB raw SQL --------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["staticmethod", "raw", -1, "SQL injection"]           # DB::raw
+      - ["staticmethod", "select", -1, "SQL injection"]        # DB::select
+      - ["staticmethod", "statement", -1, "SQL injection"]     # DB::statement
+      - ["staticmethod", "unprepared", -1, "SQL injection"]    # DB::unprepared
+      - ["method", "whereRaw", -1, "SQL injection"]
+      - ["method", "orWhereRaw", -1, "SQL injection"]
+      - ["method", "havingRaw", -1, "SQL injection"]
+      - ["method", "orHavingRaw", -1, "SQL injection"]
+      - ["method", "orderByRaw", -1, "SQL injection"]
+      - ["method", "groupByRaw", -1, "SQL injection"]
+      - ["method", "selectRaw", -1, "SQL injection"]
+      - ["method", "fromRaw", -1, "SQL injection"]
+      - ["method", "whereRaw", -1, "SQL injection"]
+      # redirects (open redirect)
+      - ["function", "redirect", 0, "open redirect"]
+      - ["method", "away", 0, "open redirect"]
+      - ["method", "to", 0, "open redirect"]
+
+  # ---- Steps: helpers that carry taint arg -> return ---------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      # global helpers
+      - ["function", "collect", 0, -1]
+      - ["function", "str", 0, -1]
+      - ["function", "data_get", 0, -1]
+      - ["function", "value", 0, -1]
+      # Str::  (fluent string helpers)
+      - ["staticmethod", "of", 0, -1]
+      - ["staticmethod", "lower", 0, -1]
+      - ["staticmethod", "upper", 0, -1]
+      - ["staticmethod", "title", 0, -1]
+      - ["staticmethod", "replace", -1, -1]
+      - ["staticmethod", "finish", 0, -1]
+      - ["staticmethod", "start", 0, -1]
+      - ["staticmethod", "after", 0, -1]
+      - ["staticmethod", "before", 0, -1]
+      # Arr::
+      - ["staticmethod", "get", 0, -1]
+      - ["staticmethod", "first", 0, -1]
+      - ["staticmethod", "pluck", 0, -1]
+      # Collection / Eloquent fluent (instance)
+      - ["method", "toArray", -1, -1]
+      - ["method", "first", -1, -1]
+      - ["method", "map", -1, -1]
+      - ["method", "filter", -1, -1]
+      - ["method", "pluck", -1, -1]
+      - ["method", "value", -1, -1]
+      - ["method", "implode", -1, -1]
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "e"]                                      # Blade escape
+      - ["method", "validate"]                                # $request->validate()
+      - ["staticmethod", "slug"]                             # Str::slug

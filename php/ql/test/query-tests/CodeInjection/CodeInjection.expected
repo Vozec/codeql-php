@@ -1,0 +1,16 @@
+edges
+| test.php:2:6:2:10 | VariableName | test.php:2:6:2:18 | SubscriptExpression | provenance |  |
+| test.php:3:7:3:12 | VariableName | test.php:3:20:3:22 | VariableName | provenance |  |
+| test.php:4:8:4:16 | VariableName | test.php:4:8:4:21 | SubscriptExpression | provenance |  |
+nodes
+| test.php:2:6:2:10 | VariableName | semmle.label | VariableName |
+| test.php:2:6:2:18 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:3:7:3:12 | VariableName | semmle.label | VariableName |
+| test.php:3:20:3:22 | VariableName | semmle.label | VariableName |
+| test.php:4:8:4:16 | VariableName | semmle.label | VariableName |
+| test.php:4:8:4:21 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:2:6:2:18 | SubscriptExpression | test.php:2:6:2:10 | VariableName | test.php:2:6:2:18 | SubscriptExpression | This code evaluation depends on a $@. | test.php:2:6:2:10 | VariableName | user-provided value |
+| test.php:3:20:3:22 | VariableName | test.php:3:7:3:12 | VariableName | test.php:3:20:3:22 | VariableName | This code evaluation depends on a $@. | test.php:3:7:3:12 | VariableName | user-provided value |
+| test.php:4:8:4:21 | SubscriptExpression | test.php:4:8:4:16 | VariableName | test.php:4:8:4:21 | SubscriptExpression | This code evaluation depends on a $@. | test.php:4:8:4:16 | VariableName | user-provided value |

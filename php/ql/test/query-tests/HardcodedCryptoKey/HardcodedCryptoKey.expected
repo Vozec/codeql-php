@@ -1,0 +1,10 @@
+edges
+| test.php:2:8:2:29 | EncapsedString | test.php:3:39:3:42 | VariableName | provenance |  |
+nodes
+| test.php:2:8:2:29 | EncapsedString | semmle.label | EncapsedString |
+| test.php:3:39:3:42 | VariableName | semmle.label | VariableName |
+| test.php:4:27:4:38 | EncapsedString | semmle.label | EncapsedString |
+subpaths
+#select
+| test.php:3:39:3:42 | VariableName | test.php:2:8:2:29 | EncapsedString | test.php:3:39:3:42 | VariableName | This crypto key is a $@. | test.php:2:8:2:29 | EncapsedString | hard-coded constant |
+| test.php:4:27:4:38 | EncapsedString | test.php:4:27:4:38 | EncapsedString | test.php:4:27:4:38 | EncapsedString | This crypto key is a $@. | test.php:4:27:4:38 | EncapsedString | hard-coded constant |

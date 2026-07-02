@@ -1,0 +1,12 @@
+edges
+| test.php:2:13:2:20 | VariableName | test.php:2:13:2:28 | SubscriptExpression | provenance |  |
+| test.php:3:13:3:17 | VariableName | test.php:3:13:3:22 | SubscriptExpression | provenance |  |
+nodes
+| test.php:2:13:2:20 | VariableName | semmle.label | VariableName |
+| test.php:2:13:2:28 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:3:13:3:17 | VariableName | semmle.label | VariableName |
+| test.php:3:13:3:22 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:2:13:2:28 | SubscriptExpression | test.php:2:13:2:20 | VariableName | test.php:2:13:2:28 | SubscriptExpression | This deserialization call depends on a $@. | test.php:2:13:2:20 | VariableName | user-provided value |
+| test.php:3:13:3:22 | SubscriptExpression | test.php:3:13:3:17 | VariableName | test.php:3:13:3:22 | SubscriptExpression | This deserialization call depends on a $@. | test.php:3:13:3:17 | VariableName | user-provided value |

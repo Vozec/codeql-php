@@ -1,0 +1,8 @@
+edges
+| test.php:2:23:2:27 | VariableName | test.php:2:8:2:34 | BinaryExpression | provenance |  |
+nodes
+| test.php:2:8:2:34 | BinaryExpression | semmle.label | BinaryExpression |
+| test.php:2:23:2:27 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:2:8:2:34 | BinaryExpression | test.php:2:23:2:27 | VariableName | test.php:2:8:2:34 | BinaryExpression | This HTTP header depends on a $@. | test.php:2:23:2:27 | VariableName | user-provided value |

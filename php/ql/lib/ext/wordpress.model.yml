@@ -1,0 +1,36 @@
+# WordPress core Models-as-Data (security-relevant APIs).
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "wp_unslash", "wordpress-request"]
+      - ["function", "get_query_var", "wordpress-query-var"]
+      - ["function", "stripslashes_deep", "wordpress-request"]
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # $wpdb read helpers (fairly WP-specific names)
+      - ["method", "get_results", -1, "SQL injection"]
+      - ["method", "get_var", -1, "SQL injection"]
+      - ["method", "get_col", -1, "SQL injection"]
+      - ["method", "get_row", -1, "SQL injection"]
+      - ["function", "wp_redirect", 0, "open redirect"]
+      - ["function", "wp_safe_redirect", 0, "open redirect"]
+      - ["function", "wp_remote_get", 0, "server-side request forgery"]
+      - ["function", "wp_remote_post", 0, "server-side request forgery"]
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "esc_html"]
+      - ["function", "esc_attr"]
+      - ["function", "esc_url"]
+      - ["function", "esc_js"]
+      - ["function", "esc_sql"]
+      - ["function", "sanitize_text_field"]
+      - ["function", "sanitize_email"]
+      - ["function", "sanitize_key"]
+      - ["function", "sanitize_file_name"]
+      - ["function", "wp_kses"]
+      - ["function", "wp_kses_post"]
+      - ["function", "absint"]
+  # Type-scoped: `$wpdb->prepare()` sanitizes ONLY on a real wpdb (a custom ->prepare() does not).
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["wpdb", "prepare"]

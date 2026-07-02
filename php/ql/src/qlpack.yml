@@ -1,0 +1,10 @@
+name: codeql/php-queries
+version: 0.0.1-dev
+groups:
+  - php
+  - queries
+suites: codeql-suites
+defaultSuiteFile: codeql-suites/php-security.qls
+dependencies:
+  codeql/php-all: ${workspace}
+warnOnImplicitThis: true

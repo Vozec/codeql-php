@@ -1,0 +1,12 @@
+edges
+| test.php:2:6:2:10 | VariableName | test.php:3:19:3:20 | VariableName | provenance |  |
+| test.php:4:25:4:29 | VariableName | test.php:4:10:4:34 | BinaryExpression | provenance |  |
+nodes
+| test.php:2:6:2:10 | VariableName | semmle.label | VariableName |
+| test.php:3:19:3:20 | VariableName | semmle.label | VariableName |
+| test.php:4:10:4:34 | BinaryExpression | semmle.label | BinaryExpression |
+| test.php:4:25:4:29 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:3:19:3:20 | VariableName | test.php:2:6:2:10 | VariableName | test.php:3:19:3:20 | VariableName | This file path depends on a $@. | test.php:2:6:2:10 | VariableName | user-provided value |
+| test.php:4:10:4:34 | BinaryExpression | test.php:4:25:4:29 | VariableName | test.php:4:10:4:34 | BinaryExpression | This file path depends on a $@. | test.php:4:25:4:29 | VariableName | user-provided value |

@@ -1,0 +1,12 @@
+| 2 | eval-use |
+| 3 | phpinfo-use |
+| 4 | unlink-use |
+| 5 | unserialize-use |
+| 6 | exec-use |
+| 7 | assert-use-audit |
+| 8 | mcrypt-use |
+| 9 | wp-ssrf-audit |
+| 10 | wp-authorisation-checks-audit |
+| 11 | wp-csrf-audit |
+| 12 | wp-file-inclusion-audit |
+| 13 | wp-sql-injection-audit |

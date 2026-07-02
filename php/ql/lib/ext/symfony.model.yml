@@ -1,0 +1,22 @@
+# Symfony HttpFoundation + Doctrine + Twig Models-as-Data.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "getContent", "symfony-request-body"]
+      - ["method", "getQueryString", "symfony-request"]
+      - ["method", "getClientIp", "symfony-request"]
+      - ["method", "getPathInfo", "symfony-request"]
+      - ["method", "getUri", "symfony-request"]
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # Doctrine DBAL / ORM (framework-specific method names)
+      - ["method", "createQuery", -1, "SQL injection"]
+      - ["method", "createNativeQuery", -1, "SQL injection"]
+      - ["method", "executeQuery", -1, "SQL injection"]
+      - ["method", "executeStatement", -1, "SQL injection"]
+      - ["method", "executeUpdate", -1, "SQL injection"]
+      # Symfony controller redirect
+      - ["method", "redirect", 0, "open redirect"]
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["staticmethod", "escape"]

@@ -1,0 +1,15 @@
+# PrestaShop Models-as-Data.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["staticmethod", "getValue", "prestashop-input"]
+      - ["staticmethod", "getAllValues", "prestashop-input"]
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # Db::getInstance()->executeS() / ExecuteS (PrestaShop-specific)
+      - ["method", "executeS", -1, "SQL injection"]
+      - ["method", "ExecuteS", -1, "SQL injection"]
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "pSQL"]
+      - ["function", "bqSQL"]

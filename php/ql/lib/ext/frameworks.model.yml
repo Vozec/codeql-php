@@ -1,0 +1,81 @@
+# PHP framework models (Models-as-Data).
+#
+# Add a new framework, router, source, sink, taint step or sanitizer by adding rows here — no QL and
+# no engine change required. Columns:
+#   sourceModel    : subjectKind, name, sourceType
+#   sinkModel      : subjectKind, name, argIndex(-1=any), vulnKind
+#   stepModel      : subjectKind, name, fromArg, toArg(-1=return)
+#   sanitizerModel : subjectKind, name
+# subjectKind is "function", "method" or "staticmethod".
+
+extensions:
+  # ---- Sources ---------------------------------------------------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sourceModel
+    data:
+      # Laravel
+      - ["staticmethod", "input", "laravel-request"]
+      - ["staticmethod", "all", "laravel-request"]
+      - ["method", "route", "laravel-route-parameter"]
+      - ["method", "boolean", "laravel-request"]
+      - ["method", "file", "laravel-uploaded-file"]
+      # Symfony (HttpFoundation)
+      - ["method", "get", "symfony-request-bag"]
+      - ["method", "getContent", "symfony-request-body"]
+      # WordPress
+      - ["function", "wp_unslash", "wordpress-request"]
+      - ["function", "get_query_var", "wordpress-query-var"]
+      # Slim / PSR-7
+      - ["method", "getQueryParams", "psr7-request"]
+      - ["method", "getParsedBody", "psr7-request"]
+      # PrestaShop (Tools::getValue reads request input)
+      - ["staticmethod", "getValue", "prestashop-input"]
+      - ["staticmethod", "getAllValues", "prestashop-input"]
+
+  # ---- Sinks -----------------------------------------------------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sinkModel
+    data:
+      # Laravel raw SQL
+      - ["method", "whereRaw", -1, "SQL injection"]
+      - ["method", "orWhereRaw", -1, "SQL injection"]
+      - ["method", "groupByRaw", -1, "SQL injection"]
+      - ["method", "havingRaw", -1, "SQL injection"]
+      - ["method", "orHavingRaw", -1, "SQL injection"]
+      - ["method", "orderByRaw", -1, "SQL injection"]
+      - ["method", "selectRaw", -1, "SQL injection"]
+      - ["method", "fromRaw", -1, "SQL injection"]
+      - ["staticmethod", "raw", -1, "SQL injection"]
+      # Laravel redirect / views
+      - ["function", "redirect", 0, "open redirect"]
+      - ["method", "away", 0, "open redirect"]
+      # Symfony controller redirect (AbstractController::redirect)
+      - ["method", "redirect", 0, "open redirect"]
+      # Twig / Blade raw output
+      - ["function", "e", -1, "reflected XSS"]
+      # Symfony process
+      - ["method", "mustRun", -1, "command injection"]
+
+  # ---- Taint steps -----------------------------------------------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: stepModel
+    data:
+      # Laravel collection / string helpers propagate taint arg -> return
+      - ["function", "collect", 0, -1]
+      - ["method", "toArray", -1, -1]
+      - ["method", "first", -1, -1]
+      - ["function", "str_contains", 0, -1]
+
+  # ---- Sanitizers ------------------------------------------------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sanitizerModel
+    data:
+      # Laravel / Symfony / WordPress escapers & validators
+      - ["function", "e"]
+      - ["method", "validate"]
+      - ["function", "esc_sql"]
+      - ["staticmethod", "escape"]

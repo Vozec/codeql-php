@@ -1,0 +1,4 @@
+| Animals\\Base |  | a |
+| Animals\\Dog | Animals\\Base | a, bark |
+| Vehicles\\Base |  | b |
+| Vehicles\\Car | Vehicles\\Base | b, drive |

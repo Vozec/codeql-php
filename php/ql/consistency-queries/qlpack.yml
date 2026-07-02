@@ -1,0 +1,4 @@
+name: codeql/php-consistency-queries
+version: 0.0.1-dev
+dependencies:
+  codeql/php-all: ${workspace}
