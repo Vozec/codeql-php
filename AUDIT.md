@@ -284,14 +284,33 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 > **Règle** : chaque item = *test qui échoue (rouge) → fix général → suite verte → commit*. Jamais de
 > patch cas-par-cas. Statuts : ☐ TODO · ◐ WIP · ☑ DONE.
 
-> ### Journal de progression (handoff)
-> **Fait & poussé** : P0 (P0.1–P0.5), **Phase A COMPLÈTE (A.1–A.7)** — tout le flux de contrôle branche,
-> hack retiré ; **B.2** (lambdas), **B.4** (dispatch fallback), **B.5** (barrier guards),
-> **B.6 partiel** (`$GLOBALS` cross-file) ; **fix ordre d'assignation** `$a=f($a)` (trouvé via question
-> reachability) ; **récursivité vérifiée** (`DeepChain`). Suite : **63 tests verts** (départ ~45).
-> **Prochain** : **B.1** (PostUpdateNode, notes ci-dessous) · **B.6 fin** (content par `(classe,champ)`) ·
-> **B.2 fin** (string-callables, `call_user_func`/`array_map` variable) · **B.3** (named-args méthodes).
-> Puis **Phase C** (migration MAD — le gros bloc « pas de cas-par-cas »), **D/E/F** (AST, requêtes, Bazel/CI).
+> ### Journal de progression (handoff) — MAJ 2026-07-03
+> **Fait & poussé** :
+> - **P0** ✓ ; **Phase A COMPLÈTE (A.1–A.7)** ✓ — tout le flux de contrôle branche, hack retiré.
+> - **Phase B** ✓ (large) : B.1 by-ref méthodes ; B.2 lambdas + string-callables + array-HO ; B.3 named-args
+>   méthodes ; B.4 dispatch fallback + **dispatch virtuel interface/abstrait** ; B.5 barrier guards ;
+>   B.6 `$GLOBALS` cross-file. + **fix ordre d'assignation** `$a=f($a)`, **spread** `f(...$args)`,
+>   récursivité vérifiée (`DeepChain`, 100 hops).
+> - **Phase C** ✓ : builtins (sources/sinks/sanitizers/steps) + méthodes framework + array-HO **migrés en
+>   MAD** (`ext/php-builtins.model.yml`, `ext/modern-frameworks.model.yml`) ; **SSTI + moderne** ajoutés en
+>   DATA (`ext/templating.model.yml`, `TemplateInjection.ql`, Guzzle SSRF). Moteur = logique seule.
+> - **Phase E** ✓ : **qhelp** pour les 13 requêtes, **suites standard** (code-scanning/security-extended/
+>   security-and-quality), imports `internal` retirés des requêtes sécurité, fix `print` XSS.
+> - **Phase F** partiel : TRAP pattern (`zstd`), **binaire décommité**, change-notes, **`php/extractor` dans
+>   le workspace Cargo** (build vérifié).
+> - Suite : **71 tests verts** (départ ~45).
+>
+> **Reste (gros items infra, à faire en effort dédié)** :
+> - **Phase D — hiérarchie AST publique** : synthétiser des wrappers publics et rendre `Php::*` privé
+>   (fuite `resolveClassReference(Php::AstNode)` Class.qll:132 ; wrappers de nœuds manquants). Refactor
+>   large et transverse — à faire prudemment (ne pas casser le pack). Résolution de noms principielle (FQN).
+> - **Phase F — Bazel** : `php/BUILD.bazel` + `php/extractor/BUILD.bazel` calqués sur ruby, ET enregistrer
+>   `tree-sitter-php` dans le vendoring cargo Bazel (`misc/bazel/3rdparty/…` via `update_cargo_deps.sh`) —
+>   nécessite la toolchain Bazel. Le build **Cargo** marche déjà (dev) ; Bazel = build CI/release.
+> - **Phase F — docs** : relocaliser les `.md` diary sous `php/docs/`, restaurer README racine, sortir
+>   `bench/`/`AUDIT.md` — **step de branche-merge** (les docs servent le handoff actuel, à ne pas faire tant
+>   qu'on travaille dessus).
+> - **B.1 fin** : PostUpdateNode général (notes ci-dessous) ; **B.6 fin** : content par `(classe,champ)`.
 > Baseline & commandes : `DEV.md` + §7. CLI local : `.tooling/codeql/codeql` (2.25.6, git-ignoré).
 
 ## Phase 0 — Vérité de base & filet (rapide, non-risqué)  — ☑ FAIT (45/45 verts, sans warning)
