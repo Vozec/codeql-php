@@ -70,6 +70,8 @@ module Completion {
       e = any(Php::WhileStatement w).getCondition()
       or
       e = any(Php::DoStatement d).getCondition()
+      or
+      e = any(Php::ForStatement f).getCondition()
     }
 
     override BooleanSuccessor getAMatchingSuccessorType() { result.getValue() = value }
@@ -237,6 +239,8 @@ private class StructuralTree extends StandardPreOrderTree instanceof Php::AstNod
     not this instanceof Php::IfStatement and
     not this instanceof Php::WhileStatement and
     not this instanceof Php::DoStatement and
+    not this instanceof Php::ForStatement and
+    not this instanceof Php::ForeachStatement and
     not isCallable(this) and
     not isTypeDeclaration(this)
   }
@@ -367,6 +371,100 @@ private class DoTree extends PostOrderTree instanceof Php::DoStatement {
     last(this.(Php::DoStatement).getCondition(), pred, c) and
     c.(BooleanCompletion).getValue() = false and
     succ = this
+  }
+}
+
+/** The loop head a `for` returns to after its init / update: its condition if present, else the body. */
+private predicate forToHead(Php::ForStatement s, AstNode succ) {
+  first(s.getCondition(), succ)
+  or
+  not exists(s.getCondition()) and first(s.getBody(0), succ)
+}
+
+/**
+ * A `for (init; cond; update) body` loop as a real branch with a back-edge: `init` runs once, then the
+ * condition routes true→body / false→exit; the body flows to `update`, and `update` loops back to the
+ * condition (the back-edge ⇒ a φ at the loop header, which `definitionReachingValue` lets taint cross).
+ * Each of `init`/`cond`/`update` may be absent; a missing condition makes an unconditional loop whose
+ * only exit is `break` (abnormal completions are not yet modelled — AUDIT.md A.6).
+ */
+private class ForTree extends PostOrderTree instanceof Php::ForStatement {
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) {
+    exists(Php::ForStatement s | s = this |
+      first(s.getInitialize(), f)
+      or
+      not exists(s.getInitialize()) and first(s.getCondition(), f)
+      or
+      not exists(s.getInitialize()) and not exists(s.getCondition()) and first(s.getBody(0), f)
+    )
+  }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::ForStatement s | s = this |
+      // init -> loop head (condition, or body if there is no condition)
+      last(s.getInitialize(), pred, c) and c instanceof NormalCompletion and forToHead(s, succ)
+      or
+      // condition true -> body entry
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = true and first(s.getBody(0), succ)
+      or
+      // condition false -> exit
+      last(s.getCondition(), pred, c) and c.(BooleanCompletion).getValue() = false and succ = this
+      or
+      // body statement i -> body statement i+1 (alternate `for(...): ... endfor;` syntax)
+      exists(int i |
+        last(s.getBody(i), pred, c) and c instanceof NormalCompletion and first(s.getBody(i + 1), succ)
+      )
+      or
+      // last body statement -> update (or straight back to the head if there is no update)
+      exists(int i |
+        last(s.getBody(i), pred, c) and not exists(s.getBody(i + 1)) and c instanceof NormalCompletion
+      |
+        first(s.getUpdate(), succ)
+        or
+        not exists(s.getUpdate()) and forToHead(s, succ)
+      )
+      or
+      // update -> condition (the back-edge; or body head if there is no condition)
+      last(s.getUpdate(), pred, c) and c instanceof NormalCompletion and forToHead(s, succ)
+    )
+  }
+}
+
+/** Gets the binding pattern of a `foreach` (the value, or `$k => $v` pair, or `[...]` — child index >= 1). */
+private AstNode foreachBinding(Php::ForeachStatement f) {
+  exists(int i | i >= 1 and result = f.getChild(i))
+}
+
+/**
+ * A `foreach (coll as pattern) body` loop with a back-edge. The collection is evaluated once (`first`),
+ * then the binding pattern acts as the loop header: it binds the next element and enters the body, the
+ * body loops back to the header (back-edge ⇒ a φ at the header), and the loop exits from the header
+ * (no more elements) or directly from the collection (empty). The tainted-collection→loop-variable step
+ * is provided separately as a taint step; here we only wire control flow.
+ */
+private class ForeachTree extends PostOrderTree instanceof Php::ForeachStatement {
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::ForeachStatement).getChild(0), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::ForeachStatement s | s = this |
+      // collection -> header (bind first element)
+      last(s.getChild(0), pred, c) and c instanceof NormalCompletion and first(foreachBinding(s), succ)
+      or
+      // header (element bound) -> body
+      last(foreachBinding(s), pred, c) and c instanceof NormalCompletion and first(s.getBody(), succ)
+      or
+      // body -> header (back-edge: bind the next element)
+      last(s.getBody(), pred, c) and c instanceof NormalCompletion and first(foreachBinding(s), succ)
+      or
+      // exit: no more elements (from the header) or an empty collection (from the collection)
+      (last(foreachBinding(s), pred, c) or last(s.getChild(0), pred, c)) and
+      c instanceof NormalCompletion and
+      succ = this
+    )
   }
 }
 

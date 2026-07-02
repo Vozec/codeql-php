@@ -1,0 +1,12 @@
+edges
+| test.php:6:35:6:39 | VariableName | test.php:7:8:7:9 | VariableName | provenance |  |
+| test.php:13:47:13:51 | VariableName | test.php:13:37:13:38 | VariableName | provenance |  |
+nodes
+| test.php:6:35:6:39 | VariableName | semmle.label | VariableName |
+| test.php:7:8:7:9 | VariableName | semmle.label | VariableName |
+| test.php:13:37:13:38 | VariableName | semmle.label | VariableName |
+| test.php:13:47:13:51 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:7:8:7:9 | VariableName | test.php:6:35:6:39 | VariableName | test.php:7:8:7:9 | VariableName | This shell command depends on a $@. | test.php:6:35:6:39 | VariableName | user-provided value |
+| test.php:13:37:13:38 | VariableName | test.php:13:47:13:51 | VariableName | test.php:13:37:13:38 | VariableName | This shell command depends on a $@. | test.php:13:47:13:51 | VariableName | user-provided value |

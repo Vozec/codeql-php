@@ -305,7 +305,10 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 - `A.2` ☑ **augmented-assign lu** (`$x .= …`) — LHS marqué **read** (ancienne valeur, read-before-write) +
   write ; valeur du def = l'expr augmentée ; `AugmentedAssignmentExpression` ajouté au `structuralPropagator`
   (taint des 2 opérandes). Test `AugmentedAssign` (ligne 8 = le FN corrigé, + ligne 13, safe ligne 18). Suite 47/47.
-- `A.3` ☐ `for` / `foreach` — Trees avec back-edge (foreach binding déjà côté SSA). Tests taint-through.
+- `A.3` ☑ `for` / `foreach` — `ForTree`/`ForeachTree` (PostOrderTree) avec vrais back-edges : `for` =
+  init→cond→body→update→cond (φ à la condition, condition du `for` ajoutée aux `BooleanCompletion`) ;
+  `foreach` = collection→header(binding)→body→header (φ au binding). Discriminant testé = taint
+  **loop-carried** (use-before-assign dans le corps, FN sur CFG linéarisé). Tests `ForLoopTaint`/`ForeachTaint`.
 - `A.4` ☐ `switch` / `match` — arêtes de cas, isolation, pas de fall-through match. Tests FP inter-case.
 - `A.5` ☐ Court-circuit `&& || ??` — arêtes booléennes.
 - `A.6` ☐ Complétions anormales `break`/`continue`/`return`/`throw`→`catch`, `try/catch/finally` ;
