@@ -377,7 +377,9 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   string-callables** `$fn='func'; $fn(...)` (`getStringNamedCallee`, test `StringCallable`). Reste :
   `call_user_func`/`array_map` avec callable **variable** (encore via le step HO inline) → généraliser puis
   retirer la liste HO hardcodée.
-- `B.3` ☐ Named-args mappés named→positional dans la couche arg (tous types d'appel, dataflow+taint).
+- `B.3` ☑ **Named-args méthodes** — le step named→param par nom marche pour fonctions ET méthodes
+  (`resolvesToCallee`/`calleeParam`/`callArgumentNode`, résolution par type). Test `NamedArgsMethod`.
+  (Reste : le mapping dans la couche *dataflow pur* — actuellement taint-step ; cf. B.3 original.)
 - `B.4` ☑ `viableCallable` : fallback gated sur « callee typé trouvé » (`not exists(getTypedCallee())`),
   pas sur « type existe ». Test `DispatchFallback` (receveur typé sans méthode → fallback par nom). 
 - `B.5` ☑ `SanitizerGuard` : `GuardBarrier extends Sanitizer` — `if (guard($x)) {…$x…}` barre la lecture

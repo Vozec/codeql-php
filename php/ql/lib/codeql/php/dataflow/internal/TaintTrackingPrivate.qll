@@ -65,6 +65,14 @@ private AstNode calleeBody(AstNode callee) {
   result = callee.(Php::MethodDeclaration).getBody()
 }
 
+/** Gets an argument node of a call `c` (function, method, nullsafe-method or static call). */
+private Php::Argument callArgumentNode(Call c) {
+  result = c.(Php::FunctionCallExpression).getArguments().getChild(_) or
+  result = c.(Php::MemberCallExpression).getArguments().getChild(_) or
+  result = c.(Php::NullsafeMemberCallExpression).getArguments().getChild(_) or
+  result = c.(Php::ScopedCallExpression).getArguments().getChild(_)
+}
+
 /**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
@@ -460,19 +468,19 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = outRead
     )
     or
-    // Named arguments (PHP 8): `f(cmd: $v)` — the value reaches the parameter *named* `cmd` in the
-    // callee (resolved by name), independent of positional order.
+    // Named arguments (PHP 8): `f(cmd: $v)` / `$o->m(cmd: $v)` — the value reaches the parameter *named*
+    // `cmd` in the callee, independent of positional order, for functions AND methods (callee resolved
+    // by name / inferred type, as elsewhere).
     exists(
-      FunctionCall c, Php::Argument arg, Php::FunctionDefinition f, Php::SimpleParameter p,
-      VariableAccess pRead, string pname
+      Call c, Php::Argument arg, AstNode callee, Php::SimpleParameter p, VariableAccess pRead, string pname
     |
-      arg = c.(Php::FunctionCallExpression).getArguments().getChild(_) and
+      arg = callArgumentNode(c) and
       pname = arg.getName().toString() and
-      c.getName() = f.getName().getValue() and
-      p = f.getParameters().getChild(_) and
+      resolvesToCallee(c, callee) and
+      p = calleeParam(callee, _) and
       p.getName().getChild().getValue() = pname and
       pRead.getName() = pname and
-      pRead.(Php::AstNode).getParent+() = f.getBody() and
+      pRead.(Php::AstNode).getParent+() = calleeBody(callee) and
       nodeFrom.asExpr() = arg.getChild() and
       nodeTo.asExpr() = pRead
     )
