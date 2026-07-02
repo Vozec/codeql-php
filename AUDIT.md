@@ -284,15 +284,15 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 > **Règle** : chaque item = *test qui échoue (rouge) → fix général → suite verte → commit*. Jamais de
 > patch cas-par-cas. Statuts : ☐ TODO · ◐ WIP · ☑ DONE.
 
-## Phase 0 — Vérité de base & filet (rapide, non-risqué)
-- `P0.1` ☐ Réparer DEV.md (chemins réels + note CLI) et corriger les compteurs faux (tests=45, 12+3
-  requêtes) dans PROJECT_STATUS/README/IMPROVEMENTS. Marquer while/do comme faits.
-- `P0.2` ☐ Supprimer la NOTE mensongère `ControlFlowGraphImpl.qll:244-252` + en-têtes périmés
-  (`:9-10`, `SsaImpl:8-9`).
-- `P0.3` ☐ Établir le baseline de tests réel (run CLI 2.25.6) et l'inscrire ici (§7). Le figer comme
-  référence de non-régression.
-- `P0.4` ☐ Durcir `CfgConsistency.ql` pour qu'il **détecte** l'absence d'arêtes de branche (sinon il
-  cautionne les trous).
+## Phase 0 — Vérité de base & filet (rapide, non-risqué)  — ☑ FAIT (45/45 verts, sans warning)
+- `P0.1` ☑ DEV.md réparé (chemins réels + note CLI + commande de test) ; compteurs corrigés (tests=45)
+  dans PROJECT_STATUS/README/IMPROVEMENTS ; while/do marqués faits ; piège `r&d`-quoting retiré.
+- `P0.2` ☑ NOTE mensongère `ControlFlowGraphImpl.qll:244-252` supprimée ; en-têtes CFG & SsaImpl
+  réécrits pour refléter le réel.
+- `P0.3` ☑ Baseline consigné (§7) : `All 45 tests passed` (CLI 2.25.6).
+- `P0.4` ☑ `CfgConsistency.ql` durci : nouvel invariant `linearisedBranch` (toute construction qui *doit*
+  brancher mais dont aucun nœud n'a ≥2 successeurs est signalée). Compile ✓ ; suite 45/45 (non-régressif).
+- `P0.5` ☑ Warning cast redondant `TaintTrackingPrivate.qll:349` supprimé.
 
 ## Phase A — CFG complet & correct (débloque le retrait du hack ; cœur soundness)
 > Méthode test-first, un Tree branchant par construction, calqué sur ruby.
@@ -350,7 +350,13 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 > CLI CodeQL **2.25.6** dans `.tooling/codeql/codeql` (git-ignoré). Commande :
 > `.tooling/codeql/codeql test run php/ql/test --search-path=php --additional-packs=.`
 
-**Statut : ⏳ run en cours** — résultat à consigner ici (compte pass/fail, tests rouges éventuels).
-Attendu d'après les `.expected` : 45 tests. À confirmer que tout est vert (le pack a été committé comme
-« 43 verts » ; l'audit a trouvé au moins 1 trou masqué — ReflectedXss `print` — qui est vert *par
-omission dans l'expected*, donc ne fera pas rougir la suite mais est un FN réel).
+**Baseline (2026-07-02, CLI 2.25.6) : `All 45 tests passed.`** — 30 query-tests + 15 library-tests,
+5m28s (extract 1m6s / comp 4m5s / eval 12.9s). Confirme que le vrai compte est **45** (docs disaient 43).
+C'est la référence de non-régression : tout item du plan doit finir sur `45/45` (ou +N nouveaux tests verts).
+
+**Warning de compilation à nettoyer** (P0.5) : `TaintTrackingPrivate.qll:349` — `test is always true, as
+VariableAccess is a supertype…` (cast redondant `recv instanceof VariableAccess`, `recv` déjà typé).
+
+**Rappel** : la suite verte ne prouve PAS l'absence de bugs — l'audit a trouvé des trous masqués *par
+omission dans les `.expected`* (ReflectedXss `print` = FN réel, pourtant « vert »). Les items du plan
+ajoutent les tests rouges manquants avant de corriger.

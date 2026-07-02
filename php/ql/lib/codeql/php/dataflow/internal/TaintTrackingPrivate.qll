@@ -346,7 +346,6 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       innerStore.(Php::AstNode).getParent+() = m.(Php::MethodDeclaration).getBody() and
       innerAssign.getRhs() = paramReadInBody(m, i) and
       call.getReceiver() = recv and
-      recv instanceof VariableAccess and
       outerRead.getObject().(VariableAccess).getName() = recv.getName() and
       outerRead.getName().(Php::Name).getValue() = fld and
       sameScope(outerRead, recv) and

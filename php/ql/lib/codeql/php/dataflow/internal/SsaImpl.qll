@@ -5,8 +5,10 @@
  * variable is identified by its name within the enclosing function/method/closure/top-level).
  * Writes are the left-hand sides of `=` assignments; every other variable access is a read.
  *
- * v1 scope: simple assignments. Not yet modelled: parameters, `global`/`static`, `foreach`
- * bindings, augmented assignments, reference and by-`&` writes, captured variables.
+ * Write accesses covered (`isWriteAccess`): plain/augmented/reference assignments, formal
+ * parameters, `foreach` bindings, `list()`/`[...]` destructuring, `global`/`static`/`catch`
+ * bindings, and element/property updates (which currently re-define the whole root variable —
+ * see AUDIT.md §3 A.1: this should be a weak update, not a strong one).
  */
 
 private import codeql.ssa.Ssa as SsaImplCommon

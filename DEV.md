@@ -29,21 +29,27 @@ tools/codeql/                # CodeQL CLI 2.25.6 (binaire)
 
 ## Toolchain
 
-- CodeQL CLI : `/home/vozec/Desktop/r&d/PHPcodeQl/tools/codeql/codeql` (2.25.6)
-- Rust pin repo : 1.88 (via `rust-toolchain.toml`, installé par rustup)
-- Le chemin projet contient `r&d` → **toujours quoter** les chemins en shell (le `&` casse le parsing).
+- Racine projet : `/home/vozec/Desktop/dev/codeql-php` (l'ancien `Desktop/r&d/PHPcodeQl` n'existe plus).
+- CodeQL CLI : **non vendorée dans le repo** — l'obtenir séparément depuis
+  [`github/codeql-cli-binaries`](https://github.com/github/codeql-cli-binaries) (match du pack : 2.25.x+),
+  la mettre sur le `PATH` ou pointer `CODEQL=/chemin/vers/codeql/codeql`.
+  (Copie locale de dev : `.tooling/codeql/codeql`, 2.25.6, git-ignorée.)
+- Rust pin repo : 1.88 (via `rust-toolchain.toml`, installé par rustup).
 
 ## Commandes clés
 
-Build complet de l'extracteur + lib :
 ```bash
-bash "/home/vozec/Desktop/r&d/PHPcodeQl/codeql/php/build.sh"
+REPO=/home/vozec/Desktop/dev/codeql-php
+CODEQL="$REPO/.tooling/codeql/codeql"   # ou tout `codeql` sur le PATH
 ```
 
-Créer une base depuis des sources PHP (search-path = dossier de l'extracteur lui-même) :
+Build complet de l'extracteur + lib :
 ```bash
-CODEQL="/home/vozec/Desktop/r&d/PHPcodeQl/tools/codeql/codeql"
-REPO="/home/vozec/Desktop/r&d/PHPcodeQl/codeql"
+bash "$REPO/php/build.sh"
+```
+
+Créer une base depuis des sources PHP (search-path = dossier de l'extracteur `php/`) :
+```bash
 "$CODEQL" database create /path/to/db --language=php \
   --source-root=/path/to/php-src --search-path="$REPO/php"
 ```
@@ -57,6 +63,13 @@ Lancer une requête :
 ```bash
 "$CODEQL" query run query.ql --database=/path/to/db --additional-packs="$REPO"
 # où query.ql commence par:  import php
+```
+
+Lancer la suite de tests (baseline : 45 verts — 30 query + 15 library) :
+```bash
+"$CODEQL" test run "$REPO/php/ql/test" --search-path="$REPO/php" --additional-packs="$REPO"
+# --learn pour (re)générer les .expected ; toujours relire un .expected généré (une erreur de
+# compilation s'y écrit aussi et passerait pour de la donnée).
 ```
 
 ## Pièges résolus (Phase 1)

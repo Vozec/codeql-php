@@ -16,7 +16,7 @@ Trois dettes structurelles dominent et se recoupent :
 3. **Heuristiques lexicales « même fichier »** → à remplacer par SSA/scope + jumpStep propres.
 
 Discipline : **chaque fix arrive avec un query-test** (cas vulnérable + cas safe) et ne doit pas
-régresser la suite (actuellement 27 tests, DVWA 50/4).
+régresser la suite (actuellement **45 tests verts** ; DVWA à re-mesurer, cf. `AUDIT.md` §7).
 
 ---
 
@@ -56,7 +56,7 @@ generator/by-ref (B7) et scoper `__toString` (B6, voir 2.4).
 
 | ID | Problème | Approche | Fichiers | Effort | Risque | Tests | Dépend |
 |----|----------|----------|----------|--------|--------|-------|--------|
-| 2.1 ☑ | **CFG linéarisé (B5)** | **RÉSOLU pour `if`/`if-else`.** (1) CFG branchant : `IfTree` (fall-through, `StandardPreOrderTree`+`last` extra) pour `if`-sans-`else`, `IfElseTree` (`PostOrderTree`, route par `BooleanCompletion` via `isValidForSpecific`) pour `if/else` → vrais φ SSA. (2) **Clé que l'autre approche manquait** : le taint droppait au φ car `definitionValue(phi)` est vide → ajout de `definitionReachingValue` (suit les inputs du phi via `phiHasInputFromBlock`) dans `DataFlowPrivate` → le taint traverse le φ. ⚠️ helpers `ifHasElse` lisent l'AST BRUT (pas `rankedCfgChild`) sinon récursion non-monotone. Vérifié : `$y="safe";if($c){$y=t;}sink($y)` + if/else flaggés, branche non-teintée non-flaggée ; 44 tests verts, DVWA 50/4. **Reste** : boucles (back-edge φ), `while`/`for`. | `ControlFlowGraphImpl.qll`, `DataFlowPrivate.qll` | L | H | `query-tests/BranchTaint` ✓ | — |
+| 2.1 ☑ | **CFG linéarisé (B5)** | **RÉSOLU pour `if`/`if-else`.** (1) CFG branchant : `IfTree` (fall-through, `StandardPreOrderTree`+`last` extra) pour `if`-sans-`else`, `IfElseTree` (`PostOrderTree`, route par `BooleanCompletion` via `isValidForSpecific`) pour `if/else` → vrais φ SSA. (2) **Clé que l'autre approche manquait** : le taint droppait au φ car `definitionValue(phi)` est vide → ajout de `definitionReachingValue` (suit les inputs du phi via `phiHasInputFromBlock`) dans `DataFlowPrivate` → le taint traverse le φ. ⚠️ helpers `ifHasElse` lisent l'AST BRUT (pas `rankedCfgChild`) sinon récursion non-monotone. Vérifié : `$y="safe";if($c){$y=t;}sink($y)` + if/else flaggés, branche non-teintée non-flaggée ; 45 tests verts. **Landé depuis** : `while`/`do` (back-edge φ, `WhileTree`/`DoTree`, test `LoopTaint` vert). **Reste** : `for`/`foreach`, `switch`/`match` (cf. `AUDIT.md` Phase A). | `ControlFlowGraphImpl.qll`, `DataFlowPrivate.qll` | L | H | `query-tests/BranchTaint` ✓ | — |
 | 2.2 | **SanitizerGuard mort (B4)** | Brancher les barrier-guards dans la config taint (`isBarrier`/guard-nodes) ; guards : `ctype_*`, `in_array($x,$allow)`, `preg_match`, `===`/`==` littéral, `is_numeric` | `Concepts.qll`, config des requêtes, `TaintTracking` | M | M | allow-list, `ctype_alnum`, bypass regex | 2.1 |
 | 2.3 ◐ | Sinks trop larges (FP) | ☑ (c) condition du ternaire exclue du propagateur (branches seules, + elvis). ☐ (a) `argIndex -1` → indices précis ; (b) sinks typés par receveur | `TaintTrackingPrivate.qll` | M | L | `query-tests/Ternary` ✓ | P0.1 |
 | 2.4 ☑ | `__toString` trop large (B6) | Scopé via `exprClass(obj)` hybride (précis si type inféré, fallback type-agnostique borné sinon) ; magic `__get`/`__call` généralisés de `resolvedNewClass`→`exprClass` | `TaintTrackingPrivate.qll` | S | L | `query-tests/ToStringScoped` ✓ | P0.1 |

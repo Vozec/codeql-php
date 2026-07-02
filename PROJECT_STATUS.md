@@ -18,7 +18,7 @@ branche de flux perdu à cause d'un cas non modélisé.
 | Pipeline | Extracteur Rust (tree-sitter-php) → TRAP → dbscheme → AST/CFG/SSA/DataFlow QL → requêtes |
 | Requêtes de sécurité | **13** (Command/SQL/Code injection, XSS, Path traversal, Open redirect, SSRF, LDAP, File inclusion, Unsafe deser, Hardcoded crypto key, Type juggling) + 2 utilitaires (coverage, routes Laravel) |
 | Modèles frameworks (MAD) | **7** — Laravel, Symfony, WordPress, PrestaShop, TYPO3, crypto, frameworks génériques |
-| Tests | **43 tests verts** (30 query-tests + 15 library-tests) |
+| Tests | **45 tests verts** (30 query-tests + 15 library-tests) — baseline CLI 2.25.6, cf. `AUDIT.md` §7 |
 | Banc de validation | **DVWA : 50 findings taint + 17 type-juggling, 6 dans `impossible.php`** (tolérés/documentés) |
 | Extracteur | ~250 LOC Rust (réutilise `shared/tree-sitter-extractor`) |
 
@@ -88,12 +88,14 @@ Détail complet, avec pour chaque item *test qui échoue → fix général → n
 **`STRUCTURAL_ROADMAP.md`**.
 
 ### Phase A — compléter les chemins de contrôle (P0)
-- **Boucles `while`/`do`/`for`/`foreach`** — back-edge `corps → tête` pour le φ de boucle (accumulateurs
-  cross-itération). *(classes `WhileTree`/`DoTree` amorcées ; `for`/`foreach` + validation taint-through à finir).*
+> Détail + bugs de soundness associés dans **`AUDIT.md` Phase A** (source de vérité désormais).
+- **Boucles `while`/`do`** — ✅ **FAIT** (`WhileTree`/`DoTree`, back-edge, test `LoopTaint` vert).
+- **Boucles `for`/`foreach`** — back-edge `corps → tête` pour le φ de boucle (reste à faire).
 - **`switch`/`match`** — arêtes de cas (et pas de fall-through pour `match`).
 - **Court-circuit `&&` `||` `??`** — arêtes booléennes.
 - **Complétions anormales** `break`/`continue`/`return`/`throw → catch`.
-- **Retrait du hack SSA** *uncertain-writes* une fois les vraies branches partout.
+- **Bug strong-update** `$a[k]=v` tue toute la racine (`AUDIT.md` A.1) ; `$x .= …` LHS non lu (A.2).
+- **Retrait du hack SSA** *uncertain-writes* une fois les vraies branches partout (gated, `AUDIT.md` A.7).
 
 ### Phase B — précision
 - **SanitizerGuard** (2.2) — `if (ctype_alnum($id)) query($id)` : barrer `$id` sur l'arête vraie
@@ -131,7 +133,7 @@ codeql database analyze <db> codeql/php/ql/src/codeql-suites/php-security.qls \
 codeql test run codeql/php/ql/test --search-path=codeql/php --additional-packs=codeql
 ```
 
-**Pièges connus** (détaillés dans `DEV.md`) : chemin contenant `r&d` → quoter ; `--search-path` =
+**Pièges connus** (détaillés dans `DEV.md`) : `--search-path` =
 `codeql/php` ; `.dbscheme.stats` requis (`codeql dataset measure`) ; artefacts `*.testproj` périmés →
 faire avorter la suite (nettoyer avant un run complet).
 

@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-43%20green-2ea44f">
+  <img alt="tests" src="https://img.shields.io/badge/tests-45%20green-2ea44f">
   <img alt="queries" src="https://img.shields.io/badge/security%20queries-13-blue">
   <img alt="frameworks" src="https://img.shields.io/badge/frameworks-Laravel%20·%20Symfony%20·%20WordPress%20·%20PrestaShop%20·%20TYPO3-8957e5">
   <img alt="status" src="https://img.shields.io/badge/DVWA-50%20taint%20findings-orange">
@@ -33,12 +33,12 @@ php/
 ├── extractor/        Rust extractor (tree-sitter-php → TRAP), ~250 LOC over shared/tree-sitter-extractor
 ├── ql/lib/           The language library:
 │   ├── ast/          AST wrappers (classes, calls, expressions, statements, namespaces)
-│   ├── controlflow/  CFG with real branching for if / if-else (SSA φ at joins)
+│   ├── controlflow/  CFG with real branching for if / if-else and while / do loops (SSA φ at joins)
 │   ├── dataflow/     SSA, local flow, type inference, interprocedural taint steps
 │   ├── security/     Sources, sinks, sanitizers, framework abstractions
 │   └── ext/          Models-as-Data: Laravel · Symfony · WordPress · PrestaShop · TYPO3 · crypto
 ├── ql/src/           13 security queries + coverage/routing utilities
-└── ql/test/          43 tests (query-tests + library-tests)
+└── ql/test/          45 tests (30 query-tests + 15 library-tests)
 ```
 
 ## Highlights
@@ -80,7 +80,7 @@ codeql test run php/ql/test --search-path=php --additional-packs=.
 Benchmarked on **DVWA** (Damn Vulnerable Web Application): **50 taint findings** across SQLi, command
 injection, XSS, path traversal, etc., **17 type-juggling** findings, and only the paths in
 `impossible.php` (prepared-statement guarded) are surfaced — a documented, bounded over-approximation.
-The `php/ql/test` suite has **43 green tests** covering each engine feature.
+The `php/ql/test` suite has **45 green tests** covering each engine feature.
 
 ## Status & roadmap
 

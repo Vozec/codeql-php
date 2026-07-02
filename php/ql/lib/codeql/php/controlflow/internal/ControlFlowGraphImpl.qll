@@ -6,8 +6,10 @@
  * methods, closures and type declarations are scope boundaries: they appear as leaves in their
  * enclosing scope and (for callables) get their own control-flow graph.
  *
- * Not yet modelled (planned refinements): boolean branching edges for `if`/`while`/`match`,
- * short-circuit operators, and abnormal completions for `break`/`continue`/`return`/`throw`.
+ * Branching is modelled for `if`/`if-else` (`IfTree`/`IfElseTree`) and `while`/`do` loops
+ * (`WhileTree`/`DoTree`, with a back-edge at the loop header). Still linearised (see AUDIT.md §3,
+ * Phase A): `for`/`foreach`, `switch`/`match`, short-circuit `&&`/`||`/`??`, and the abnormal
+ * completions `break`/`continue`/`return`/`throw` (+ `try`/`catch`/`finally`).
  */
 
 private import codeql.php.AST
@@ -241,16 +243,6 @@ private class StructuralTree extends StandardPreOrderTree instanceof Php::AstNod
 
   override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
 }
-// NOTE (CFG branching, deferred — empirically disproven approaches documented in STRUCTURAL_ROADMAP §1):
-// `if` is left in `StructuralTree` (linearised). A custom branching `IfTree` was attempted several
-// ways: a `PreOrderTree` or a `succ`-override DISCONNECTS the body from the CFG; the additive
-// `StandardPreOrderTree`-with-extra-`last` variant DOES create the fall-through edge (visible in the
-// CFG dump) but, crucially, the taint does NOT propagate across the resulting SSA φ — it silently
-// DROPPED the canonical `$y="safe"; if($c){$y=$_GET['x'];} sink($y)` finding that the linearised CFG
-// + uncertain-writes hack detects. So branching is not merely an edge-wiring change; it needs the SSA
-// φ to actually carry taint (likely `BooleanCompletion` wiring + revisiting `variableWrite`). Until
-// then, taint crosses branches via the `variableWrite` uncertain-writes model in `SsaImpl.qll`.
-
 // NOTE: these read the RAW AST (`getAFieldOrChild`), NOT `rankedCfgChild` — because `ifHasElse`
 // gates the `IfTree`/`IfElseTree` characteristic predicates, and `rankedCfgChild` filters by
 // `instanceof ControlFlowTree`, which would make those char-preds non-monotonically recursive.
