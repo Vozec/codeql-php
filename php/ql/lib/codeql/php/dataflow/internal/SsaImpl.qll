@@ -159,32 +159,18 @@ module SsaInput implements SsaImplCommon::InputSig<Location, Cfg::BasicBlock> {
       variableAccessAt(bb, i, va) and
       isWriteAccess(va) and
       v = MkLocalVariable(bb.getScope(), va.getName()) and
-      // A write is UNCERTAIN (a weak/may-write that does not kill prior definitions) when either:
-      //  - it is a partial update `$x[k]=v` / `$x->p=v` — it redefines only part of the container, so
-      //    taint on the whole variable must survive an unrelated element/property assignment
-      //    (else: false negative). (AUDIT.md A.1.)
-      //  - it occurs inside a conditional branch — legacy over-approximation preserving taint across
-      //    the still-linearised constructs (`switch`/`match`/`for`/`foreach`); to be removed once
-      //    those branch for real (AUDIT.md A.7).
-      // Otherwise it is a certain (strong) write.
-      (if isPartialUpdate(va) or inConditionalBranch(va) then certain = false else certain = true)
+      // A write is UNCERTAIN (a weak/may-write that does not kill prior definitions) only for a partial
+      // update `$x[k]=v` / `$x->p=v`, which redefines just part of the container, so taint on the whole
+      // variable must survive an unrelated element/property assignment (else: false negative — A.1).
+      // Every other write is a certain (strong) update: the real branching CFG (if/else/loops/switch/
+      // match/ternary/short-circuit) provides genuine SSA φ nodes at joins that carry taint across
+      // branches, so the former uncertain-writes-in-a-conditional over-approximation is gone (A.7).
+      (if isPartialUpdate(va) then certain = false else certain = true)
     )
   }
 
   /** Holds if `va` is the root variable of a partial element/property update (`$x[k]=v`, `$x->p=v`). */
   private predicate isPartialUpdate(VariableAccess va) { va = updateBaseVariable() }
-
-  /** Holds if `va` occurs inside a conditional branch body (`if`/`elseif`/`else`/`case`/`match` arm). */
-  private predicate inConditionalBranch(VariableAccess va) {
-    exists(Php::AstNode anc | anc = va.(Php::AstNode).getParent+() |
-      anc instanceof Php::IfStatement or
-      anc instanceof Php::ElseClause or
-      anc instanceof Php::ElseIfClause or
-      anc instanceof Php::CaseStatement or
-      anc instanceof Php::DefaultStatement or
-      anc instanceof Php::MatchConditionalExpression
-    )
-  }
 
   predicate variableRead(Cfg::BasicBlock bb, int i, SourceVariable v, boolean certain) {
     exists(VariableAccess va |
