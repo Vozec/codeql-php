@@ -245,6 +245,9 @@ private class StructuralTree extends StandardPreOrderTree instanceof Php::AstNod
     not this instanceof Php::DoStatement and
     not this instanceof Php::ForStatement and
     not this instanceof Php::ForeachStatement and
+    // The `match` block is not a CFG node: `MatchTree` routes the subject directly to the arms, so the
+    // block must not also linearise them here.
+    not this instanceof Php::MatchBlock and
     not isCallable(this) and
     not isTypeDeclaration(this)
   }
@@ -548,9 +551,36 @@ private class NullCoalesceTree extends PostOrderTree instanceof Php::BinaryExpre
  * binary operators are excluded — they branch instead (`LogicalAndTree`/`LogicalOrTree`/`NullCoalesceTree`).
  */
 private class ExprTree extends StandardPostOrderTree instanceof Php::Expression {
-  ExprTree() { not isCallable(this) and not isShortCircuit(this) }
+  ExprTree() {
+    not isCallable(this) and not isShortCircuit(this) and not this instanceof Php::MatchExpression
+  }
 
   override ControlFlowTree getChildNode(int i) { result = rankedCfgChild(this, i) }
+}
+
+/**
+ * A `match ($subject) { conds => r, …, default => r }` expression: the subject is evaluated, then
+ * exactly one arm is selected and its return produces the value. Arms do NOT fall through. The subject
+ * routes to any arm (non-deterministic selection — no per-arm condition splitting), and each arm meets
+ * at the match node (post-order root). The selected arm's return taints the result via a taint step
+ * (`defaultAdditionalTaintStep`); here we only wire control flow.
+ */
+private class MatchTree extends PostOrderTree instanceof Php::MatchExpression {
+  final override predicate propagatesAbnormal(AstNode child) { none() }
+
+  final override predicate first(AstNode f) { first(this.(Php::MatchExpression).getCondition(), f) }
+
+  final override predicate succ(AstNode pred, AstNode succ, Completion c) {
+    exists(Php::MatchExpression m | m = this |
+      // subject evaluated -> an arm (non-deterministic selection)
+      last(m.getCondition(), pred, c) and
+      c instanceof NormalCompletion and
+      first(m.getBody().getChild(_), succ)
+      or
+      // an arm evaluated -> the match result
+      last(m.getBody().getChild(_), pred, c) and c instanceof NormalCompletion and succ = this
+    )
+  }
 }
 
 /**

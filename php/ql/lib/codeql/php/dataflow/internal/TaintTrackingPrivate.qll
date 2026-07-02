@@ -148,6 +148,18 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = ce
     )
     or
+    // `match ($subj) { conds => r, default => r2 }`: the value is the selected arm's RETURN, so every
+    // arm return propagates to the result (over-approx: any arm may be selected). The subject only
+    // selects — it does not taint the result (like a ternary condition).
+    exists(Php::MatchExpression m, Php::AstNode arm |
+      arm = m.getBody().getChild(_) and
+      (
+        nodeFrom.asExpr() = arm.(Php::MatchConditionalExpression).getReturnExpression() or
+        nodeFrom.asExpr() = arm.(Php::MatchDefaultExpression).getReturnExpression()
+      ) and
+      nodeTo.asExpr() = m
+    )
+    or
     // Interpolation via heredoc body (its parts are not direct field-or-children of the heredoc).
     exists(Php::Heredoc h | nodeFrom.asExpr() = h.getValue().getChild(_) and nodeTo.asExpr() = h)
     or

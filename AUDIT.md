@@ -313,10 +313,13 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
   `&&`/`and` : gauche vrai→droite, faux→résultat ; `||`/`or` : gauche faux→droite, vrai→résultat (BooleanCompletion
   sur l'opérande gauche) ; `??` : branche non-déterministe (pas de nullness completion). Exclus du `ExprTree`.
   Taint via opérandes inchangé (`structuralPropagator`). Test `CfgShortCircuit` (expected vide = tout branche).
-- `A.4` ☐ **`switch` / `match`** — ⚠️ **entrelacé avec A.6** : sans modéliser `break`, le fall-through de
-  `switch` relie tous les cases (fuite inter-case) — l'isolation de case n'a de sens qu'avec la complétion
-  `break`. `match` (expression, sans fall-through) est plus simple et peut se faire seul. → faire `match`
-  d'abord, puis **`switch` + `break` ensemble** (A.4∧A.6). Tests : FP inter-case (switch), arme exclusive (match).
+- `A.4a` ☑ **`match`** — `MatchTree` (subject→bras non-déterministe→résultat, exclu de `ExprTree` ;
+  `MatchBlock` exclu de `StructuralTree` pour ne pas linéariser les bras) + **taint-step** retour de bras →
+  résultat (le vrai FN : le résultat ne portait aucun taint). Test `MatchTaint` (retours teintés flaggés,
+  subject teinté seul = safe).
+- `A.4b` ☐ **`switch` + `break`** — ⚠️ **à co-livrer avec A.6** : sans `break`, le fall-through de `switch`
+  relie tous les cases (fuite inter-case) — l'isolation n'a de sens qu'avec la complétion `break`.
+  Tests : fall-through explicite (BUG) vs case isolé par `break` (safe).
 - `A.6` ☐ Complétions anormales `break`/`continue`/`return`/`throw`→`catch`, `try/catch/finally` ;
   produire réellement `ReturnCompletion` (code mort actuel). Tests : catch-param taint (FN), code-mort (FP).
   **`break`/`continue` à co-livrer avec `switch` et à re-vérifier sur les boucles A.3 (sortie/continuation).**
