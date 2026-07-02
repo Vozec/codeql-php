@@ -12,12 +12,8 @@ predicate isRemoteSource(DataFlow::Node n) {
   n.asExpr().(VariableAccess).getName() =
     ["_GET", "_POST", "_REQUEST", "_COOKIE", "_SERVER", "_FILES", "_ENV", "HTTP_RAW_POST_DATA"]
   or
-  exists(FunctionCall c |
-    c.getName() =
-      ["getenv", "apache_request_headers", "getallheaders", "filter_input", "filter_input_array"] and
-    n.asExpr() = c
-  )
-  or
+  // NOTE: built-in request/env source functions (getenv, filter_input, apache_request_headers, …) are
+  // DATA — `sourceModel` rows in `ext/php-builtins.model.yml`, applied by `DataRemoteSource` (Phase C).
   // Framework request helpers (Laravel `request()`, WordPress, etc.).
   exists(FunctionCall c | c.getName() = ["request", "wp_unslash"] and n.asExpr() = c)
   or
@@ -50,29 +46,9 @@ predicate isRemoteSource(DataFlow::Node n) {
   )
 }
 
-/** Functions whose result is a sanitized (safe) value, acting as a taint barrier. */
-predicate isSanitizerFunction(string name) {
-  name =
-    [
-      // XSS / output
-      "htmlspecialchars", "htmlentities", "strip_tags", "esc_html", "esc_attr", "esc_url",
-      "esc_js", "sanitize_text_field", "sanitize_email", "wp_kses", "wp_kses_post",
-      // Command
-      "escapeshellarg", "escapeshellcmd",
-      // SQL
-      "mysqli_real_escape_string", "mysql_real_escape_string", "pg_escape_string",
-      "pg_escape_literal", "addslashes", "quote",
-      // Numeric / type coercion
-      "intval", "floatval", "doubleval", "abs", "count", "settype",
-      // Path
-      "basename", "realpath",
-      // Validation/encoding — NOTE: `ctype_*`/`is_numeric` are NOT here; they return a boolean, not a
-      // sanitized value, so they are modelled as branch GUARDS (`isSanitizerGuardFunction`), not as
-      // value-sanitizers.
-      "filter_var", "preg_quote", "urlencode", "rawurlencode",
-      "base64_encode", "bin2hex", "md5", "sha1", "hash"
-    ]
-}
+// NOTE: built-in value-sanitizer functions (htmlspecialchars, escapeshellarg, filter_var, …) are DATA
+// — `sanitizerModel` rows in `ext/php-builtins.model.yml`, applied by `DataSanitizer` (Phase C). The
+// `ctype_*`/`is_numeric` validators are branch GUARDS, not value-sanitizers (`isSanitizerGuardFunction`).
 
 /**
  * Validator functions used as branch GUARDS: `if (g($x)) { … }` establishes that `$x` is safe on the
@@ -106,45 +82,21 @@ predicate isGuardedRead(DataFlow::Node n) {
   )
 }
 
-/** Holds if `n` is the result of a sanitizer call (a taint barrier). */
+/** Holds if `n` is the result of a sanitizer call (a taint barrier) not already covered by MAD. */
 predicate isSanitizer(DataFlow::Node n) {
-  exists(FunctionCall c | isSanitizerFunction(c.getName()) and n.asExpr() = c)
-  or
   exists(MethodCall c | c.getMethodName() = ["quote", "escape", "real_escape_string"] and n.asExpr() = c)
   or
   // Numeric casts sanitize.
   exists(CastExpr cast | cast.getTypeName() = ["int", "integer", "float", "double", "bool", "boolean"] and n.asExpr() = cast)
 }
 
-/** Maps a dangerous built-in function name to the vulnerability `kind` its arguments expose. */
-string sinkFunctionKind(string fname) {
-  fname = ["system", "exec", "shell_exec", "passthru", "proc_open", "popen"] and
-  result = "command injection"
-  or
-  fname = ["eval", "assert", "create_function"] and result = "code injection"
-  or
-  fname = ["mysqli_query", "mysql_query", "pg_query", "pg_send_query"] and result = "SQL injection"
-  or
-  fname = ["print", "printf", "print_r", "vprintf"] and result = "reflected XSS"
-  or
-  fname = ["include", "require", "include_once", "require_once"] and result = "file inclusion"
-  or
-  fname =
-    [
-      "fopen", "file_get_contents", "file_put_contents", "readfile", "file", "unlink", "fwrite",
-      "copy", "rename", "mkdir", "rmdir", "scandir", "opendir"
-    ] and
-  result = "path traversal"
-  or
-  fname = ["header", "http_redirect"] and result = "open redirect"
-  or
-  fname = ["curl_setopt", "curl_init", "fsockopen", "stream_socket_client", "get_headers"] and
-  result = "server-side request forgery"
-  or
-  fname = ["ldap_search", "ldap_list", "ldap_read", "ldap_bind"] and result = "LDAP injection"
-  or
-  fname = "unserialize" and result = "unsafe deserialization"
-}
+/**
+ * Maps a dangerous built-in function name to the vulnerability `kind` its arguments expose — read from
+ * the `sinkModel` DATA (`ext/php-builtins.model.yml`), NOT a hardcoded QL list (Phase C). Used by the
+ * dynamic-dispatch sinks below (`$fn(...)`, `call_user_func('system', …)`), where the callee name is
+ * resolved structurally in QL and then looked up here.
+ */
+string sinkFunctionKind(string fname) { sinkModel("function", fname, -1, result) }
 
 /** Gets the constant string value of a single- or double-quoted string literal `e`. */
 private string constantStringValue(Expr e) {
@@ -196,8 +148,9 @@ private string stringLiteralCallee(FunctionCall c) {
 
 /** Holds if `n` is a sink of vulnerability class `kind`. */
 predicate isSinkOfKind(DataFlow::Node n, string kind) {
-  exists(FunctionCall c | kind = sinkFunctionKind(c.getName()) and n.asExpr() = c.getAnArgument())
-  or
+  // NOTE: the direct built-in function sink (`system($x)`, …) is DATA — `sinkModel` rows applied by
+  // `DataSink` (Phase C). The cases below are STRUCTURAL/dynamic dispatch, keyed by the DATA-backed
+  // `sinkFunctionKind` name→kind lookup.
   // Callee written as a string literal: `"system"($x)`.
   exists(FunctionCall c |
     kind = sinkFunctionKind(stringLiteralCallee(c)) and n.asExpr() = c.getAnArgument()

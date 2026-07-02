@@ -138,19 +138,6 @@ private string resolvedStringOf(Expr e) {
   )
 }
 
-/** Built-in functions that pass taint from an argument through to their result. */
-private predicate propagatingBuiltin(string name) {
-  name =
-    [
-      "strtoupper", "strtolower", "ucfirst", "ucwords", "lcfirst", "trim", "ltrim", "rtrim", "substr",
-      "str_replace", "str_ireplace", "preg_replace", "preg_replace_callback", "sprintf", "vsprintf",
-      "implode", "join", "strrev", "str_repeat", "str_pad", "substr_replace", "strtr", "chunk_split",
-      "nl2br", "wordwrap", "strval", "urldecode", "rawurldecode", "base64_decode", "json_decode",
-      "unserialize", "stripslashes", "stripcslashes", "html_entity_decode", "htmlspecialchars_decode",
-      "utf8_decode", "utf8_encode", "hex2bin", "quotemeta", "wordwrap", "ucwords"
-    ]
-}
-
 predicate defaultTaintSanitizer(DataFlow::Node node) { node instanceof Sanitizer }
 
 cached
@@ -198,11 +185,8 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // Interpolation via heredoc body (its parts are not direct field-or-children of the heredoc).
     exists(Php::Heredoc h | nodeFrom.asExpr() = h.getValue().getChild(_) and nodeTo.asExpr() = h)
     or
-    // Taint-propagating string built-ins (plain function calls are otherwise not auto-propagated).
-    exists(FunctionCall c |
-      propagatingBuiltin(c.getName()) and nodeFrom.asExpr() = c.getAnArgument() and nodeTo.asExpr() = c
-    )
-    or
+    // NOTE: taint-propagating string built-ins (strtoupper/trim/substr/…) are DATA — `stepModel` rows
+    // in `ext/php-builtins.model.yml`, applied by `DataStep` — not a hardcoded QL list (Phase C).
     // Assignment-as-expression (chained `$a = $b = $s`): the assignment yields its assigned value.
     exists(AssignExpr a | nodeFrom.asExpr() = a.getRhs() and nodeTo.asExpr() = a)
     or

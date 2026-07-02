@@ -1,0 +1,166 @@
+# PHP built-in functions as Models-as-Data.
+#
+# The ENGINE (how a call propagates, dispatches, mutates) lives in QL and is language-general. The
+# COVERAGE — which built-in function is a source / sink / sanitizer / taint step — is DATA and lives
+# here, so it is extended by adding rows, never by editing QL. Columns:
+#   sourceModel    : subjectKind, name, sourceType
+#   sinkModel      : subjectKind, name, argIndex(-1=any), vulnKind
+#   stepModel      : subjectKind, name, fromArg(-1=any), toArg(-1=return)
+#   sanitizerModel : subjectKind, name
+# subjectKind is "function" for all built-ins below.
+
+extensions:
+  # ---- Sources: built-in request/environment readers ------------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sourceModel
+    data:
+      - ["function", "getenv", "remote"]
+      - ["function", "apache_request_headers", "remote"]
+      - ["function", "getallheaders", "remote"]
+      - ["function", "filter_input", "remote"]
+      - ["function", "filter_input_array", "remote"]
+
+  # ---- Sinks: dangerous built-in functions (any argument) -------------------------------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sinkModel
+    data:
+      # command injection
+      - ["function", "system", -1, "command injection"]
+      - ["function", "exec", -1, "command injection"]
+      - ["function", "shell_exec", -1, "command injection"]
+      - ["function", "passthru", -1, "command injection"]
+      - ["function", "proc_open", -1, "command injection"]
+      - ["function", "popen", -1, "command injection"]
+      # code injection
+      - ["function", "eval", -1, "code injection"]
+      - ["function", "assert", -1, "code injection"]
+      - ["function", "create_function", -1, "code injection"]
+      # SQL injection
+      - ["function", "mysqli_query", -1, "SQL injection"]
+      - ["function", "mysql_query", -1, "SQL injection"]
+      - ["function", "pg_query", -1, "SQL injection"]
+      - ["function", "pg_send_query", -1, "SQL injection"]
+      # reflected XSS
+      - ["function", "print", -1, "reflected XSS"]
+      - ["function", "printf", -1, "reflected XSS"]
+      - ["function", "print_r", -1, "reflected XSS"]
+      - ["function", "vprintf", -1, "reflected XSS"]
+      # path traversal
+      - ["function", "fopen", -1, "path traversal"]
+      - ["function", "file_get_contents", -1, "path traversal"]
+      - ["function", "file_put_contents", -1, "path traversal"]
+      - ["function", "readfile", -1, "path traversal"]
+      - ["function", "file", -1, "path traversal"]
+      - ["function", "unlink", -1, "path traversal"]
+      - ["function", "fwrite", -1, "path traversal"]
+      - ["function", "copy", -1, "path traversal"]
+      - ["function", "rename", -1, "path traversal"]
+      - ["function", "mkdir", -1, "path traversal"]
+      - ["function", "rmdir", -1, "path traversal"]
+      - ["function", "scandir", -1, "path traversal"]
+      - ["function", "opendir", -1, "path traversal"]
+      # open redirect
+      - ["function", "header", -1, "open redirect"]
+      - ["function", "http_redirect", -1, "open redirect"]
+      # server-side request forgery
+      - ["function", "curl_setopt", -1, "server-side request forgery"]
+      - ["function", "curl_init", -1, "server-side request forgery"]
+      - ["function", "fsockopen", -1, "server-side request forgery"]
+      - ["function", "stream_socket_client", -1, "server-side request forgery"]
+      - ["function", "get_headers", -1, "server-side request forgery"]
+      # LDAP injection
+      - ["function", "ldap_search", -1, "LDAP injection"]
+      - ["function", "ldap_list", -1, "LDAP injection"]
+      - ["function", "ldap_read", -1, "LDAP injection"]
+      - ["function", "ldap_bind", -1, "LDAP injection"]
+      # unsafe deserialization
+      - ["function", "unserialize", -1, "unsafe deserialization"]
+
+  # ---- Sanitizers: built-in encoders / escapers / validators (value-returning) ----------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sanitizerModel
+    data:
+      - ["function", "htmlspecialchars"]
+      - ["function", "htmlentities"]
+      - ["function", "strip_tags"]
+      - ["function", "esc_html"]
+      - ["function", "esc_attr"]
+      - ["function", "esc_url"]
+      - ["function", "esc_js"]
+      - ["function", "sanitize_text_field"]
+      - ["function", "sanitize_email"]
+      - ["function", "wp_kses"]
+      - ["function", "wp_kses_post"]
+      - ["function", "escapeshellarg"]
+      - ["function", "escapeshellcmd"]
+      - ["function", "mysqli_real_escape_string"]
+      - ["function", "mysql_real_escape_string"]
+      - ["function", "pg_escape_string"]
+      - ["function", "pg_escape_literal"]
+      - ["function", "addslashes"]
+      - ["function", "quote"]
+      - ["function", "intval"]
+      - ["function", "floatval"]
+      - ["function", "doubleval"]
+      - ["function", "abs"]
+      - ["function", "count"]
+      - ["function", "settype"]
+      - ["function", "basename"]
+      - ["function", "realpath"]
+      - ["function", "filter_var"]
+      - ["function", "preg_quote"]
+      - ["function", "urlencode"]
+      - ["function", "rawurlencode"]
+      - ["function", "base64_encode"]
+      - ["function", "bin2hex"]
+      - ["function", "md5"]
+      - ["function", "sha1"]
+      - ["function", "hash"]
+
+  # ---- Taint steps: string built-ins that propagate any argument to the result ----------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: stepModel
+    data:
+      - ["function", "strtoupper", -1, -1]
+      - ["function", "strtolower", -1, -1]
+      - ["function", "ucfirst", -1, -1]
+      - ["function", "ucwords", -1, -1]
+      - ["function", "lcfirst", -1, -1]
+      - ["function", "trim", -1, -1]
+      - ["function", "ltrim", -1, -1]
+      - ["function", "rtrim", -1, -1]
+      - ["function", "substr", -1, -1]
+      - ["function", "str_replace", -1, -1]
+      - ["function", "str_ireplace", -1, -1]
+      - ["function", "preg_replace", -1, -1]
+      - ["function", "preg_replace_callback", -1, -1]
+      - ["function", "sprintf", -1, -1]
+      - ["function", "vsprintf", -1, -1]
+      - ["function", "implode", -1, -1]
+      - ["function", "join", -1, -1]
+      - ["function", "strrev", -1, -1]
+      - ["function", "str_repeat", -1, -1]
+      - ["function", "str_pad", -1, -1]
+      - ["function", "substr_replace", -1, -1]
+      - ["function", "strtr", -1, -1]
+      - ["function", "chunk_split", -1, -1]
+      - ["function", "nl2br", -1, -1]
+      - ["function", "wordwrap", -1, -1]
+      - ["function", "strval", -1, -1]
+      - ["function", "urldecode", -1, -1]
+      - ["function", "rawurldecode", -1, -1]
+      - ["function", "base64_decode", -1, -1]
+      - ["function", "json_decode", -1, -1]
+      - ["function", "unserialize", -1, -1]
+      - ["function", "stripslashes", -1, -1]
+      - ["function", "stripcslashes", -1, -1]
+      - ["function", "html_entity_decode", -1, -1]
+      - ["function", "htmlspecialchars_decode", -1, -1]
+      - ["function", "utf8_decode", -1, -1]
+      - ["function", "utf8_encode", -1, -1]
+      - ["function", "hex2bin", -1, -1]
+      - ["function", "quotemeta", -1, -1]
