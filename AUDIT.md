@@ -339,13 +339,15 @@ Vérifiés **corrects** : Rust 251 LOC ✓, 7 MAD ✓.
 - `CfgConsistency` durci : exclut le **code mort** prouvable (statements après un producteur anormal) —
   sinon `return`/`break` bien modélisés le faisaient sur-signaler.
 
-- `A.7` ☐ **Retirer le hack uncertain-writes** (`SsaImpl.qll` `variableWrite`) : `isPartialUpdate` reste
-  uncertain (A.1), retirer `inConditionalBranch` (autres writes `certain=true`). **Débloqué** : TOUS les
-  constructs branchent (if/while/do/for/foreach/switch/match/ternaire/court-circuit). Test rouge du FP
-  intra-branche (`$y=$_GET['x']; $y="safe"; sink($y)` ne doit PAS être flaggé). Re-valider toute la suite.
+- `A.7` ☑ **Hack uncertain-writes retiré** (`SsaImpl.variableWrite`) : seul `isPartialUpdate` reste
+  uncertain (A.1), tout autre write est `certain=true` ; prédicat `inConditionalBranch` supprimé. Le φ réel
+  porte le taint. Test `SanitizeInBranch` (FP intra-branche éliminé, vrais BUG cross/single-branch conservés).
+  **Zéro régression** sur toute la suite → le CFG branchant remplace complètement le hack.
 
-> **État Phase A** : A.1–A.6 ☑ (tout le contrôle de flux branche, complétions anormales incluses).
-> Reste **A.7** (retrait du hack, maintenant débloqué). `CfgConsistency`/`CfgCoverage` : 0 angle mort.
+> **✅ PHASE A COMPLÈTE** : A.1–A.7 ☑. Tout le flux de contrôle PHP branche pour de vrai (if/elseif/else,
+> while/do/for/foreach avec break/continue, switch fall-through+break, match, try/catch/finally, ternaire/elvis,
+> court-circuit `&&`/`||`/`??`, return/throw), plus de hack, plus de linéarisation. `CfgConsistency`/`CfgCoverage`
+> = 0 angle mort. Suite **57/57**. Prochaine phase : **B** (pièces moteur stubbées) ou **C** (migration MAD).
 
 ## Phase B — Moteur dataflow complet (retire les patches par-pattern)
 - `B.1` ☐ `PostUpdateNode`/`getPreUpdateNode` généraux (receveurs + `&`-args, méthodes incluses) →
