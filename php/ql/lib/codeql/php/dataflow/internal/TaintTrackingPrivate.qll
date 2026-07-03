@@ -234,6 +234,26 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = bodyRead
     )
     or
+    // By-REFERENCE closure capture `function() use (&$out) { $out = v; }`: a write to the captured
+    // variable inside the closure body flows BACK to reads of it in the enclosing scope (the reference
+    // makes the closure's write mutate the outer variable). The mirror of the by-value capture above.
+    exists(
+      Php::AnonymousFunction cl, Php::AnonymousFunctionUseClause uc, Php::ByRef capture,
+      AssignExpr innerWrite, VariableAccess innerTarget, VariableAccess outerRead, string name
+    |
+      uc = cl.getChild() and
+      capture = uc.getChild(_) and
+      name = capture.getChild().(VariableAccess).getName() and
+      innerWrite.getLhs() = innerTarget and
+      innerTarget.getName() = name and
+      cl.getBody() = innerTarget.(Php::AstNode).getParent+() and
+      outerRead.getName() = name and
+      not cl.getBody() = outerRead.(Php::AstNode).getParent*() and
+      sameScope(outerRead, cl) and
+      nodeFrom.asExpr() = innerWrite.getRhs() and
+      nodeTo.asExpr() = outerRead
+    )
+    or
     // Arrow function auto-capture `fn() => ... $x ...`: enclosing assignment reaches the arrow body.
     exists(Php::ArrowFunction af, AssignExpr a, VariableAccess w, VariableAccess bodyRead |
       a.getLhs() = w and
