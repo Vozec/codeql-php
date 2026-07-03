@@ -238,6 +238,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       bodyRead.getName() = capture.getName() and
       cl.getBody() = bodyRead.(Php::AstNode).getParent+() and
       not cl.getBody() = w.(Php::AstNode).getParent*() and
+      // The captured assignment must live in the closure's DEFINING scope (a `use($x)` closure captures
+      // `$x` from where the closure is written) — not a same-named variable in an unrelated scope/file.
+      sameScope(w, cl) and
       nodeFrom.asExpr() = a.getRhs() and
       nodeTo.asExpr() = bodyRead
     )
@@ -278,6 +281,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     exists(Php::DynamicVariableName dv, Php::AssignmentExpression a, VariableAccess read |
       a.getLeft() = dv and
       read.getName() = resolvedStringOf(dv.getChild()) and
+      // Same scope only — a `$$n` write in one function must not taint a same-named plain variable
+      // in an unrelated function that happens to share the file.
+      sameScope(dv, read) and
       nodeFrom.asExpr() = a.getRight() and
       nodeTo.asExpr() = read
     )
@@ -474,7 +480,10 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       n2 = ra.getRight().(VariableAccess).getName() and
       av.getLhs() = aw and
       (aw.getName() = n1 and br.getName() = n2 or aw.getName() = n2 and br.getName() = n1) and
-      aw.getLocation().getFile() = br.getLocation().getFile() and
+      // A `$b =& $a` alias is scope-local: require the alias, the write and the read to share a scope,
+      // not merely the same file (same-named locals in unrelated functions must not cross-link).
+      sameScope(ra, aw) and
+      sameScope(aw, br) and
       nodeFrom.asExpr() = av.getRhs() and
       nodeTo.asExpr() = br
     )

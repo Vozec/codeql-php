@@ -373,16 +373,52 @@ private string globalsKey(Php::SubscriptExpression sub) {
   result = sub.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue()
 }
 
+/** Gets a function/method/closure body AST node. */
+private AstNode aCallableBody() {
+  result = any(Php::FunctionDefinition f).getBody() or
+  result = any(Php::MethodDeclaration m).getBody() or
+  result = any(Php::AnonymousFunction a).getBody() or
+  result = any(Php::ArrowFunction a).getBody()
+}
+
+/** Holds if `v` sits at file top level (outside any function/method/closure body). */
+private predicate atTopLevel(VariableAccess v) { not v.(Php::AstNode).getParent+() = aCallableBody() }
+
+/** Holds if `v` (named `name`) is inside a function/method that declares `global $name`. */
+private predicate inFunctionGlobal(VariableAccess v, string name) {
+  exists(Php::GlobalDeclaration g, AstNode body |
+    body = aCallableBody() and
+    g.getChild(_).(VariableAccess).getName() = name and
+    g.(Php::AstNode).getParent+() = body and
+    v.(Php::AstNode).getParent+() = body
+  )
+}
+
+/**
+ * Holds if variable access `v` (named `name`) refers to the GLOBAL `$name`: either it sits at file
+ * top level (where `$name` is the global) or it is inside a function that declares `global $name`.
+ */
+private predicate inGlobalScope(VariableAccess v, string name) {
+  v.getName() = name and (atTopLevel(v) or inFunctionGlobal(v, name))
+}
+
 predicate jumpStep(Node node1, Node node2) {
   // Global variables (`global $g`) alias a single cross-scope value: assigning `$g` in one scope
   // flows to reads of `$g` in another. Modelled as a jump step (non-local, value-preserving), so it
-  // works for every data-flow query and is not restricted to a single file.
+  // works for every data-flow query and is not restricted to a single file. Both the writing and the
+  // reading scope must actually declare `global $g` — otherwise a purely local `$g` in a function that
+  // never touches the global would be cross-linked to every other `$g` in the program (a false positive).
   exists(string gname, AssignExpr a, VariableAccess w, VariableAccess r |
-    gname = any(Php::GlobalDeclaration g).getChild(_).(VariableAccess).getName() and
     a.getLhs() = w and
     w.getName() = gname and
     r.getName() = gname and
     r != w and
+    inGlobalScope(w, gname) and
+    inGlobalScope(r, gname) and
+    // At least one endpoint must be a function's `global $g` import — a pure top-level `$g → $g` flow is
+    // ordinary local dataflow, not a cross-scope global alias, so it must NOT get a (SSA-order-blind)
+    // jump step (that would cross-link every same-named top-level variable — a false positive).
+    (inFunctionGlobal(w, gname) or inFunctionGlobal(r, gname)) and
     node1.asExpr() = a.getRhs() and
     node2.asExpr() = r
   )
