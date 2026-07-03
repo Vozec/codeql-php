@@ -572,10 +572,11 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
 private predicate structuralPropagator(AstNode e) {
   e instanceof Php::MemberAccessExpression or
   e instanceof Php::NullsafeMemberAccessExpression or
-  e instanceof Php::MemberCallExpression or
-  e instanceof Php::NullsafeMemberCallExpression or
+  // NOTE: method/static CALL expressions are deliberately NOT here. A call's argument→return flow is
+  // decided by the callee body (real interprocedural summaries via `viableCallable`) or by a Models-as-
+  // Data `stepModel` row for library methods — never a blanket "every argument taints the result", which
+  // would defeat every method-based sanitizer (e.g. `$db->quote($x)`, `$purifier->purify($x)`).
   e instanceof Php::ScopedPropertyAccessExpression or
-  e instanceof Php::ScopedCallExpression or
   e instanceof Php::CastExpression or
   e instanceof Php::UnaryOpExpression or
   e instanceof Php::BinaryExpression or

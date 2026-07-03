@@ -11,13 +11,11 @@ edges
 | test.php:8:23:8:27 | VariableName | test.php:8:23:8:32 | SubscriptExpression | provenance |  |
 | test.php:8:23:8:32 | SubscriptExpression | test.php:7:13:7:14 | VariableName | provenance |  |
 | test.php:11:25:11:26 | VariableName | test.php:11:38:11:39 | VariableName | provenance |  |
-| test.php:12:28:12:29 | VariableName | test.php:12:55:12:66 | MemberCallExpression | provenance |  |
 | test.php:12:28:12:29 | VariableName | test.php:12:64:12:65 | VariableName | provenance |  |
 | test.php:12:64:12:65 | VariableName | test.php:11:25:11:26 | VariableName | provenance |  |
 | test.php:12:64:12:65 | VariableName | test.php:12:55:12:66 | MemberCallExpression | provenance |  |
 | test.php:15:10:15:32 | MemberCallExpression | test.php:16:12:16:13 | VariableName | provenance |  |
 | test.php:15:22:15:26 | VariableName | test.php:15:22:15:31 | SubscriptExpression | provenance |  |
-| test.php:15:22:15:26 | VariableName | test.php:16:12:16:13 | VariableName | provenance |  |
 | test.php:15:22:15:31 | SubscriptExpression | test.php:12:28:12:29 | VariableName | provenance |  |
 | test.php:15:22:15:31 | SubscriptExpression | test.php:15:10:15:32 | MemberCallExpression | provenance |  |
 | test.php:20:17:20:18 | VariableName | test.php:20:30:20:61 | FunctionCallExpression | provenance |  |

@@ -1,0 +1,26 @@
+edges
+| test.php:10:29:10:30 | VariableName | test.php:10:41:10:42 | VariableName | provenance |  |
+| test.php:12:16:12:20 | VariableName | test.php:12:16:12:25 | SubscriptExpression | provenance |  |
+| test.php:12:16:12:25 | SubscriptExpression | test.php:10:29:10:30 | VariableName | provenance |  |
+| test.php:12:16:12:25 | SubscriptExpression | test.php:12:8:12:26 | MemberCallExpression | provenance |  |
+| test.php:15:35:15:36 | VariableName | test.php:15:47:15:48 | VariableName | provenance |  |
+| test.php:16:19:16:23 | VariableName | test.php:16:19:16:28 | SubscriptExpression | provenance |  |
+| test.php:16:19:16:28 | SubscriptExpression | test.php:15:35:15:36 | VariableName | provenance |  |
+| test.php:16:19:16:28 | SubscriptExpression | test.php:16:8:16:29 | ScopedCallExpression | provenance |  |
+nodes
+| test.php:10:29:10:30 | VariableName | semmle.label | VariableName |
+| test.php:10:41:10:42 | VariableName | semmle.label | VariableName |
+| test.php:12:8:12:26 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:12:16:12:20 | VariableName | semmle.label | VariableName |
+| test.php:12:16:12:25 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:15:35:15:36 | VariableName | semmle.label | VariableName |
+| test.php:15:47:15:48 | VariableName | semmle.label | VariableName |
+| test.php:16:8:16:29 | ScopedCallExpression | semmle.label | ScopedCallExpression |
+| test.php:16:19:16:23 | VariableName | semmle.label | VariableName |
+| test.php:16:19:16:28 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+| test.php:12:16:12:25 | SubscriptExpression | test.php:10:29:10:30 | VariableName | test.php:10:41:10:42 | VariableName | test.php:12:8:12:26 | MemberCallExpression |
+| test.php:16:19:16:28 | SubscriptExpression | test.php:15:35:15:36 | VariableName | test.php:15:47:15:48 | VariableName | test.php:16:8:16:29 | ScopedCallExpression |
+#select
+| test.php:12:8:12:26 | MemberCallExpression | test.php:12:16:12:20 | VariableName | test.php:12:8:12:26 | MemberCallExpression | This shell command depends on a $@. | test.php:12:16:12:20 | VariableName | user-provided value |
+| test.php:16:8:16:29 | ScopedCallExpression | test.php:16:19:16:23 | VariableName | test.php:16:8:16:29 | ScopedCallExpression | This shell command depends on a $@. | test.php:16:19:16:23 | VariableName | user-provided value |

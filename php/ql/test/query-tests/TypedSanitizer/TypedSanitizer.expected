@@ -4,7 +4,6 @@ edges
 | test.php:8:10:8:64 | MemberCallExpression | test.php:5:25:5:28 | VariableName | provenance |  |
 | test.php:8:23:8:63 | BinaryExpression | test.php:4:29:4:32 | VariableName | provenance |  |
 | test.php:8:23:8:63 | BinaryExpression | test.php:8:10:8:64 | MemberCallExpression | provenance |  |
-| test.php:8:53:8:57 | VariableName | test.php:8:10:8:64 | MemberCallExpression | provenance |  |
 | test.php:8:53:8:57 | VariableName | test.php:8:23:8:63 | BinaryExpression | provenance |  |
 nodes
 | test.php:4:29:4:32 | VariableName | semmle.label | VariableName |
