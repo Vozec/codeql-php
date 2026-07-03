@@ -1,7 +1,20 @@
 # Plan détaillé — Phases D (AST public) & F (Bazel)
 
 > Branche `phase-d-f-hardening`. Exécution autonome, test-first, un commit par étape vérifiable.
-> Filet : `.tooling/codeql/codeql test run php/ql/test` doit rester vert (71/71) à chaque étape D.
+> Filet : `.tooling/codeql/codeql test run php/ql/test` doit rester vert à chaque étape D.
+
+## ✅ ÉTAT — LES DEUX PHASES SONT FAITES (branche `phase-d-f-hardening`, suite 72/72)
+- **Phase D ✅** : D.1 (signature `resolveClassReference` → `AstNode`), D.2 (wrappers publics
+  include/shell/throw/clone/print/array/closure + switch/try/for/do/catch/break/continue), D.3 (API
+  publique `dataflow/CallGraph`, migration LaravelRoutes + CallResolutionCoverage hors `internal`),
+  D.4 (imports `use` non-aliasés), D.5 (cleanup toString). Seul SemgrepAudit (bench) garde `internal`.
+- **Phase F Bazel ✅** : `php/{,extractor/,ql/lib/,tools/}BUILD.bazel` + `php/scripts/create-extractor-pack.sh`
+  (calqués ruby) ; `tree-sitter-php` enregistré dans le vendoring cargo Bazel (régénéré, Cargo.lock **minimal**
+  sans bump des autres langages) + MODULE.bazel. **Vérifié** : `bazel build //php/extractor:extractor` →
+  *Build completed successfully*.
+
+---
+### Plan d'origine (référence) :
 
 ## Phase D — Hiérarchie AST publique (rendre `Php::*` privé du point de vue des requêtes)
 
