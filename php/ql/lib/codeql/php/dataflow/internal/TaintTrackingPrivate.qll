@@ -65,12 +65,13 @@ private AstNode calleeBody(AstNode callee) {
   result = callee.(Php::MethodDeclaration).getBody()
 }
 
-/** Gets an argument node of a call `c` (function, method, nullsafe-method or static call). */
+/** Gets an argument node of a call `c` (function, method, nullsafe-method, static or `new` call). */
 private Php::Argument callArgumentNode(Call c) {
   result = c.(Php::FunctionCallExpression).getArguments().getChild(_) or
   result = c.(Php::MemberCallExpression).getArguments().getChild(_) or
   result = c.(Php::NullsafeMemberCallExpression).getArguments().getChild(_) or
-  result = c.(Php::ScopedCallExpression).getArguments().getChild(_)
+  result = c.(Php::ScopedCallExpression).getArguments().getChild(_) or
+  result = c.(Php::ObjectCreationExpression).getChild(_).(Php::Arguments).getChild(_)
 }
 
 /**
@@ -86,6 +87,13 @@ private predicate resolvesToCallee(Call call, AstNode callee) {
   or
   callee.(Php::MethodDeclaration).getName().getValue() = call.(MethodCall).getMethodName() and
   not TI::hasInferredReceiver(call)
+  or
+  // `new C(...)` resolves to `C::__construct` (so named-args and by-ref work for constructors too).
+  exists(ClassLike cls |
+    cls.getName() = call.(NewExpr).getClassName() and
+    callee = cls.getAMethod() and
+    callee.(Php::MethodDeclaration).getName().getValue() = "__construct"
+  )
 }
 
 /**
@@ -321,6 +329,26 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = r
     )
     or
+    // Constructor property promotion `new C($v)` with `__construct(public $f)`: the constructor argument
+    // IS the promoted field, so it flows to reads of `$o->f` on the constructed object `$o = new C($v)`.
+    exists(
+      NewExpr ne, ClassLike cls, Method ctor, Php::PropertyPromotionParameter pp, int i,
+      AssignExpr objAssign, VariableAccess objVar, Php::MemberAccessExpression fieldRead, string f
+    |
+      cls.getName() = ne.getClassName() and
+      ctor = cls.getAMethod() and
+      ctor.getName() = "__construct" and
+      pp = ctor.(Php::MethodDeclaration).getParameters().getChild(i) and
+      f = pp.getName().(Php::VariableName).getChild().getValue() and
+      objAssign.getRhs() = ne and
+      objAssign.getLhs() = objVar and
+      fieldRead.getObject().(VariableAccess).getName() = objVar.getName() and
+      fieldRead.getName().(Php::Name).getValue() = f and
+      sameScope(fieldRead, objVar) and
+      nodeFrom.asExpr() = ne.getArgument(i) and
+      nodeTo.asExpr() = fieldRead
+    )
+    or
     // Magic `__toString`: an object used in string context (concat, interpolation, `(string)` cast)
     // invokes `__toString()`; its returned value taints that context. Type-agnostic (works for
     // parameters/fields/returns of unknown type, e.g. a cast inside `__wakeup`), bounded because it
@@ -404,6 +432,33 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       sameScope(outerRead, recv) and
       outerRead != innerStore and
       nodeFrom.asExpr() = call.getArgument(i) and
+      nodeTo.asExpr() = outerRead
+    )
+    or
+    // Constructor mutation flow-back: `$o = new C($a)` where `__construct` stores a parameter into
+    // `$this->f` makes reads of `$o->f` tainted (the constructor acts as a field setter). Mirrors the
+    // setter step for `new`; the source is the parameter READ, so it fires for positional args (engine
+    // parameter passing) and named args (the named-arg step taints the parameter) alike.
+    exists(
+      NewExpr call, ClassLike cls, Method ctor, int i, AssignExpr innerAssign,
+      Php::MemberAccessExpression innerStore, AssignExpr objAssign, VariableAccess objVar,
+      Php::MemberAccessExpression outerRead, string fld
+    |
+      cls.getName() = call.getClassName() and
+      ctor = cls.getAMethod() and
+      ctor.getName() = "__construct" and
+      innerAssign.getLhs() = innerStore and
+      innerStore.getObject().(VariableAccess).getName() = "this" and
+      innerStore.getName().(Php::Name).getValue() = fld and
+      innerStore.(Php::AstNode).getParent+() = ctor.(Php::MethodDeclaration).getBody() and
+      innerAssign.getRhs() = paramReadInBody(ctor, i) and
+      objAssign.getRhs() = call and
+      objAssign.getLhs() = objVar and
+      outerRead.getObject().(VariableAccess).getName() = objVar.getName() and
+      outerRead.getName().(Php::Name).getValue() = fld and
+      sameScope(outerRead, objVar) and
+      outerRead != innerStore and
+      (nodeFrom.asExpr() = call.getArgument(i) or nodeFrom.asExpr() = innerAssign.getRhs()) and
       nodeTo.asExpr() = outerRead
     )
     or

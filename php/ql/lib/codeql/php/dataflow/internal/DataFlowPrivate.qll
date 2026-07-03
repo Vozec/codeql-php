@@ -473,6 +473,11 @@ private predicate isFirstClassCallable(FunctionCall fc) {
   )
 }
 
+/** Holds if method call `mc` is a first-class-callable creation `$obj->m(...)` (a `...` placeholder). */
+private predicate isFirstClassCallableMethod(MethodCall mc) {
+  exists(Php::VariadicPlaceholder p | p.(Php::AstNode).getParent+() = mc)
+}
+
 /**
  * Holds if `creation` creates a first-class callable whose body is the callable `c`: a closure, an arrow
  * function, or the PHP-8.1 first-class-callable syntax `f(...)` (which references the function/method
@@ -488,6 +493,18 @@ predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c)
     or
     // First-class callable `wrap(...)`: the callable is the referenced function (by name).
     exists(FunctionCall fc | fc = creation.asExpr() and isFirstClassCallable(fc) and c.getName() = fc.getName())
+    or
+    // Method first-class callable `$obj->m(...)`: the callable is the resolved method (by inferred type,
+    // falling back to name when the receiver type is unknown).
+    exists(MethodCall mc |
+      mc = creation.asExpr() and
+      isFirstClassCallableMethod(mc) and
+      (
+        c = TI::inferredMethod(mc)
+        or
+        not TI::hasInferredReceiver(mc) and c.getName() = mc.getMethodName()
+      )
+    )
   )
 }
 
