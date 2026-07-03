@@ -76,16 +76,16 @@ class ClassLike extends AstNode {
   }
 
   /** Gets the superclass of this class, or a super-interface of this interface. */
-  ClassLike getASuperType() { result = resolveClassReference(this.getASuperTypeRef()) }
+  ClassLike getASuperType() { result = resolveClassReference(this.getASuperTypeRef().(AstNode)) }
 
   /** Gets an interface directly implemented by this class. */
   ClassLike getAnImplementedInterface() {
-    result = resolveClassReference(this.getAnImplementedRef())
+    result = resolveClassReference(this.getAnImplementedRef().(AstNode))
   }
 
   /** Gets a trait directly `use`d by this type. */
   ClassLike getAUsedTrait() {
-    result = resolveClassReference(this.getAUsedTraitRef()) and result instanceof Php::TraitDeclaration
+    result = resolveClassReference(this.getAUsedTraitRef().(AstNode)) and result instanceof Php::TraitDeclaration
   }
 
   /** Gets a direct super type: superclass or a directly implemented interface. */
@@ -129,7 +129,7 @@ class ClassLike extends AstNode {
  * This disambiguates identical short names living in different namespaces. `use`-import aliases
  * are not yet followed (a known refinement).
  */
-ClassLike resolveClassReference(Php::AstNode ref) {
+ClassLike resolveClassReference(AstNode ref) {
   result.getName() = simpleNameOf(ref) and
   result.getNamespace() = NS::referencedNamespace(ref)
   or
@@ -138,7 +138,7 @@ ClassLike resolveClassReference(Php::AstNode ref) {
   exists(Php::NamespaceUseClause uc |
     uc.getAlias().toString() = simpleNameOf(ref) and
     uc.getLocation().getFile() = ref.getLocation().getFile() and
-    result = resolveClassReference(uc.getChild())
+    result = resolveClassReference(uc.getChild().(AstNode))
   )
 }
 

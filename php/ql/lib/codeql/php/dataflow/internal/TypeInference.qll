@@ -14,7 +14,7 @@ private import codeql.php.dataflow.internal.SsaImpl as Ssa
 
 /** Gets the class a type-declaration node `t` denotes (`Foo`, `?Foo`, namespace-aware). */
 private ClassLike typeNodeClass(AstNode t) {
-  result = resolveClassReference(t.(Php::NamedType).getChild())
+  result = resolveClassReference(t.(Php::NamedType).getChild().(AstNode))
   or
   result = typeNodeClass(t.(Php::OptionalType).getChild())
 }
@@ -92,7 +92,7 @@ private predicate returnsThis(Method m) {
 cached
 ClassLike exprClass(Expr e) {
   // `new C(...)` — namespace-aware.
-  result = resolveClassReference(e.(Php::ObjectCreationExpression).getChild(_))
+  result = resolveClassReference(e.(Php::ObjectCreationExpression).getChild(_).(AstNode))
   or
   // `$this` inside a method resolves to the declaring class (and its subclasses inherit the type).
   e.(VariableAccess).getName() = "this" and result = enclosingClass(e)
@@ -183,7 +183,7 @@ Method staticInferredMethod(StaticMethodCall sc) {
       c = enclosingClass(sc).getASuperType()
       or
       // Explicit class name (namespace-aware); empty for relative scopes, which is fine.
-      c = resolveClassReference(sc.(Php::ScopedCallExpression).getScope())
+      c = resolveClassReference(sc.(Php::ScopedCallExpression).getScope().(AstNode))
     )
   )
 }

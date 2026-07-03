@@ -50,6 +50,67 @@ class StringLiteral extends Literal {
     this instanceof Php::EncapsedString and
     not this.(Php::EncapsedString).getChild(_) instanceof Php::VariableName
   }
+
+  /** Gets the literal text of this string (its concatenated string content). */
+  string getValue() {
+    result = this.(Php::String).getChild(_).(Php::StringContent).getValue() or
+    result = this.(Php::EncapsedString).getChild(_).(Php::StringContent).getValue()
+  }
+}
+
+/** An anonymous function or arrow function — a closure (a first-class callable value). */
+class Closure extends Expr {
+  Closure() { this instanceof Php::AnonymousFunction or this instanceof Php::ArrowFunction }
+}
+
+/** An array literal, `[...]` or `array(...)`. */
+class ArrayLiteral extends Expr instanceof Php::ArrayCreationExpression {
+  /** Gets an element expression of this array literal. */
+  Expr getAnElement() {
+    result = super.getChild(_).(Php::ArrayElementInitializer).getChild(_)
+  }
+}
+
+/** An `include`/`require`/`include_once`/`require_once` expression (file inclusion). */
+class IncludeExpr extends Expr {
+  IncludeExpr() {
+    this instanceof Php::IncludeExpression or
+    this instanceof Php::IncludeOnceExpression or
+    this instanceof Php::RequireExpression or
+    this instanceof Php::RequireOnceExpression
+  }
+
+  /** Gets the included path expression. */
+  Expr getPath() {
+    result = this.(Php::IncludeExpression).getChild() or
+    result = this.(Php::IncludeOnceExpression).getChild() or
+    result = this.(Php::RequireExpression).getChild() or
+    result = this.(Php::RequireOnceExpression).getChild()
+  }
+}
+
+/** A backtick shell-command expression, `` `cmd` `` (executes a shell command). */
+class ShellCommandExpr extends Expr instanceof Php::ShellCommandExpression {
+  /** Gets a part of the shell command. */
+  Expr getAPart() { result = super.getChild(_) }
+}
+
+/** A `throw` expression. */
+class ThrowExpr extends Expr instanceof Php::ThrowExpression {
+  /** Gets the thrown expression. */
+  Expr getThrown() { result = super.getChild() }
+}
+
+/** A `clone $x` expression. */
+class CloneExpr extends Expr instanceof Php::CloneExpression {
+  /** Gets the cloned expression. */
+  Expr getOperand() { result = super.getChild() }
+}
+
+/** A `print` expression (a language construct, not a function call). */
+class PrintExpr extends Expr instanceof Php::PrintIntrinsic {
+  /** Gets the printed operand. */
+  Expr getOperand() { result = super.getChild() }
 }
 
 /** A binary operation, e.g. `$a . $b` or `$x == $y`. */

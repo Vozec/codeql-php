@@ -37,10 +37,67 @@ class IfStmt extends Stmt instanceof Php::IfStatement {
 }
 
 /** A `while` statement. */
-class WhileStmt extends Stmt instanceof Php::WhileStatement { }
+class WhileStmt extends Stmt instanceof Php::WhileStatement {
+  /** Gets the loop condition. */
+  Expr getCondition() { result = super.getCondition().(Expr) }
+
+  /** Gets the loop body. */
+  AstNode getBody() { result = super.getBody() }
+}
+
+/** A `do … while` statement. */
+class DoStmt extends Stmt instanceof Php::DoStatement {
+  /** Gets the loop condition. */
+  Expr getCondition() { result = super.getCondition().(Expr) }
+
+  /** Gets the loop body. */
+  AstNode getBody() { result = super.getBody() }
+}
+
+/** A `for (init; cond; update) body` statement. */
+class ForStmt extends Stmt instanceof Php::ForStatement {
+  /** Gets the loop condition, if any. */
+  Expr getCondition() { result = super.getCondition().(Expr) }
+
+  /** Gets a body statement. */
+  AstNode getBody() { result = super.getBody(_) }
+}
 
 /** A `foreach` statement. */
 class ForeachStmt extends Stmt instanceof Php::ForeachStatement {
   /** Gets the loop body. */
   AstNode getBody() { result = super.getBody() }
 }
+
+/** A `switch` statement. */
+class SwitchStmt extends Stmt instanceof Php::SwitchStatement {
+  /** Gets the subject expression. */
+  Expr getSubject() { result = super.getCondition().(Expr) }
+
+  /** Gets a `case`/`default` arm. */
+  AstNode getAnArm() { result = super.getBody().getChild(_) }
+}
+
+/** A `try … catch … finally` statement. */
+class TryStmt extends Stmt instanceof Php::TryStatement {
+  /** Gets the `try` body. */
+  AstNode getBody() { result = super.getBody() }
+
+  /** Gets a `catch` clause. */
+  CatchClause getACatchClause() { result = super.getChild(_) }
+}
+
+/** A `catch (Type $e) { … }` clause. */
+class CatchClause extends AstNode instanceof Php::CatchClause {
+  /** Gets the caught-exception variable name (without the leading `$`). */
+  string getVariableName() { result = super.getName().getChild().getValue() }
+
+  /** Gets the clause body. */
+  AstNode getBody() { result = super.getBody() }
+}
+
+/** A `break` statement. */
+class BreakStmt extends Stmt instanceof Php::BreakStatement { }
+
+/** A `continue` statement. */
+class ContinueStmt extends Stmt instanceof Php::ContinueStatement { }
