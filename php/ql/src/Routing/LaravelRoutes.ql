@@ -10,7 +10,6 @@
  */
 
 import codeql.php.AST
-import codeql.php.ast.internal.TreeSitter
 
 /** HTTP verb methods registered on the `Route` facade or a router instance. */
 private predicate routeVerb(string name) {
@@ -28,18 +27,16 @@ predicate laravelRoute(Call c, string verb, string path, string handler) {
   ) and
   routeVerb(verb) and
   (
-    path = c.getArgument(0).(Php::String).getChild(_).(Php::StringContent).getValue()
+    path = c.getArgument(0).(StringLiteral).getValue()
     or
-    not c.getArgument(0) instanceof Php::String and path = "<dynamic>"
+    not c.getArgument(0) instanceof StringLiteral and path = "<dynamic>"
   ) and
   (
-    handler = c.getArgument(1).(Php::String).getChild(_).(Php::StringContent).getValue()
+    handler = c.getArgument(1).(StringLiteral).getValue()
     or
-    c.getArgument(1) instanceof Php::AnonymousFunction and handler = "<closure>"
+    c.getArgument(1) instanceof Closure and handler = "<closure>"
     or
-    c.getArgument(1) instanceof Php::ArrowFunction and handler = "<closure>"
-    or
-    exists(Php::ArrayCreationExpression a | a = c.getArgument(1)) and handler = "<[Controller::class, method]>"
+    c.getArgument(1) instanceof ArrayLiteral and handler = "<[Controller::class, method]>"
     or
     not exists(c.getArgument(1)) and handler = "<none>"
   )
