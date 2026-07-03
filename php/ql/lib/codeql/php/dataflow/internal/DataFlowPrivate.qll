@@ -466,16 +466,29 @@ private newtype TLambdaCallKind = TNoLambda()
 
 class LambdaCallKind = TLambdaCallKind;
 
+/** Holds if function call `fc` is a first-class-callable creation `f(...)` (a `...` placeholder). */
+private predicate isFirstClassCallable(FunctionCall fc) {
+  exists(Php::VariadicPlaceholder p |
+    p.(Php::AstNode).getParent+() = fc.(Php::FunctionCallExpression).getArguments()
+  )
+}
+
 /**
- * Holds if `creation` creates a first-class callable (a closure or arrow function) whose body is the
- * callable `c`. The closure value flows (via ordinary data flow) to wherever it is invoked, where
- * `lambdaCall` picks it up — so a closure stored in a variable and called later is handled generally,
- * without enumerating higher-order built-ins (B.2).
+ * Holds if `creation` creates a first-class callable whose body is the callable `c`: a closure, an arrow
+ * function, or the PHP-8.1 first-class-callable syntax `f(...)` (which references the function/method
+ * `f`). The callable value flows (via ordinary data flow) to wherever it is invoked, where `lambdaCall`
+ * picks it up — so a callable stored in a variable and called later is handled generally, without
+ * enumerating higher-order built-ins (B.2).
  */
 predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c) {
   kind = TNoLambda() and
-  c = creation.asExpr() and
-  (creation.asExpr() instanceof Php::AnonymousFunction or creation.asExpr() instanceof Php::ArrowFunction)
+  (
+    (creation.asExpr() instanceof Php::AnonymousFunction or creation.asExpr() instanceof Php::ArrowFunction) and
+    c = creation.asExpr()
+    or
+    // First-class callable `wrap(...)`: the callable is the referenced function (by name).
+    exists(FunctionCall fc | fc = creation.asExpr() and isFirstClassCallable(fc) and c.getName() = fc.getName())
+  )
 }
 
 /**
