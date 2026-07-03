@@ -140,6 +140,17 @@ ClassLike resolveClassReference(AstNode ref) {
     uc.getLocation().getFile() = ref.getLocation().getFile() and
     result = resolveClassReference(uc.getChild().(AstNode))
   )
+  or
+  // Follow a non-aliased `use App\Runner;` import: a bare `Runner` reference resolves to the imported
+  // fully-qualified type (its last segment matches the reference), giving precise TYPE-based dispatch
+  // instead of relying on the name-only fallback.
+  not ref instanceof Php::QualifiedName and
+  exists(Php::NamespaceUseClause uc |
+    not exists(uc.getAlias()) and
+    simpleNameOf(uc.getChild()) = simpleNameOf(ref) and
+    uc.getLocation().getFile() = ref.getLocation().getFile() and
+    result = resolveClassReference(uc.getChild().(AstNode))
+  )
 }
 
 /** A `class` declaration. */

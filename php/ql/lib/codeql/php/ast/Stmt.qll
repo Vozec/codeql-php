@@ -5,9 +5,7 @@ import codeql.php.ast.AstNode
 import codeql.php.ast.Expr
 
 /** A statement. */
-class Stmt extends AstNode instanceof Php::Statement {
-  override string toString() { result = this.getPrimaryQlClass() }
-}
+class Stmt extends AstNode instanceof Php::Statement { }
 
 /** An expression statement, `expr;`. */
 class ExprStmt extends Stmt instanceof Php::ExpressionStatement {

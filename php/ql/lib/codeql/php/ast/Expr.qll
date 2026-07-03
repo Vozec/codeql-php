@@ -4,9 +4,7 @@ private import codeql.php.ast.internal.TreeSitter
 import codeql.php.ast.AstNode
 
 /** An expression. */
-class Expr extends AstNode instanceof Php::Expression {
-  override string toString() { result = this.getPrimaryQlClass() }
-}
+class Expr extends AstNode instanceof Php::Expression { }
 
 /**
  * An access to a variable, e.g. `$name`.
