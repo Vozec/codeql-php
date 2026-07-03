@@ -458,3 +458,20 @@ VariableAccess is a supertype…` (cast redondant `recv instanceof VariableAcces
 **Rappel** : la suite verte ne prouve PAS l'absence de bugs — l'audit a trouvé des trous masqués *par
 omission dans les `.expected`* (ReflectedXss `print` = FN réel, pourtant « vert »). Les items du plan
 ajoutent les tests rouges manquants avant de corriger.
+
+---
+## §8 — Session raffinements (branche `phase-b-refinements`, 2026-07-03)
+
+Après Phases D (AST public) + F (Bazel), balayage probe→fix systématique de patterns PHP modernes.
+**6 FN réels corrigés** (chacun test-first, un commit, suite verte à chaque étape) ; suite **45 → 78** :
+
+- **Closure capture par référence** `use (&$out)` : write dans la closure remonte au scope englobant.
+- **First-class callables** (PHP 8.1) : `f(...)` ET `$obj->m(...)` modélisés comme `lambdaCreation`.
+- **Steps DATA array/string** : explode/str_split/preg_split + array_values/keys/merge/slice/… (stepModel).
+- **Constructeur = setter** : `new C($t)` avec `$this->f = $param` teinte `$o->f` — positionnel, **named-args**
+  (`new C(b: $t)`), et **property promotion** (`__construct(public $cmd)`). Field-précis.
+- **Foreach par référence** `foreach (… as &$v)` / `… as $k => &$v` : la collection teinte la liaison.
+
+Vérifié : chaque fix est dans le moteur de taint générique → s'applique à TOUS les vuln kinds (confirmé
+SQL, SSTI). **FN niches restants documentés** (non corrigés, rares) : `compact('x')` (résolution de var par
+nom dynamique) ; arrow imbriqué `fn() => fn() => $x` (capture transitive sur 2 niveaux).
