@@ -153,6 +153,7 @@ use_repo(
     "vendor_ts__tree-sitter-generate-0.26.8",
     "vendor_ts__tree-sitter-json-0.24.8",
     "vendor_ts__tree-sitter-language-0.1.5",
+    "vendor_ts__tree-sitter-php-0.24.2",
     "vendor_ts__tree-sitter-python-0.23.6",
     "vendor_ts__tree-sitter-ql-0.23.1",
     "vendor_ts__tree-sitter-ruby-0.23.1",
