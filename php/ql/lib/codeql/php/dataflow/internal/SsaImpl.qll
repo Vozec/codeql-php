@@ -47,6 +47,10 @@ predicate isForeachBinding(Php::AstNode t) {
   exists(Php::ForeachStatement f, int i | i >= 1 and t = f.getChild(i))
   or
   exists(Php::Pair p | isForeachBinding(p) and t = p.getChild(_))
+  or
+  // Unwrap a by-reference binding `&$v` — `foreach (... as &$v)` or `... as $k => &$v` — so the actual
+  // referenced variable is the binding target.
+  exists(Php::ByRef r | isForeachBinding(r) and t = r.getChild())
 }
 
 /**

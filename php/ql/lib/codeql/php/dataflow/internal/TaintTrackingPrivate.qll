@@ -600,6 +600,9 @@ private VariableAccess foreachBindingVar(AstNode t) {
   result = foreachBindingVar(t.(Php::Pair).getChild(_))
   or
   result = foreachBindingVar(t.(Php::ListLiteral).getChild(_))
+  or
+  // by-reference value binding `foreach (... as &$v)`.
+  result = foreachBindingVar(t.(Php::ByRef).getChild())
 }
 
 /** Gets a `class::$prop` key identifying a static property access. */
