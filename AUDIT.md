@@ -475,3 +475,33 @@ Après Phases D (AST public) + F (Bazel), balayage probe→fix systématique de 
 Vérifié : chaque fix est dans le moteur de taint générique → s'applique à TOUS les vuln kinds (confirmé
 SQL, SSTI). **FN niches restants documentés** (non corrigés, rares) : `compact('x')` (résolution de var par
 nom dynamique) ; arrow imbriqué `fn() => fn() => $x` (capture transitive sur 2 niveaux).
+
+---
+## §9 — Audit multi-agent + corrections (branche `audit-fixes`, 2026-07-04)
+
+5 agents parallèles (bricolage, layering, FN, FP, AST/CFG) ont audité le pack, **chaque claim vérifié par
+exécution de POC**. Corrections livrées (test-first, suite 45→83) :
+
+### Faux positifs corrigés (angles morts introduits / latents)
+- **CRITIQUE** : appels méthode/statique ne passent plus en bloc leurs arguments au retour
+  (`structuralPropagator` — défaisait tout sanitizer-méthode). Retour/arg décidés par l'interproc réelle
+  ou une ligne MAD `stepModel`.
+- Steps cross-scope guardés par `sameScope` : closure `use($x)`, `$$n`, `=&`, `global $g` (ce dernier
+  exige désormais un `global` de fonction à au moins un bout — plus de cross-link top-level).
+- Constructeur/setter : classe résolue namespace-aware (`TI::exprClass`), source = `argBoundToParam`
+  (per-call-site, named par nom) → plus de fuite cross-instance ni de mauvaise classe même-nom.
+- `__set` type-gated ; bug de précédence `DataStep` (`toArg=-1` teintait tous les args).
+
+### Faux négatifs corrigés
+- **Arrow functions `fn()=>expr`** (ubiquitaire) : le corps est modélisé comme valeur de retour.
+- **`$a['k'] .= v` / `$this->buf .= v`** (augmenté sur élément/propriété) : redéfinit le conteneur + store.
+- **`call_user_func[_array]`** (string / closure / arrow) : args→params + retour→résultat.
+
+### Reste identifié, NON corrigé (documenté, MED/refactor) — pour retest
+- FN MED : `self::$p`/`parent::$p` (clé non construite) ; static FCC `C::m(...)` ; FCC via variable/array ;
+  ctor déléguant à un setter ; ctor `$this->data[]=$a` ; `[$a,&$b]` destructuring by-ref ; `use A\{B,C}`
+  groupé (namespace) ; `new self()/static()` type non inféré ; `compact()` ; arrow imbriqué.
+- FP recall-first ACCEPTABLE (bornés) : `__toString`/`__set` fallback type-inconnu ; static-prop partagé.
+- Layering (refactors) : migrer vers MAD les guards (`ctype_*`…), sanitizers-méthode, et introduire des
+  extensibles `callbackModel` (HO-dispatch, triplé/incohérent aujourd'hui), `outRefModel` (`parse_str`),
+  `sanitizerGuardModel`, `staticmethod` qualifié-classe (facade Request/Input).
