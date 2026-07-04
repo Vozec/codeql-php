@@ -4,7 +4,6 @@ edges
 | test.php:3:61:3:62 | VariableName | test.php:3:50:3:54 | [post] VariableName [.v] | provenance |  |
 | test.php:5:1:5:2 | [post] VariableName [.v] | test.php:6:8:6:9 | VariableName [.v] | provenance |  |
 | test.php:5:9:5:13 | VariableName | test.php:5:9:5:18 | SubscriptExpression | provenance |  |
-| test.php:5:9:5:13 | VariableName | test.php:6:8:6:12 | MemberAccessExpression | provenance |  |
 | test.php:5:9:5:18 | SubscriptExpression | test.php:3:44:3:45 | VariableName | provenance |  |
 | test.php:5:9:5:18 | SubscriptExpression | test.php:5:1:5:2 | [post] VariableName [.v] | provenance |  |
 | test.php:6:8:6:9 | VariableName [.v] | test.php:6:8:6:12 | MemberAccessExpression | provenance |  |

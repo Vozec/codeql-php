@@ -253,14 +253,23 @@ class NormalReturn extends ReturnKind, TNormalReturn {
 }
 
 /** A node holding a value returned from a callable. */
-class ReturnNode extends ExprNode {
+class ReturnNode extends Node {
   ReturnNode() {
-    exists(Php::ReturnStatement r | this.asExpr() = r.getChild())
+    exists(Php::ReturnStatement r | this.(ExprNode).asExpr() = r.getChild())
     or
     // An arrow function `fn(...) => expr` has no `return` statement — its body expression IS the
     // returned value. Its enclosing CFG scope is the `ArrowFunctionScope`, so this return connects to
     // the arrow's invocations (direct call, stored-then-called, array_map, …) like any other callable.
-    this.asExpr() = any(Php::ArrowFunction a).getBody()
+    this.(ExprNode).asExpr() = any(Php::ArrowFunction a).getBody()
+    or
+    // A constructor "returns" the mutated `$this` as the `new C(...)` value: the post-update of a
+    // `$this` store base in the ctor body carries a `$this->f = v` field write out to the constructed
+    // object, so `$o = new C($v); $o->f` flows generically (a `new` has no receiver argument, so this
+    // is the ctor analogue of the receiver post-update used for ordinary method calls).
+    exists(Php::MethodDeclaration ctor |
+      ctor.getName().getValue() = "__construct" and
+      this.(PostUpdateNode).getPreUpdateNode().asExpr() = thisAccess(ctor)
+    )
   }
 
   ReturnKind getKind() { result = TNormalReturn() }
