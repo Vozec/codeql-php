@@ -90,7 +90,12 @@ predicate isWriteAccess(VariableAccess va) {
   or
   isForeachBinding(va)
   or
-  exists(Php::ListLiteral l | isDestructuringTarget(l) and va = l.getChild(_))
+  exists(Php::ListLiteral l, Php::AstNode elem |
+    isDestructuringTarget(l) and elem = l.getChild(_)
+  |
+    // `[$a, $b]` — the element, and `[$a, &$b]` — the by-reference element unwrapped to its variable.
+    va = elem or va = elem.(Php::ByRef).getChild()
+  )
   or
   // Update of an element/property: `$a[k] = v` or `$o->p = v` redefines the base variable `$a`/`$o`.
   va = updateBaseVariable()
