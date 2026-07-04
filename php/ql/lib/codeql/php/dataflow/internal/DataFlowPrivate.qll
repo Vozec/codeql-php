@@ -476,14 +476,16 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
     Ssa::LocalVariable v, Ssa::Definition def, Ssa::Cfg::BasicBlock bb1, int i1, VariableAccess r1,
     Ssa::Cfg::BasicBlock bb2, int i2, VariableAccess r2
   |
-    Ssa::Impl::ssaDefReachesRead(v, def, bb1, i1) and
+    // Drive from the small set of post-update pre-nodes (call arguments / store bases), NOT from every
+    // read pair — keeps this step from becoming quadratic in a variable's reads on large code bases.
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = r1 and
     Ssa::variableAccessAt(bb1, i1, r1) and
+    Ssa::Impl::ssaDefReachesRead(v, def, bb1, i1) and
     Ssa::Impl::ssaDefReachesRead(v, def, bb2, i2) and
     Ssa::variableAccessAt(bb2, i2, r2) and
     r1 != r2 and
     // CFG order: r1 strictly before r2 (same block earlier index, or an earlier block).
     (bb1 = bb2 and i1 < i2 or bb1.getASuccessor+() = bb2) and
-    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = r1 and
     node2.asExpr() = r2
   )
 }

@@ -81,16 +81,20 @@ predicate isGuardedRead(DataFlow::Node n) {
 private predicate sameAccessPath(Expr a, Expr b) {
   a.(VariableAccess).getName() = b.(VariableAccess).getName()
   or
+  // `$var[k]` with a constant key (one level, non-recursive — covers `$octet[0]`, keeps the join cheap).
   exists(Php::SubscriptExpression sa, Php::SubscriptExpression sb |
-    sa = a and sb = b and
-    sameAccessPath(sa.getChild(0), sb.getChild(0)) and
-    sa.getChild(1).(Php::Integer).getValue() = sb.getChild(1).(Php::Integer).getValue()
-    or
-    sa = a and sb = b and
-    sameAccessPath(sa.getChild(0), sb.getChild(0)) and
-    sa.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue() =
-      sb.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue()
+    sa = a and
+    sb = b and
+    sa.getChild(0).(VariableAccess).getName() = sb.getChild(0).(VariableAccess).getName() and
+    subscriptConstKey(sa) = subscriptConstKey(sb)
   )
+}
+
+/** Gets the constant integer or string key of a `$arr[k]` subscript (empty if the key is not constant). */
+private string subscriptConstKey(Php::SubscriptExpression sub) {
+  result = sub.getChild(1).(Php::Integer).getValue()
+  or
+  result = sub.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue()
 }
 
 /** Holds if `n` is the result of a sanitizer call (a taint barrier) not already covered by MAD. */
