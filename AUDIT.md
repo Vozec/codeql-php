@@ -505,3 +505,34 @@ exécution de POC**. Corrections livrées (test-first, suite 45→83) :
 - Layering (refactors) : migrer vers MAD les guards (`ctype_*`…), sanitizers-méthode, et introduire des
   extensibles `callbackModel` (HO-dispatch, triplé/incohérent aujourd'hui), `outRefModel` (`parse_str`),
   `sanitizerGuardModel`, `staticmethod` qualifié-classe (facade Request/Input).
+
+---
+## §10 — Modèle inter-objets PRINCIPIEL (branche `audit-fixes-med`, 2026-07-04)
+
+Objectif utilisateur : « supports tout les liens inter objets PHP », zéro bricolage, s'adapter à toute
+syntaxe. Remplacement du cas-par-cas par un modèle de content natif dans le moteur (comme Java/Ruby).
+
+### Moteur (DataFlowPrivate/SsaImpl) — le vrai anti-bricolage
+- Receveur `$o->m()` = argument **-1** ; `$this` = paramètre **-1** (ThisParameterNode) ; **PostUpdateNode** réel.
+- Content de champ **à travers les appels**, 2 jambes (trouvées par agent de debug) : base de store lisible
+  côté callee (SsaImpl) + **post-update→lecture-suivante ordonné CFG** côté caller (DataFlowPrivate).
+- **InitializeReturnNode** : le constructeur "retourne" le `$this` muté comme valeur du `new`.
+- **Fold 2-niveaux** : `$this->items[] = $v` / `$this->other->f = $v` remontent d'un niveau.
+- Résolutions structurelles : `new self()/static()`, `self::$p`, list by-ref destructuring.
+
+### Bricolage SUPPRIMÉ (subsumé par le générique, vérifié sans perte)
+Steps manuels **setter** et **constructeur** effacés ; helper mort `argBoundToParam` élagué.
+**Gardé** (recall légitime, pas bricolage) : instance-field coarse, property-promotion, magies.
+
+### Validation par agents adversariaux (2)
+- **FN** : setter/getter (direct/helper/hérité/trait/fluent), ctor (positionnel/nommé/promotion/factory),
+  mutation par fonction, multi-hop, nested, arrays d'objets, collections, static props, cross-file — TOUT
+  flowe génériquement. Les 2 seuls trous (array-append + nested à travers appel) corrigés (fold 2-niveaux).
+- **FP** : sweep différentiel (modèle vs pré-modèle) → **AUCUN nouveau faux positif**. Précision tenue :
+  read-before-mutation (bloc/branches/boucle), confusion de champ, objet-différent, réassignation, no-store,
+  receiver-leak, branches exclusives, cross-scope, ctor-champ-différent — tous 0. Clé sur la même déf SSA.
+- FP pré-existante corrigée : sources `method` par **nom bare** trop larges (`->get()`/`->file()`…) retirées,
+  gardant les distinctives + le facade statique class-qualifié.
+
+Suite : **45 → 87**. Reste (schéma) : sources `method` qualifiées-classe ; instance-sensitivity du content
+(limite CodeQL fondamentale, non aggravée).

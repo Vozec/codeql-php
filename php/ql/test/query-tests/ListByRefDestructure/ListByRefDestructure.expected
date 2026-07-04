@@ -1,0 +1,16 @@
+edges
+| test.php:4:22:4:26 | VariableName | test.php:5:8:5:9 | VariableName | provenance |  |
+| test.php:7:19:7:23 | VariableName | test.php:8:39:8:40 | VariableName | provenance |  |
+| test.php:11:21:11:25 | VariableName | test.php:12:8:12:9 | VariableName | provenance |  |
+nodes
+| test.php:4:22:4:26 | VariableName | semmle.label | VariableName |
+| test.php:5:8:5:9 | VariableName | semmle.label | VariableName |
+| test.php:7:19:7:23 | VariableName | semmle.label | VariableName |
+| test.php:8:39:8:40 | VariableName | semmle.label | VariableName |
+| test.php:11:21:11:25 | VariableName | semmle.label | VariableName |
+| test.php:12:8:12:9 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:5:8:5:9 | VariableName | test.php:4:22:4:26 | VariableName | test.php:5:8:5:9 | VariableName | This shell command depends on a $@. | test.php:4:22:4:26 | VariableName | user-provided value |
+| test.php:8:39:8:40 | VariableName | test.php:7:19:7:23 | VariableName | test.php:8:39:8:40 | VariableName | This shell command depends on a $@. | test.php:7:19:7:23 | VariableName | user-provided value |
+| test.php:12:8:12:9 | VariableName | test.php:11:21:11:25 | VariableName | test.php:12:8:12:9 | VariableName | This shell command depends on a $@. | test.php:11:21:11:25 | VariableName | user-provided value |

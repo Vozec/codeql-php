@@ -120,22 +120,6 @@ private predicate hasNamedArgument(Call c) {
 }
 
 /**
- * Gets the argument EXPRESSION of call `c` bound to parameter `i` of `callee` — the per-call-site node
- * (never a node shared inside the callee). Matches a named argument by parameter name, or a positional
- * argument by index when the call uses no named arguments. Used so mutation flow-back steps read the
- * exact argument for this call (no cross-instance merge, correct for reordered named args).
- */
-private Expr argBoundToParam(Call c, AstNode callee, int i) {
-  exists(Php::Argument a |
-    a = callArgumentNode(c) and
-    a.getName().toString() = calleeParam(callee, i).getName().getChild().getValue() and
-    result = a.getChild()
-  )
-  or
-  not hasNamedArgument(c) and result = c.getArgument(i)
-}
-
-/**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
  * "no inferred receiver" (as in `viableCallable`) avoids matching a same-named method on an unrelated
@@ -491,54 +475,11 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = call
     )
     or
-    // Setter mutation flow-back (lightweight PostUpdate): `$o->set($a)` where `set` stores its
-    // parameter into `$this->f` makes later reads of `$o->f` tainted. Resolved by the TYPE-based call
-    // graph and scoped to the same receiver variable + field + scope (bounded, not lexical).
-    exists(
-      MethodCall call, Method m, int i, AssignExpr innerAssign, Php::MemberAccessExpression innerStore,
-      VariableAccess recv, Php::MemberAccessExpression outerRead, string fld
-    |
-      m = TI::inferredMethod(call) and
-      innerAssign.getLhs() = innerStore and
-      innerStore.getObject().(VariableAccess).getName() = "this" and
-      innerStore.getName().(Php::Name).getValue() = fld and
-      innerStore.(Php::AstNode).getParent+() = m.(Php::MethodDeclaration).getBody() and
-      innerAssign.getRhs() = paramReadInBody(m, i) and
-      call.getReceiver() = recv and
-      outerRead.getObject().(VariableAccess).getName() = recv.getName() and
-      outerRead.getName().(Php::Name).getValue() = fld and
-      sameScope(outerRead, recv) and
-      outerRead != innerStore and
-      nodeFrom.asExpr() = argBoundToParam(call, m, i) and
-      nodeTo.asExpr() = outerRead
-    )
-    or
-    // Constructor mutation flow-back: `$o = new C($a)` where `__construct` stores a parameter into
-    // `$this->f` makes reads of `$o->f` tainted (the constructor acts as a field setter). The class is
-    // resolved namespace-aware (TI::exprClass — not by short name), and the source is the per-call-site
-    // argument bound to the stored parameter (argBoundToParam), so a DIFFERENT `new C(...)` instance and
-    // a same-named class in another namespace do not leak into this field read.
-    exists(
-      NewExpr call, Method ctor, int i, AssignExpr innerAssign, Php::MemberAccessExpression innerStore,
-      AssignExpr objAssign, VariableAccess objVar, Php::MemberAccessExpression outerRead, string fld
-    |
-      ctor = TI::exprClass(call).getAMethod() and
-      ctor.getName() = "__construct" and
-      innerAssign.getLhs() = innerStore and
-      innerStore.getObject().(VariableAccess).getName() = "this" and
-      innerStore.getName().(Php::Name).getValue() = fld and
-      innerStore.(Php::AstNode).getParent+() = ctor.(Php::MethodDeclaration).getBody() and
-      innerAssign.getRhs() = paramReadInBody(ctor, i) and
-      objAssign.getRhs() = call and
-      objAssign.getLhs() = objVar and
-      outerRead.getObject().(VariableAccess).getName() = objVar.getName() and
-      outerRead.getName().(Php::Name).getValue() = fld and
-      sameScope(outerRead, objVar) and
-      outerRead != innerStore and
-      nodeFrom.asExpr() = argBoundToParam(call, ctor, i) and
-      nodeTo.asExpr() = outerRead
-    )
-    or
+    // (Setter mutation flow-back — `$o->set($a)` storing into `$this->f`, later `$o->f` reads — is now
+    // handled generically by the field-content model + receiver-as-argument + PostUpdate in
+    // DataFlowPrivate, so no hand-written setter step here.)
+    // (Constructor mutation flow-back — `$o = new C($a)` storing into `$this->f`, later `$o->f` reads —
+    // is now handled generically by the InitializeReturnNode + field-content model in DataFlowPrivate.)
     // NOTE: `$GLOBALS['k']` is handled cross-file as a value-preserving `jumpStep` in DataFlowPrivate
     // (a genuine superglobal), so no same-file taint step is needed here (B.6).
 
@@ -713,9 +654,14 @@ private VariableAccess foreachBindingVar(AstNode t) {
 
 /** Gets a `class::$prop` key identifying a static property access. */
 private string staticPropKey(Php::ScopedPropertyAccessExpression sp) {
-  result =
-    sp.getScope().(Php::Name).getValue() + "::" +
-      sp.getName().(Php::VariableName).getChild().getValue()
+  exists(string prop | prop = sp.getName().(Php::VariableName).getChild().getValue() |
+    // explicit class name `C::$p`
+    result = sp.getScope().(Php::Name).getValue() + "::" + prop
+    or
+    // `self::$p` / `static::$p` — normalize to the enclosing class so a same-class write/read connect.
+    sp.getScope().(Php::RelativeScope).toString() = ["self", "static"] and
+    result = enclosingClassDecl(sp).getName().getValue() + "::" + prop
+  )
 }
 
 bindingset[node]

@@ -1,0 +1,20 @@
+edges
+| test.php:6:38:6:42 | VariableName | test.php:6:38:6:47 | SubscriptExpression | provenance |  |
+| test.php:6:38:6:47 | SubscriptExpression | test.php:7:31:7:41 | ScopedPropertyAccessExpression | provenance |  |
+| test.php:12:40:12:44 | VariableName | test.php:12:40:12:49 | SubscriptExpression | provenance |  |
+| test.php:12:40:12:49 | SubscriptExpression | test.php:13:31:13:43 | ScopedPropertyAccessExpression | provenance |  |
+| test.php:26:9:26:13 | VariableName | test.php:27:8:27:12 | MemberAccessExpression | provenance |  |
+nodes
+| test.php:6:38:6:42 | VariableName | semmle.label | VariableName |
+| test.php:6:38:6:47 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:7:31:7:41 | ScopedPropertyAccessExpression | semmle.label | ScopedPropertyAccessExpression |
+| test.php:12:40:12:44 | VariableName | semmle.label | VariableName |
+| test.php:12:40:12:49 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:13:31:13:43 | ScopedPropertyAccessExpression | semmle.label | ScopedPropertyAccessExpression |
+| test.php:26:9:26:13 | VariableName | semmle.label | VariableName |
+| test.php:27:8:27:12 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+subpaths
+#select
+| test.php:7:31:7:41 | ScopedPropertyAccessExpression | test.php:6:38:6:42 | VariableName | test.php:7:31:7:41 | ScopedPropertyAccessExpression | This shell command depends on a $@. | test.php:6:38:6:42 | VariableName | user-provided value |
+| test.php:13:31:13:43 | ScopedPropertyAccessExpression | test.php:12:40:12:44 | VariableName | test.php:13:31:13:43 | ScopedPropertyAccessExpression | This shell command depends on a $@. | test.php:12:40:12:44 | VariableName | user-provided value |
+| test.php:27:8:27:12 | MemberAccessExpression | test.php:26:9:26:13 | VariableName | test.php:27:8:27:12 | MemberAccessExpression | This shell command depends on a $@. | test.php:26:9:26:13 | VariableName | user-provided value |

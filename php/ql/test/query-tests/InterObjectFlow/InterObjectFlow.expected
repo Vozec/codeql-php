@@ -1,0 +1,80 @@
+edges
+| test.php:8:23:8:24 | VariableName | test.php:8:40:8:41 | VariableName | provenance |  |
+| test.php:8:29:8:30 | [post] VariableName [.data] | test.php:8:19:8:20 | VariableName [Return] [.data] | provenance |  |
+| test.php:8:40:8:41 | VariableName | test.php:8:29:8:30 | [post] VariableName [.data] | provenance |  |
+| test.php:10:6:10:9 | [post] VariableName [.data] | test.php:11:8:11:11 | VariableName [.data] | provenance |  |
+| test.php:10:12:10:16 | VariableName | test.php:10:12:10:21 | SubscriptExpression | provenance |  |
+| test.php:10:12:10:21 | SubscriptExpression | test.php:8:23:8:24 | VariableName | provenance |  |
+| test.php:10:12:10:21 | SubscriptExpression | test.php:10:6:10:9 | [post] VariableName [.data] | provenance |  |
+| test.php:11:8:11:11 | VariableName [.data] | test.php:11:8:11:17 | MemberAccessExpression | provenance |  |
+| test.php:14:40:14:41 | VariableName | test.php:14:56:14:57 | VariableName | provenance |  |
+| test.php:14:45:14:49 | [post] VariableName [.v] | test.php:14:27:14:60 | $this in put [Return] [.v] | provenance |  |
+| test.php:14:56:14:57 | VariableName | test.php:14:45:14:49 | [post] VariableName [.v] | provenance |  |
+| test.php:14:56:14:57 | VariableName | test.php:14:86:14:93 | MemberAccessExpression | provenance |  |
+| test.php:14:62:14:96 | $this in take [.v] | test.php:14:86:14:90 | VariableName [.v] | provenance |  |
+| test.php:14:86:14:90 | VariableName [.v] | test.php:14:86:14:93 | MemberAccessExpression | provenance |  |
+| test.php:14:86:14:93 | MemberAccessExpression | test.php:15:47:15:56 | MemberCallExpression | provenance |  |
+| test.php:14:86:14:93 | MemberAccessExpression | test.php:19:8:19:17 | MemberCallExpression | provenance |  |
+| test.php:15:22:15:23 | VariableName [.v] | test.php:15:47:15:48 | VariableName [.v] | provenance |  |
+| test.php:15:33:15:34 | VariableName [Return] [.v] | test.php:18:10:18:11 | [post] VariableName [.v] | provenance |  |
+| test.php:15:39:15:40 | [post] VariableName [.v] | test.php:15:33:15:34 | VariableName [Return] [.v] | provenance |  |
+| test.php:15:39:15:40 | [post] VariableName [.v] | test.php:15:33:15:34 | VariableName [Return] [.v] | provenance |  |
+| test.php:15:47:15:48 | VariableName [.v] | test.php:14:62:14:96 | $this in take [.v] | provenance |  |
+| test.php:15:47:15:48 | VariableName [.v] | test.php:15:47:15:56 | MemberCallExpression | provenance |  |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:14:40:14:41 | VariableName | provenance |  |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:14:40:14:41 | VariableName | provenance |  |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:15:39:15:40 | [post] VariableName [.v] | provenance |  |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:15:39:15:40 | [post] VariableName [.v] | provenance |  |
+| test.php:16:20:16:21 | [post] VariableName [.v] | test.php:18:6:18:7 | VariableName [.v] | provenance |  |
+| test.php:16:28:16:32 | VariableName | test.php:16:28:16:37 | SubscriptExpression | provenance |  |
+| test.php:16:28:16:37 | SubscriptExpression | test.php:14:40:14:41 | VariableName | provenance |  |
+| test.php:16:28:16:37 | SubscriptExpression | test.php:16:20:16:21 | [post] VariableName [.v] | provenance |  |
+| test.php:18:6:18:7 | VariableName [.v] | test.php:15:22:15:23 | VariableName [.v] | provenance |  |
+| test.php:18:6:18:7 | VariableName [.v] | test.php:18:10:18:11 | [post] VariableName [.v] | provenance |  |
+| test.php:18:10:18:11 | [post] VariableName [.v] | test.php:19:8:19:9 | VariableName [.v] | provenance |  |
+| test.php:19:8:19:9 | VariableName [.v] | test.php:14:62:14:96 | $this in take [.v] | provenance |  |
+| test.php:19:8:19:9 | VariableName [.v] | test.php:19:8:19:17 | MemberCallExpression | provenance |  |
+nodes
+| test.php:8:19:8:20 | VariableName [Return] [.data] | semmle.label | VariableName [Return] [.data] |
+| test.php:8:23:8:24 | VariableName | semmle.label | VariableName |
+| test.php:8:29:8:30 | [post] VariableName [.data] | semmle.label | [post] VariableName [.data] |
+| test.php:8:40:8:41 | VariableName | semmle.label | VariableName |
+| test.php:10:6:10:9 | [post] VariableName [.data] | semmle.label | [post] VariableName [.data] |
+| test.php:10:12:10:16 | VariableName | semmle.label | VariableName |
+| test.php:10:12:10:21 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:11:8:11:11 | VariableName [.data] | semmle.label | VariableName [.data] |
+| test.php:11:8:11:17 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| test.php:14:27:14:60 | $this in put [Return] [.v] | semmle.label | $this in put [Return] [.v] |
+| test.php:14:40:14:41 | VariableName | semmle.label | VariableName |
+| test.php:14:45:14:49 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:14:56:14:57 | VariableName | semmle.label | VariableName |
+| test.php:14:62:14:96 | $this in take [.v] | semmle.label | $this in take [.v] |
+| test.php:14:86:14:90 | VariableName [.v] | semmle.label | VariableName [.v] |
+| test.php:14:86:14:93 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| test.php:14:86:14:93 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| test.php:15:22:15:23 | VariableName [.v] | semmle.label | VariableName [.v] |
+| test.php:15:33:15:34 | VariableName [Return] [.v] | semmle.label | VariableName [Return] [.v] |
+| test.php:15:33:15:34 | VariableName [Return] [.v] | semmle.label | VariableName [Return] [.v] |
+| test.php:15:39:15:40 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:15:39:15:40 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:15:47:15:48 | VariableName [.v] | semmle.label | VariableName [.v] |
+| test.php:15:47:15:56 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:15:47:15:56 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:16:20:16:21 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:16:28:16:32 | VariableName | semmle.label | VariableName |
+| test.php:16:28:16:37 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:18:6:18:7 | VariableName [.v] | semmle.label | VariableName [.v] |
+| test.php:18:10:18:11 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:19:8:19:9 | VariableName [.v] | semmle.label | VariableName [.v] |
+| test.php:19:8:19:17 | MemberCallExpression | semmle.label | MemberCallExpression |
+subpaths
+| test.php:10:12:10:21 | SubscriptExpression | test.php:8:23:8:24 | VariableName | test.php:8:19:8:20 | VariableName [Return] [.data] | test.php:10:6:10:9 | [post] VariableName [.data] |
+| test.php:15:47:15:48 | VariableName [.v] | test.php:14:62:14:96 | $this in take [.v] | test.php:14:86:14:93 | MemberAccessExpression | test.php:15:47:15:56 | MemberCallExpression |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:14:40:14:41 | VariableName | test.php:14:27:14:60 | $this in put [Return] [.v] | test.php:15:39:15:40 | [post] VariableName [.v] |
+| test.php:15:47:15:56 | MemberCallExpression | test.php:14:40:14:41 | VariableName | test.php:14:27:14:60 | $this in put [Return] [.v] | test.php:15:39:15:40 | [post] VariableName [.v] |
+| test.php:16:28:16:37 | SubscriptExpression | test.php:14:40:14:41 | VariableName | test.php:14:27:14:60 | $this in put [Return] [.v] | test.php:16:20:16:21 | [post] VariableName [.v] |
+| test.php:18:6:18:7 | VariableName [.v] | test.php:15:22:15:23 | VariableName [.v] | test.php:15:33:15:34 | VariableName [Return] [.v] | test.php:18:10:18:11 | [post] VariableName [.v] |
+| test.php:19:8:19:9 | VariableName [.v] | test.php:14:62:14:96 | $this in take [.v] | test.php:14:86:14:93 | MemberAccessExpression | test.php:19:8:19:17 | MemberCallExpression |
+#select
+| test.php:11:8:11:17 | MemberAccessExpression | test.php:10:12:10:16 | VariableName | test.php:11:8:11:17 | MemberAccessExpression | This shell command depends on a $@. | test.php:10:12:10:16 | VariableName | user-provided value |
+| test.php:19:8:19:17 | MemberCallExpression | test.php:16:28:16:32 | VariableName | test.php:19:8:19:17 | MemberCallExpression | This shell command depends on a $@. | test.php:16:28:16:32 | VariableName | user-provided value |

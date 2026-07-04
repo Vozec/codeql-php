@@ -16,7 +16,46 @@ private import DataFlowPublic
 
 class DataFlowSecondLevelScope = Unit;
 
-newtype TNode = TExprNode(Cfg::CfgNode n)
+/** Gets a `$this` variable access inside method `m`'s body. */
+private VariableAccess thisAccess(Php::MethodDeclaration m) {
+  result.getName() = "this" and result.(Php::AstNode).getParent+() = m.getBody()
+}
+
+/**
+ * Holds if CFG node `n` needs a post-update node: every call argument (including the receiver at
+ * position -1) and every object that is the base of a field store (`$o->f = v`, `$o->f .= v`) — a
+ * mutation applied there must be observable at later reads of the same object.
+ */
+private predicate needsPostUpdate(Cfg::CfgNode n) {
+  n = any(DataFlowCall c).getArgumentCfgNode(_)
+  or
+  exists(AssignExpr a, Php::MemberAccessExpression m | a.getLhs() = m and n.getAstNode() = m.getObject())
+  or
+  exists(Php::AugmentedAssignmentExpression a, Php::MemberAccessExpression m |
+    a.getLeft() = m and n.getAstNode() = m.getObject()
+  )
+  or
+  // base of an array store `$a[k] = v` — so an appended/keyed element folds onto the base's post-update
+  // (interprocedural array-field mutation, e.g. a method doing `$this->items[] = $v`).
+  exists(AssignExpr a, Php::SubscriptExpression sub | a.getLhs() = sub and n.getAstNode() = sub.getChild(0))
+  or
+  // The OBJECT of a nested store base (`$o` in `$o->f->g = v` / `$o->f[] = v`) also needs a post-update,
+  // so the inner access's mutation folds up one more level onto `$o` — the two-level interprocedural
+  // carry-out (a method doing `$this->items[] = $v` or `$this->other->f = $v`).
+  exists(Php::MemberAccessExpression m | m = nestedStoreBase() and n.getAstNode() = m.getObject())
+}
+
+/** Gets a member access that is the base of a nested store (`$o->f->g = v` or `$o->f[] = v`). */
+private Php::MemberAccessExpression nestedStoreBase() {
+  exists(AssignExpr a, Php::MemberAccessExpression outer | a.getLhs() = outer and result = outer.getObject())
+  or
+  exists(AssignExpr a, Php::SubscriptExpression sub | a.getLhs() = sub and result = sub.getChild(0))
+}
+
+newtype TNode =
+  TExprNode(Cfg::CfgNode n) or
+  TThisParameterNode(Php::MethodDeclaration m) { exists(thisAccess(m)) } or
+  TExprPostUpdateNode(Cfg::CfgNode n) { needsPostUpdate(n) }
 
 // --- Callables and calls ------------------------------------------------------------------------
 
@@ -75,14 +114,18 @@ class DataFlowCall instanceof Cfg::CfgNode {
 
   DataFlowCallable getEnclosingCallable() { result = super.getScope() }
 
-  /** Gets the CFG node of this call's `pos`th argument. */
+  /** Gets the CFG node of this call's `pos`th argument (`pos = -1` is the `$o->m()` receiver). */
   Cfg::CfgNode getArgumentCfgNode(int pos) {
+    pos >= 0 and
     result.getAstNode() = c.getArgument(pos) and
     // Named arguments (`f(x: $v)`) are routed by name via a taint step, so exclude them here to avoid
     // mis-mapping to the parameter at their textual position.
     not exists(Php::Argument a |
       a.getChild() = c.getArgument(pos) and exists(a.getName().(Php::Name))
     )
+    or
+    // The receiver of `$o->m(...)` is the `this` argument (position -1).
+    pos = -1 and result.getAstNode() = c.(MethodCall).getReceiver()
   }
 
   /** Gets the closure directly invoked by this call, for an IIFE `(function(){...})(...)`. */
@@ -165,7 +208,13 @@ class DataFlowCall instanceof Cfg::CfgNode {
 }
 
 /** Gets the callable that node `n` belongs to. */
-DataFlowCallable nodeGetEnclosingCallable(Node n) { result = n.getCfgNode().getScope() }
+DataFlowCallable nodeGetEnclosingCallable(Node n) {
+  result = n.getCfgNode().getScope()
+  or
+  result = n.(ThisParameterNode).getMethod()
+  or
+  result = n.(PostUpdateNode).getPreUpdateNode().getCfgNode().getScope()
+}
 
 /** Gets the data-flow type of node `n` (PHP is dynamically typed, so a single unknown type). */
 DataFlowType getNodeType(Node n) { result = TUnknownType() and exists(n) }
@@ -220,14 +269,23 @@ class NormalReturn extends ReturnKind, TNormalReturn {
 }
 
 /** A node holding a value returned from a callable. */
-class ReturnNode extends ExprNode {
+class ReturnNode extends Node {
   ReturnNode() {
-    exists(Php::ReturnStatement r | this.asExpr() = r.getChild())
+    exists(Php::ReturnStatement r | this.(ExprNode).asExpr() = r.getChild())
     or
     // An arrow function `fn(...) => expr` has no `return` statement — its body expression IS the
     // returned value. Its enclosing CFG scope is the `ArrowFunctionScope`, so this return connects to
     // the arrow's invocations (direct call, stored-then-called, array_map, …) like any other callable.
-    this.asExpr() = any(Php::ArrowFunction a).getBody()
+    this.(ExprNode).asExpr() = any(Php::ArrowFunction a).getBody()
+    or
+    // A constructor "returns" the mutated `$this` as the `new C(...)` value: the post-update of a
+    // `$this` store base in the ctor body carries a `$this->f = v` field write out to the constructed
+    // object, so `$o = new C($v); $o->f` flows generically (a `new` has no receiver argument, so this
+    // is the ctor analogue of the receiver post-update used for ordinary method calls).
+    exists(Php::MethodDeclaration ctor |
+      ctor.getName().getValue() = "__construct" and
+      this.(PostUpdateNode).getPreUpdateNode().asExpr() = thisAccess(ctor)
+    )
   }
 
   ReturnKind getKind() { result = TNormalReturn() }
@@ -252,10 +310,40 @@ class CastNode extends Node {
   CastNode() { none() }
 }
 
-class PostUpdateNode extends Node {
-  PostUpdateNode() { none() }
+/**
+ * The synthetic `$this` parameter of a method (parameter position -1). Its value is the receiver of
+ * each call to the method; a local-flow step connects it to every `$this` access in the body, so
+ * `$this->f` stores/reads participate in the generic field-content model.
+ */
+class ThisParameterNode extends Node, TThisParameterNode {
+  Php::MethodDeclaration m;
 
-  Node getPreUpdateNode() { none() }
+  ThisParameterNode() { this = TThisParameterNode(m) }
+
+  /** Gets the method this is the `$this` parameter of. */
+  Php::MethodDeclaration getMethod() { result = m }
+
+  override string toString() { result = "$this in " + m.getName().getValue() }
+
+  override Location getLocation() { result = m.getLocation() }
+}
+
+/**
+ * A node representing the state of a value AFTER a call/store may have mutated it. `getPreUpdateNode`
+ * is the node holding the value BEFORE. Field stores target the post-update of the base object, and
+ * the engine reverses value-preserving steps to carry a callee's field write back to the caller.
+ */
+class PostUpdateNode extends Node, TExprPostUpdateNode {
+  Cfg::CfgNode n;
+
+  PostUpdateNode() { this = TExprPostUpdateNode(n) }
+
+  /** Gets the node holding this value before the update. */
+  Node getPreUpdateNode() { result = TExprNode(n) }
+
+  override string toString() { result = "[post] " + n.toString() }
+
+  override Location getLocation() { result = n.getLocation() }
 }
 
 // --- Types (trivial: PHP is dynamically typed) --------------------------------------------------
@@ -293,13 +381,14 @@ ContentApprox getContentApprox(Content c) { result = c }
 // --- Positions ----------------------------------------------------------------------------------
 
 class ParameterPosition extends int {
-  ParameterPosition() { this = [0 .. 63] }
+  ParameterPosition() { this = [-1 .. 63] }
 }
 
 class ArgumentPosition extends int {
-  ArgumentPosition() { this = [0 .. 63] }
+  ArgumentPosition() { this = [-1 .. 63] }
 }
 
+// Position -1 is the `this`/receiver position; it matches itself like every other position.
 predicate parameterMatch(ParameterPosition ppos, ArgumentPosition apos) { ppos = apos }
 
 // --- Local flow ---------------------------------------------------------------------------------
@@ -369,6 +458,33 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
     Ssa::Impl::ssaDefReachesRead(v, def, bbr, ir) and
     Ssa::variableAccessAt(bbr, ir, read) and
     node2.asExpr() = read
+  )
+  or
+  // The synthetic `$this` parameter flows to every `$this` access in the method body ($this has no SSA
+  // definition of its own — it is an implicit variable — so this replaces the missing entry-def edge).
+  model = "" and
+  exists(Php::MethodDeclaration m |
+    node1 = TThisParameterNode(m) and node2.asExpr() = thisAccess(m)
+  )
+  or
+  // Caller-side leg of interprocedural field mutation: the POST-UPDATE of a variable read (an argument /
+  // receiver / store base whose object a callee may have mutated) flows to a LATER read of the same SSA
+  // variable, so `fill($o); … $o->f` observes a mutation `fill` made to `$o`. CFG-ordered so a
+  // post-update never flows to an EARLIER read (that would be an unsound backward edge).
+  model = "" and
+  exists(
+    Ssa::LocalVariable v, Ssa::Definition def, Ssa::Cfg::BasicBlock bb1, int i1, VariableAccess r1,
+    Ssa::Cfg::BasicBlock bb2, int i2, VariableAccess r2
+  |
+    Ssa::Impl::ssaDefReachesRead(v, def, bb1, i1) and
+    Ssa::variableAccessAt(bb1, i1, r1) and
+    Ssa::Impl::ssaDefReachesRead(v, def, bb2, i2) and
+    Ssa::variableAccessAt(bb2, i2, r2) and
+    r1 != r2 and
+    // CFG order: r1 strictly before r2 (same block earlier index, or an earlier block).
+    (bb1 = bb2 and i1 < i2 or bb1.getASuccessor+() = bb2) and
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = r1 and
+    node2.asExpr() = r2
   )
 }
 
@@ -463,15 +579,17 @@ predicate storeStep(Node node1, ContentSet c, Node node2) {
   // `$a[k] = v` — stores into the base variable, which is an SSA update definition and therefore
   // flows to subsequent reads of `$a`.
   exists(AssignExpr a, Php::SubscriptExpression sub |
-    a.getLhs() = sub and node1.asExpr() = a.getRhs() and node2.asExpr() = sub.getChild(0) and
+    a.getLhs() = sub and node1.asExpr() = a.getRhs() and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = sub.getChild(0) and
     c = TArrayContent()
   )
   or
-  // `$o->f = v` — stores into the base object at field `f`.
+  // `$o->f = v` — stores `v` into field `f` of the base object's POST-UPDATE node, so the mutation is
+  // observed at later reads of `$o` (and, interprocedurally, carried back through the receiver).
   exists(AssignExpr a, Php::MemberAccessExpression m, string f |
     a.getLhs() = m and
     node1.asExpr() = a.getRhs() and
-    node2.asExpr() = m.getObject() and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject() and
     f = m.getName().(Php::Name).getValue() and
     c = TFieldContent(f)
   )
@@ -489,11 +607,22 @@ predicate storeStep(Node node1, ContentSet c, Node node2) {
     c = TArrayContent()
   )
   or
-  // Augmented store `$o->f .= v` — the right operand flows into the base object's field content.
+  // Augmented store `$o->f .= v` — the right operand flows into the base object's post-update field.
   exists(Php::AugmentedAssignmentExpression a, Php::MemberAccessExpression m, string f |
     a.getLeft() = m and
     node1.asExpr() = a.getRight() and
-    node2.asExpr() = m.getObject() and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject() and
+    f = m.getName().(Php::Name).getValue() and
+    c = TFieldContent(f)
+  )
+  or
+  // Two-level fold: the post-update of a nested store base `$o->f` (holding the inner mutation from
+  // `$o->f->g = v` or `$o->f[] = v`) is stored back onto `$o`'s post-update at field `f`, so the nested
+  // mutation reaches later `$o->f` reads (and, interprocedurally, the receiver of a method that did it).
+  exists(Php::MemberAccessExpression m, string f |
+    m = nestedStoreBase() and
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = m and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject() and
     f = m.getName().(Php::Name).getValue() and
     c = TFieldContent(f)
   )

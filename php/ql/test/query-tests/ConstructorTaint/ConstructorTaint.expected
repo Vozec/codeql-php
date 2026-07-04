@@ -1,15 +1,38 @@
 edges
-| test.php:6:14:6:18 | VariableName | test.php:7:8:7:13 | MemberAccessExpression | provenance |  |
-| test.php:11:28:11:32 | VariableName | test.php:12:8:12:13 | MemberAccessExpression | provenance |  |
+| test.php:5:44:5:45 | VariableName | test.php:5:60:5:61 | VariableName | provenance |  |
+| test.php:5:60:5:61 | VariableName | test.php:5:49:5:53 | [post] VariableName [.v] | provenance |  |
+| test.php:6:7:6:24 | ObjectCreationExpression [.v] | test.php:7:8:7:10 | VariableName [.v] | provenance |  |
+| test.php:6:14:6:18 | VariableName | test.php:6:14:6:23 | SubscriptExpression | provenance |  |
+| test.php:6:14:6:23 | SubscriptExpression | test.php:5:44:5:45 | VariableName | provenance |  |
+| test.php:6:14:6:23 | SubscriptExpression | test.php:6:7:6:24 | ObjectCreationExpression [.v] | provenance |  |
+| test.php:7:8:7:10 | VariableName [.v] | test.php:7:8:7:13 | MemberAccessExpression | provenance |  |
+| test.php:10:53:10:57 | [post] VariableName [.v] | test.php:11:7:11:38 | ObjectCreationExpression [.v] | provenance |  |
+| test.php:10:64:10:65 | VariableName | test.php:10:53:10:57 | [post] VariableName [.v] | provenance |  |
+| test.php:11:7:11:38 | ObjectCreationExpression [.v] | test.php:12:8:12:10 | VariableName [.v] | provenance |  |
+| test.php:11:28:11:32 | VariableName | test.php:11:28:11:37 | SubscriptExpression | provenance |  |
+| test.php:11:28:11:37 | SubscriptExpression | test.php:10:64:10:65 | VariableName | provenance |  |
+| test.php:12:8:12:10 | VariableName [.v] | test.php:12:8:12:13 | MemberAccessExpression | provenance |  |
 | test.php:16:14:16:18 | VariableName | test.php:17:8:17:14 | MemberAccessExpression | provenance |  |
 nodes
+| test.php:5:44:5:45 | VariableName | semmle.label | VariableName |
+| test.php:5:49:5:53 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:5:60:5:61 | VariableName | semmle.label | VariableName |
+| test.php:6:7:6:24 | ObjectCreationExpression [.v] | semmle.label | ObjectCreationExpression [.v] |
 | test.php:6:14:6:18 | VariableName | semmle.label | VariableName |
+| test.php:6:14:6:23 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:7:8:7:10 | VariableName [.v] | semmle.label | VariableName [.v] |
 | test.php:7:8:7:13 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| test.php:10:53:10:57 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:10:64:10:65 | VariableName | semmle.label | VariableName |
+| test.php:11:7:11:38 | ObjectCreationExpression [.v] | semmle.label | ObjectCreationExpression [.v] |
 | test.php:11:28:11:32 | VariableName | semmle.label | VariableName |
+| test.php:11:28:11:37 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:12:8:12:10 | VariableName [.v] | semmle.label | VariableName [.v] |
 | test.php:12:8:12:13 | MemberAccessExpression | semmle.label | MemberAccessExpression |
 | test.php:16:14:16:18 | VariableName | semmle.label | VariableName |
 | test.php:17:8:17:14 | MemberAccessExpression | semmle.label | MemberAccessExpression |
 subpaths
+| test.php:6:14:6:23 | SubscriptExpression | test.php:5:44:5:45 | VariableName | test.php:5:49:5:53 | [post] VariableName [.v] | test.php:6:7:6:24 | ObjectCreationExpression [.v] |
 #select
 | test.php:7:8:7:13 | MemberAccessExpression | test.php:6:14:6:18 | VariableName | test.php:7:8:7:13 | MemberAccessExpression | This shell command depends on a $@. | test.php:6:14:6:18 | VariableName | user-provided value |
 | test.php:12:8:12:13 | MemberAccessExpression | test.php:11:28:11:32 | VariableName | test.php:12:8:12:13 | MemberAccessExpression | This shell command depends on a $@. | test.php:11:28:11:32 | VariableName | user-provided value |

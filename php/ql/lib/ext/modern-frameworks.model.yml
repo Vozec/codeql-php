@@ -52,17 +52,14 @@ extensions:
       - ["method", "getInt", "remote"]
       - ["method", "getAlpha", "remote"]
       - ["method", "getDigits", "remote"]
-      # Laravel / generic request object accessors (matched by method name, framework-agnostic)
+      # Laravel / generic request object accessors (matched by method name, framework-agnostic).
+      # NOTE: only request-DISTINCTIVE method names are listed. Generic names that collide with ordinary
+      # getters/collections/DB/HTTP objects (`get`, `post`, `all`, `query`, `header`, `json`, `fetch`,
+      # `fetchAll`) were REMOVED — matched by bare name they fired on unrelated `$obj->get()` etc. (a loud
+      # false positive). The proper fix is a class-qualified `staticmethod`/`method` source (schema TODO);
+      # until then, prefer precision on these ambiguous names over recall.
       - ["function", "request", "remote"]
       - ["function", "wp_unslash", "remote"]
       - ["method", "input", "remote"]
-      - ["method", "query", "remote"]
-      - ["method", "post", "remote"]
-      - ["method", "get", "remote"]
-      - ["method", "all", "remote"]
       - ["method", "cookie", "remote"]
-      - ["method", "header", "remote"]
-      - ["method", "json", "remote"]
-      - ["method", "fetch", "remote"]
-      - ["method", "fetchAll", "remote"]
       - ["method", "getClientOriginalName", "remote"]

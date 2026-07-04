@@ -1,8 +1,23 @@
 edges
-| test.php:5:9:5:13 | VariableName | test.php:6:8:6:12 | MemberAccessExpression | provenance |  |
+| test.php:3:44:3:45 | VariableName | test.php:3:61:3:62 | VariableName | provenance |  |
+| test.php:3:50:3:54 | [post] VariableName [.v] | test.php:3:24:3:65 | $this in set [Return] [.v] | provenance |  |
+| test.php:3:61:3:62 | VariableName | test.php:3:50:3:54 | [post] VariableName [.v] | provenance |  |
+| test.php:5:1:5:2 | [post] VariableName [.v] | test.php:6:8:6:9 | VariableName [.v] | provenance |  |
+| test.php:5:9:5:13 | VariableName | test.php:5:9:5:18 | SubscriptExpression | provenance |  |
+| test.php:5:9:5:18 | SubscriptExpression | test.php:3:44:3:45 | VariableName | provenance |  |
+| test.php:5:9:5:18 | SubscriptExpression | test.php:5:1:5:2 | [post] VariableName [.v] | provenance |  |
+| test.php:6:8:6:9 | VariableName [.v] | test.php:6:8:6:12 | MemberAccessExpression | provenance |  |
 nodes
+| test.php:3:24:3:65 | $this in set [Return] [.v] | semmle.label | $this in set [Return] [.v] |
+| test.php:3:44:3:45 | VariableName | semmle.label | VariableName |
+| test.php:3:50:3:54 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
+| test.php:3:61:3:62 | VariableName | semmle.label | VariableName |
+| test.php:5:1:5:2 | [post] VariableName [.v] | semmle.label | [post] VariableName [.v] |
 | test.php:5:9:5:13 | VariableName | semmle.label | VariableName |
+| test.php:5:9:5:18 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:6:8:6:9 | VariableName [.v] | semmle.label | VariableName [.v] |
 | test.php:6:8:6:12 | MemberAccessExpression | semmle.label | MemberAccessExpression |
 subpaths
+| test.php:5:9:5:18 | SubscriptExpression | test.php:3:44:3:45 | VariableName | test.php:3:24:3:65 | $this in set [Return] [.v] | test.php:5:1:5:2 | [post] VariableName [.v] |
 #select
 | test.php:6:8:6:12 | MemberAccessExpression | test.php:5:9:5:13 | VariableName | test.php:6:8:6:12 | MemberAccessExpression | This shell command depends on a $@. | test.php:5:9:5:13 | VariableName | user-provided value |
