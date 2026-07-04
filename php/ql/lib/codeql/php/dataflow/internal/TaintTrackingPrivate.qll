@@ -713,9 +713,14 @@ private VariableAccess foreachBindingVar(AstNode t) {
 
 /** Gets a `class::$prop` key identifying a static property access. */
 private string staticPropKey(Php::ScopedPropertyAccessExpression sp) {
-  result =
-    sp.getScope().(Php::Name).getValue() + "::" +
-      sp.getName().(Php::VariableName).getChild().getValue()
+  exists(string prop | prop = sp.getName().(Php::VariableName).getChild().getValue() |
+    // explicit class name `C::$p`
+    result = sp.getScope().(Php::Name).getValue() + "::" + prop
+    or
+    // `self::$p` / `static::$p` — normalize to the enclosing class so a same-class write/read connect.
+    sp.getScope().(Php::RelativeScope).toString() = ["self", "static"] and
+    result = enclosingClassDecl(sp).getName().getValue() + "::" + prop
+  )
 }
 
 bindingset[node]

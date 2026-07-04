@@ -94,6 +94,10 @@ ClassLike exprClass(Expr e) {
   // `new C(...)` — namespace-aware.
   result = resolveClassReference(e.(Php::ObjectCreationExpression).getChild(_).(AstNode))
   or
+  // `new self()` / `new static()` inside a method resolve to the enclosing class (idiomatic factories).
+  e.(Php::ObjectCreationExpression).getChild(_).(Php::Name).getValue() = ["self", "static"] and
+  result = enclosingClass(e)
+  or
   // `$this` inside a method resolves to the declaring class (and its subclasses inherit the type).
   e.(VariableAccess).getName() = "this" and result = enclosingClass(e)
   or
