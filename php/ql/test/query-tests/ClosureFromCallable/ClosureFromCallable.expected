@@ -1,0 +1,23 @@
+edges
+| test.php:3:16:3:17 | VariableName | test.php:3:29:3:30 | VariableName | provenance |  |
+| test.php:7:11:7:15 | VariableName | test.php:7:11:7:20 | SubscriptExpression | provenance |  |
+| test.php:7:11:7:20 | SubscriptExpression | test.php:3:16:3:17 | VariableName | provenance |  |
+| test.php:7:11:7:20 | SubscriptExpression | test.php:7:8:7:21 | FunctionCallExpression | provenance |  |
+| test.php:10:11:10:15 | VariableName | test.php:10:11:10:20 | SubscriptExpression | provenance |  |
+| test.php:10:11:10:20 | SubscriptExpression | test.php:3:16:3:17 | VariableName | provenance |  |
+| test.php:10:11:10:20 | SubscriptExpression | test.php:10:8:10:21 | FunctionCallExpression | provenance |  |
+nodes
+| test.php:3:16:3:17 | VariableName | semmle.label | VariableName |
+| test.php:3:29:3:30 | VariableName | semmle.label | VariableName |
+| test.php:7:8:7:21 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:7:11:7:15 | VariableName | semmle.label | VariableName |
+| test.php:7:11:7:20 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:10:8:10:21 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:10:11:10:15 | VariableName | semmle.label | VariableName |
+| test.php:10:11:10:20 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+| test.php:7:11:7:20 | SubscriptExpression | test.php:3:16:3:17 | VariableName | test.php:3:29:3:30 | VariableName | test.php:7:8:7:21 | FunctionCallExpression |
+| test.php:10:11:10:20 | SubscriptExpression | test.php:3:16:3:17 | VariableName | test.php:3:29:3:30 | VariableName | test.php:10:8:10:21 | FunctionCallExpression |
+#select
+| test.php:7:8:7:21 | FunctionCallExpression | test.php:7:11:7:15 | VariableName | test.php:7:8:7:21 | FunctionCallExpression | This shell command depends on a $@. | test.php:7:11:7:15 | VariableName | user-provided value |
+| test.php:10:8:10:21 | FunctionCallExpression | test.php:10:11:10:15 | VariableName | test.php:10:8:10:21 | FunctionCallExpression | This shell command depends on a $@. | test.php:10:11:10:15 | VariableName | user-provided value |

@@ -721,6 +721,14 @@ predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c)
         not TI::hasInferredReceiver(mc) and c.getName() = mc.getMethodName()
       )
     )
+    or
+    // `Closure::fromCallable('func')` — a closure for the referenced function (by name).
+    exists(StaticMethodCall sc |
+      sc = creation.asExpr() and
+      sc.getTargetName() = "Closure" and
+      sc.getMethodName() = "fromCallable" and
+      c.getName() = sc.getArgument(0).(StringLiteral).getValue()
+    )
   )
 }
 
