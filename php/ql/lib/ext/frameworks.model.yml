@@ -17,11 +17,10 @@ extensions:
       # Laravel
       - ["staticmethod", "input", "laravel-request"]
       - ["staticmethod", "all", "laravel-request"]
-      - ["method", "route", "laravel-route-parameter"]
-      - ["method", "boolean", "laravel-request"]
-      - ["method", "file", "laravel-uploaded-file"]
-      # Symfony (HttpFoundation)
-      - ["method", "get", "symfony-request-bag"]
+      # (bare method names `route`/`boolean`/`file`/`get` removed — they collide with ordinary
+      #  `$obj->get()`/`$obj->file()` etc. and fire as sources on unrelated classes. A class-qualified
+      #  method source is the proper fix; until the schema supports it, prefer precision here.)
+      # Symfony (HttpFoundation) — distinctive accessor names only
       - ["method", "getContent", "symfony-request-body"]
       # WordPress
       - ["function", "wp_unslash", "wordpress-request"]
