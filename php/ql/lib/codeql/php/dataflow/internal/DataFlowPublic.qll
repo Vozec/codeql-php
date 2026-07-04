@@ -45,13 +45,22 @@ class ExprNode extends Node, TExprNode {
 /** Gets the data-flow node corresponding to control-flow node `n`. */
 Node exprNode(Cfg::CfgNode n) { result = TExprNode(n) }
 
-/** A parameter, seen as a data-flow node. */
-class ParameterNode extends ExprNode {
-  ParameterNode() { this.getCfgNode() = any(DataFlowCallable c).getParameterCfgNode(_) }
+/**
+ * A parameter, seen as a data-flow node: a positional formal parameter (backed by its CFG node) or
+ * the synthetic `$this` parameter (position -1) of a method.
+ */
+class ParameterNode extends Node {
+  ParameterNode() {
+    this.getCfgNode() = any(DataFlowCallable c).getParameterCfgNode(_)
+    or
+    this instanceof ThisParameterNode
+  }
 
-  /** Holds if this node is the `pos`th parameter of callable `c`. */
+  /** Holds if this node is the `pos`th parameter of callable `c` (`pos = -1` is `$this`). */
   predicate isParameterOf(DataFlowCallable c, ParameterPosition pos) {
     this.getCfgNode() = c.getParameterCfgNode(pos)
+    or
+    pos = -1 and c = this.(ThisParameterNode).getMethod()
   }
 }
 
