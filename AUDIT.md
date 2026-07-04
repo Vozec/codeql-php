@@ -564,8 +564,13 @@ SÉCURISÉE de DVWA) — les 3 versions vulnérables restent détectées. Préci
 
 ### Performance
 Profiling XSS sur WordPress (4.5M nœuds) : goulots = CFG (208s, lib partagée, inhérent) + local-flow.
-Optimisation de mes steps (post-update piloté par petit ensemble, sameAccessPath non-récursif) :
-**wp-includes 4m14s → 1m53s (~2.3×)**. La requête complète WordPress termine (pas de crash/hang).
+Deux optimisations (résultats identiques, suite 87/87) :
+1. post-update piloté par petit ensemble + sameAccessPath non-récursif → **WordPress 9m50s→3m26s (~2.9×)**.
+2. `getContentApprox` grossier (buckets par 1ère lettre du champ) pour le code OO-lourd → **Laravel src
+   3m29s→1m15s (~2.8×)**.
+WordPress complet et Laravel src analysables en minutes. Le framework Laravel COMPLET (avec ses ~1300
+fichiers de tests, mocks/closures lourds) reste lent (>8min) mais **ne crash pas** — en pratique on
+analyse le code applicatif (src+vendor), pas les tests du framework.
 
 ### Limites connues (documentées)
 tree-sitter-php ne parse pas `function readonly()` (WP) — 2/1927 fichiers partiellement extraits. Perf : le
