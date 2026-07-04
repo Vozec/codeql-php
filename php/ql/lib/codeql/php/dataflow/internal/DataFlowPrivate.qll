@@ -441,6 +441,26 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
   exists(Php::MethodDeclaration m |
     node1 = TThisParameterNode(m) and node2.asExpr() = thisAccess(m)
   )
+  or
+  // Caller-side leg of interprocedural field mutation: the POST-UPDATE of a variable read (an argument /
+  // receiver / store base whose object a callee may have mutated) flows to a LATER read of the same SSA
+  // variable, so `fill($o); … $o->f` observes a mutation `fill` made to `$o`. CFG-ordered so a
+  // post-update never flows to an EARLIER read (that would be an unsound backward edge).
+  model = "" and
+  exists(
+    Ssa::LocalVariable v, Ssa::Definition def, Ssa::Cfg::BasicBlock bb1, int i1, VariableAccess r1,
+    Ssa::Cfg::BasicBlock bb2, int i2, VariableAccess r2
+  |
+    Ssa::Impl::ssaDefReachesRead(v, def, bb1, i1) and
+    Ssa::variableAccessAt(bb1, i1, r1) and
+    Ssa::Impl::ssaDefReachesRead(v, def, bb2, i2) and
+    Ssa::variableAccessAt(bb2, i2, r2) and
+    r1 != r2 and
+    // CFG order: r1 strictly before r2 (same block earlier index, or an earlier block).
+    (bb1 = bb2 and i1 < i2 or bb1.getASuccessor+() = bb2) and
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = r1 and
+    node2.asExpr() = r2
+  )
 }
 
 predicate localFlowStep(Node node1, Node node2) { simpleLocalFlowStep(node1, node2, _) }

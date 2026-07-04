@@ -3,14 +3,39 @@ edges
 | test.php:5:12:5:16 | VariableName | test.php:5:12:5:21 | SubscriptExpression | provenance |  |
 | test.php:5:12:5:21 | SubscriptExpression | test.php:5:1:5:2 | VariableName [[]] | provenance |  |
 | test.php:6:8:6:9 | VariableName [[]] | test.php:6:8:6:14 | SubscriptExpression | provenance |  |
+| test.php:8:44:8:45 | VariableName | test.php:8:63:8:64 | VariableName | provenance |  |
+| test.php:8:49:8:53 | [post] VariableName [.buf] | test.php:8:31:8:67 | $this in add [Return] [.buf] | provenance |  |
+| test.php:8:63:8:64 | VariableName | test.php:8:49:8:53 | [post] VariableName [.buf] | provenance |  |
+| test.php:8:69:8:104 | $this in get [.buf] | test.php:8:92:8:96 | VariableName [.buf] | provenance |  |
+| test.php:8:92:8:96 | VariableName [.buf] | test.php:8:92:8:101 | MemberAccessExpression | provenance |  |
+| test.php:10:1:10:2 | [post] VariableName [.buf] | test.php:11:8:11:9 | VariableName [.buf] | provenance |  |
+| test.php:10:9:10:13 | VariableName | test.php:10:9:10:18 | SubscriptExpression | provenance |  |
+| test.php:10:9:10:18 | SubscriptExpression | test.php:8:44:8:45 | VariableName | provenance |  |
+| test.php:10:9:10:18 | SubscriptExpression | test.php:10:1:10:2 | [post] VariableName [.buf] | provenance |  |
+| test.php:11:8:11:9 | VariableName [.buf] | test.php:8:69:8:104 | $this in get [.buf] | provenance |  |
+| test.php:11:8:11:9 | VariableName [.buf] | test.php:11:8:11:16 | MemberCallExpression | provenance |  |
 nodes
 | test.php:5:1:5:2 | VariableName [[]] | semmle.label | VariableName [[]] |
 | test.php:5:12:5:16 | VariableName | semmle.label | VariableName |
 | test.php:5:12:5:21 | SubscriptExpression | semmle.label | SubscriptExpression |
 | test.php:6:8:6:9 | VariableName [[]] | semmle.label | VariableName [[]] |
 | test.php:6:8:6:14 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:8:31:8:67 | $this in add [Return] [.buf] | semmle.label | $this in add [Return] [.buf] |
+| test.php:8:44:8:45 | VariableName | semmle.label | VariableName |
+| test.php:8:49:8:53 | [post] VariableName [.buf] | semmle.label | [post] VariableName [.buf] |
+| test.php:8:63:8:64 | VariableName | semmle.label | VariableName |
+| test.php:8:69:8:104 | $this in get [.buf] | semmle.label | $this in get [.buf] |
+| test.php:8:92:8:96 | VariableName [.buf] | semmle.label | VariableName [.buf] |
+| test.php:8:92:8:101 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| test.php:10:1:10:2 | [post] VariableName [.buf] | semmle.label | [post] VariableName [.buf] |
+| test.php:10:9:10:13 | VariableName | semmle.label | VariableName |
+| test.php:10:9:10:18 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:11:8:11:9 | VariableName [.buf] | semmle.label | VariableName [.buf] |
 | test.php:11:8:11:16 | MemberCallExpression | semmle.label | MemberCallExpression |
 subpaths
+| test.php:10:9:10:18 | SubscriptExpression | test.php:8:44:8:45 | VariableName | test.php:8:31:8:67 | $this in add [Return] [.buf] | test.php:10:1:10:2 | [post] VariableName [.buf] |
+| test.php:11:8:11:9 | VariableName [.buf] | test.php:8:69:8:104 | $this in get [.buf] | test.php:8:92:8:101 | MemberAccessExpression | test.php:11:8:11:16 | MemberCallExpression |
 #select
 | test.php:6:8:6:14 | SubscriptExpression | test.php:5:12:5:16 | VariableName | test.php:6:8:6:14 | SubscriptExpression | This shell command depends on a $@. | test.php:5:12:5:16 | VariableName | user-provided value |
+| test.php:11:8:11:16 | MemberCallExpression | test.php:10:9:10:13 | VariableName | test.php:11:8:11:16 | MemberCallExpression | This shell command depends on a $@. | test.php:10:9:10:13 | VariableName | user-provided value |
 | test.php:11:8:11:16 | MemberCallExpression | test.php:11:8:11:16 | MemberCallExpression | test.php:11:8:11:16 | MemberCallExpression | This shell command depends on a $@. | test.php:11:8:11:16 | MemberCallExpression | user-provided value |

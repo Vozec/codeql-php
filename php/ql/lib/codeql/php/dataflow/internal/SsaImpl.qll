@@ -201,6 +201,12 @@ module SsaInput implements SsaImplCommon::InputSig<Location, Cfg::BasicBlock> {
         // the shared SSA lib orders the read before the write at the same position, so this read sees
         // the prior definition — without it, taint on the old value is dropped (AUDIT.md A.2).
         isAugmentedAssignTarget(va)
+        or
+        // The base of a partial element/property store `$o->f = v` / `$o[k] = v` READS the container
+        // reference before writing into its field/element. Exposing that read lets the object value
+        // reach the store's post-update node — the callee-side leg of interprocedural field mutation
+        // (a parameter mutated via `$param->f = v` returns the mutation to the caller's argument).
+        va = updateBaseVariable()
       )
     )
   }
