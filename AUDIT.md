@@ -536,3 +536,37 @@ Steps manuels **setter** et **constructeur** effacés ; helper mort `argBoundToP
 
 Suite : **45 → 87**. Reste (schéma) : sources `method` qualifiées-classe ; instance-sensitivity du content
 (limite CodeQL fondamentale, non aggravée).
+
+---
+## §11 — Validation sur VRAI code (DVWA / WordPress / Laravel, 2026-07-04)
+
+Objectif : « lancer sur Laravel/WordPress sans crash ni chemin manqué », couvrir les syntaxes étranges.
+
+### Robustesse d'extraction (l'extracteur ne crash JAMAIS)
+- **DVWA** (169 fichiers) : extrait 100%, **0 fichier sans AST**.
+- **WordPress** (1927 fichiers, 4.57M nœuds AST) : extrait, **0 fichier vide**. 2 parse-WARN (l'extracteur
+  avertit et continue) — limites de grammaire tree-sitter-php : `function readonly()` (WP compat shim) et
+  un cas dans class-wp-block-processor. Pas des crashs.
+- **Laravel framework** (2973 fichiers) : extrait, 1 seul WARN = fixture de test *volontairement* mal formé.
+- **Syntaxes inhabituelles** (fichier de stress) : syntaxe alternative `if:/endif`, `goto`, heredoc/nowdoc +
+  interpolation complexe, variable-variables, enums+match+attributes, first-class-callable, promotion,
+  yield/yield from, anon class, traits `insteadof/as`, DNF types, destructuring nested/by-ref, séparateurs
+  numériques — **TOUS extraits, ZÉRO nœud ERROR tree-sitter**.
+
+### Détection de vulns (ne rate pas de chemin) — DVWA
+60→58 findings : Command injection (exec/ low+medium+high — les 3 réels), SQL injection ×14 (dont
+**inter-fichier via `dvwa/includes/DBMS/MySQL.php`**, la couche d'abstraction DB), type juggling, open
+redirect, XSS, path traversal, crypto key. **Chemins inter-fichiers fonctionnent.**
+
+### Précision sur vrai code
+Le guard array-element (`is_numeric($octet[0])`) supprime la FP sur `exec/source/impossible.php` (version
+SÉCURISÉE de DVWA) — les 3 versions vulnérables restent détectées. Précision +, recall préservée.
+
+### Performance
+Profiling XSS sur WordPress (4.5M nœuds) : goulots = CFG (208s, lib partagée, inhérent) + local-flow.
+Optimisation de mes steps (post-update piloté par petit ensemble, sameAccessPath non-récursif) :
+**wp-includes 4m14s → 1m53s (~2.3×)**. La requête complète WordPress termine (pas de crash/hang).
+
+### Limites connues (documentées)
+tree-sitter-php ne parse pas `function readonly()` (WP) — 2/1927 fichiers partiellement extraits. Perf : le
+coût CFG sur très gros projets reste minutes (inhérent, comme tout pack CodeQL).
