@@ -1,0 +1,52 @@
+edges
+| main.php:5:8:5:20 | ObjectCreationExpression [.data] | main.php:6:22:6:25 | VariableName [.data] | provenance |  |
+| main.php:6:11:6:26 | ObjectCreationExpression [.req, .data] | main.php:7:1:7:7 | VariableName [.req, .data] | provenance |  |
+| main.php:6:22:6:25 | VariableName [.data] | main.php:6:11:6:26 | ObjectCreationExpression [.req, .data] | provenance |  |
+| main.php:6:22:6:25 | VariableName [.data] | service.php:8:41:8:42 | VariableName [.data] | provenance |  |
+| main.php:7:1:7:7 | VariableName [.req, .data] | service.php:9:5:9:84 | $this in handle [.req, .data] | provenance |  |
+| service.php:4:38:4:41 | VariableName | service.php:4:54:4:57 | VariableName | provenance |  |
+| service.php:8:41:8:42 | VariableName [.data] | service.php:8:60:8:61 | VariableName [.data] | provenance |  |
+| service.php:8:60:8:61 | VariableName [.data] | service.php:8:47:8:51 | [post] VariableName [.req, .data] | provenance |  |
+| service.php:9:5:9:84 | $this in handle [.req, .data] | service.php:9:58:9:62 | VariableName [.req, .data] | provenance |  |
+| service.php:9:58:9:62 | VariableName [.req, .data] | service.php:9:58:9:67 | MemberAccessExpression [.data] | provenance |  |
+| service.php:9:58:9:67 | MemberAccessExpression [.data] | service.php:9:58:9:80 | MemberCallExpression | provenance |  |
+| service.php:9:58:9:67 | MemberAccessExpression [.data] | source.php:6:5:6:68 | $this in input [.data] | provenance |  |
+| service.php:9:58:9:80 | MemberCallExpression | service.php:4:38:4:41 | VariableName | provenance |  |
+| service.php:9:58:9:80 | MemberCallExpression | service.php:4:38:4:41 | VariableName | provenance |  |
+| source.php:5:37:5:41 | [post] VariableName [.data] | main.php:5:8:5:20 | ObjectCreationExpression [.data] | provenance |  |
+| source.php:5:51:5:55 | VariableName | source.php:5:37:5:41 | [post] VariableName [.data] | provenance |  |
+| source.php:5:51:5:55 | VariableName | source.php:6:49:6:59 | MemberAccessExpression | provenance |  |
+| source.php:6:5:6:68 | $this in input [.data] | source.php:6:49:6:53 | VariableName [.data] | provenance |  |
+| source.php:6:49:6:53 | VariableName [.data] | source.php:6:49:6:59 | MemberAccessExpression | provenance |  |
+| source.php:6:49:6:59 | MemberAccessExpression | source.php:6:49:6:65 | SubscriptExpression | provenance |  |
+| source.php:6:49:6:59 | MemberAccessExpression | source.php:6:49:6:65 | SubscriptExpression | provenance |  |
+| source.php:6:49:6:65 | SubscriptExpression | service.php:9:58:9:80 | MemberCallExpression | provenance |  |
+nodes
+| main.php:5:8:5:20 | ObjectCreationExpression [.data] | semmle.label | ObjectCreationExpression [.data] |
+| main.php:6:11:6:26 | ObjectCreationExpression [.req, .data] | semmle.label | ObjectCreationExpression [.req, .data] |
+| main.php:6:22:6:25 | VariableName [.data] | semmle.label | VariableName [.data] |
+| main.php:7:1:7:7 | VariableName [.req, .data] | semmle.label | VariableName [.req, .data] |
+| service.php:4:38:4:41 | VariableName | semmle.label | VariableName |
+| service.php:4:54:4:57 | VariableName | semmle.label | VariableName |
+| service.php:8:41:8:42 | VariableName [.data] | semmle.label | VariableName [.data] |
+| service.php:8:47:8:51 | [post] VariableName [.req, .data] | semmle.label | [post] VariableName [.req, .data] |
+| service.php:8:60:8:61 | VariableName [.data] | semmle.label | VariableName [.data] |
+| service.php:9:5:9:84 | $this in handle [.req, .data] | semmle.label | $this in handle [.req, .data] |
+| service.php:9:58:9:62 | VariableName [.req, .data] | semmle.label | VariableName [.req, .data] |
+| service.php:9:58:9:67 | MemberAccessExpression [.data] | semmle.label | MemberAccessExpression [.data] |
+| service.php:9:58:9:80 | MemberCallExpression | semmle.label | MemberCallExpression |
+| service.php:9:58:9:80 | MemberCallExpression | semmle.label | MemberCallExpression |
+| source.php:5:37:5:41 | [post] VariableName [.data] | semmle.label | [post] VariableName [.data] |
+| source.php:5:51:5:55 | VariableName | semmle.label | VariableName |
+| source.php:6:5:6:68 | $this in input [.data] | semmle.label | $this in input [.data] |
+| source.php:6:49:6:53 | VariableName [.data] | semmle.label | VariableName [.data] |
+| source.php:6:49:6:59 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| source.php:6:49:6:59 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+| source.php:6:49:6:65 | SubscriptExpression | semmle.label | SubscriptExpression |
+| source.php:6:49:6:65 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+| main.php:6:22:6:25 | VariableName [.data] | service.php:8:41:8:42 | VariableName [.data] | service.php:8:47:8:51 | [post] VariableName [.req, .data] | main.php:6:11:6:26 | ObjectCreationExpression [.req, .data] |
+| service.php:9:58:9:67 | MemberAccessExpression [.data] | source.php:6:5:6:68 | $this in input [.data] | source.php:6:49:6:65 | SubscriptExpression | service.php:9:58:9:80 | MemberCallExpression |
+#select
+| service.php:4:54:4:57 | VariableName | service.php:9:58:9:80 | MemberCallExpression | service.php:4:54:4:57 | VariableName | This shell command depends on a $@. | service.php:9:58:9:80 | MemberCallExpression | user-provided value |
+| service.php:4:54:4:57 | VariableName | source.php:5:51:5:55 | VariableName | service.php:4:54:4:57 | VariableName | This shell command depends on a $@. | source.php:5:51:5:55 | VariableName | user-provided value |
