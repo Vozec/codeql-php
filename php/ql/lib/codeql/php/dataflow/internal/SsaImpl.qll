@@ -121,6 +121,13 @@ VariableAccess rootVariableOfAccess(Expr e) {
  */
 VariableAccess updateBaseVariable() {
   exists(AssignExpr a | isNestedAccess(a.getLhs()) and result = rootVariableOfAccess(a.getLhs()))
+  or
+  // Augmented assignment into an element/property (`$a['k'] .= v`, `$this->buf .= v`) also re-defines
+  // the root container — otherwise the container keeps its prior (untainted) definition (a false negative
+  // for the very common "build a command/query string via `.=` into a field/array slot" pattern).
+  exists(Php::AugmentedAssignmentExpression a |
+    isNestedAccess(a.getLeft()) and result = rootVariableOfAccess(a.getLeft())
+  )
 }
 
 private newtype TLocalVariable =

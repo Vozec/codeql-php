@@ -1,0 +1,27 @@
+edges
+| test.php:7:8:7:12 | VariableName | test.php:7:8:7:17 | SubscriptExpression | provenance |  |
+| test.php:7:8:7:17 | SubscriptExpression | test.php:7:58:7:61 | VariableName | provenance |  |
+| test.php:12:17:12:21 | VariableName | test.php:12:36:12:37 | VariableName | provenance |  |
+| test.php:18:32:18:36 | VariableName | test.php:18:32:18:41 | SubscriptExpression | provenance |  |
+| test.php:18:32:18:41 | SubscriptExpression | test.php:19:23:19:24 | VariableName | provenance |  |
+| test.php:18:32:18:41 | SubscriptExpression | test.php:19:34:19:35 | VariableName | provenance |  |
+| test.php:19:23:19:24 | VariableName | test.php:19:34:19:35 | VariableName | provenance |  |
+| test.php:25:6:25:10 | VariableName | test.php:25:35:25:36 | VariableName | provenance |  |
+nodes
+| test.php:7:8:7:12 | VariableName | semmle.label | VariableName |
+| test.php:7:8:7:17 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:7:58:7:61 | VariableName | semmle.label | VariableName |
+| test.php:12:17:12:21 | VariableName | semmle.label | VariableName |
+| test.php:12:36:12:37 | VariableName | semmle.label | VariableName |
+| test.php:18:32:18:36 | VariableName | semmle.label | VariableName |
+| test.php:18:32:18:41 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:19:23:19:24 | VariableName | semmle.label | VariableName |
+| test.php:19:34:19:35 | VariableName | semmle.label | VariableName |
+| test.php:25:6:25:10 | VariableName | semmle.label | VariableName |
+| test.php:25:35:25:36 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:7:58:7:61 | VariableName | test.php:7:8:7:12 | VariableName | test.php:7:58:7:61 | VariableName | This shell command depends on a $@. | test.php:7:8:7:12 | VariableName | user-provided value |
+| test.php:12:36:12:37 | VariableName | test.php:12:17:12:21 | VariableName | test.php:12:36:12:37 | VariableName | This shell command depends on a $@. | test.php:12:17:12:21 | VariableName | user-provided value |
+| test.php:19:34:19:35 | VariableName | test.php:18:32:18:36 | VariableName | test.php:19:34:19:35 | VariableName | This shell command depends on a $@. | test.php:18:32:18:36 | VariableName | user-provided value |
+| test.php:25:35:25:36 | VariableName | test.php:25:6:25:10 | VariableName | test.php:25:35:25:36 | VariableName | This shell command depends on a $@. | test.php:25:6:25:10 | VariableName | user-provided value |

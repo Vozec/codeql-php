@@ -37,6 +37,46 @@ private Expr methodReturnValue(Method m) {
   )
 }
 
+/** Gets the body of any callable kind (function, method, closure, arrow). */
+private AstNode anyCalleeBody(AstNode callee) {
+  result = callee.(Php::FunctionDefinition).getBody() or
+  result = callee.(Php::MethodDeclaration).getBody() or
+  result = callee.(Php::AnonymousFunction).getBody() or
+  result = callee.(Php::ArrowFunction).getBody()
+}
+
+/** Gets a formal parameter of any callable kind (function, method, closure, arrow). */
+private Php::SimpleParameter anyCalleeParam(AstNode callee) {
+  result = callee.(Php::FunctionDefinition).getParameters().getChild(_) or
+  result = callee.(Php::MethodDeclaration).getParameters().getChild(_) or
+  result = callee.(Php::AnonymousFunction).getParameters().getChild(_) or
+  result = callee.(Php::ArrowFunction).getParameters().getChild(_)
+}
+
+/** Gets the value returned by any callable kind (a `return` operand, or an arrow's body expression). */
+private Expr anyCalleeReturnValue(AstNode callee) {
+  exists(Php::ReturnStatement ret |
+    ret.(Php::AstNode).getParent+() = anyCalleeBody(callee) and result = ret.getChild()
+  )
+  or
+  result = callee.(Php::ArrowFunction).getBody()
+}
+
+/**
+ * Gets the callable that a `call_user_func` / `call_user_func_array` call `c` invokes: a string function
+ * name (`call_user_func('f', …)`) or an inline closure/arrow (`call_user_func(fn(…) => …, …)`) at arg 0.
+ * (Array `[obj, 'method']` and variable-held callables are a further refinement.)
+ */
+private AstNode cufCallee(FunctionCall c) {
+  c.getName() = ["call_user_func", "call_user_func_array"] and
+  (
+    result.(Php::FunctionDefinition).getName().getValue() = c.getArgument(0).(StringLiteral).getValue()
+    or
+    result = c.getArgument(0) and
+    (result instanceof Php::AnonymousFunction or result instanceof Php::ArrowFunction)
+  )
+}
+
 /** Gets the callable body (function/method/closure/arrow) that transitively contains `n`. */
 cached
 private AstNode enclosingCallableBody(AstNode n) {
@@ -72,6 +112,27 @@ private Php::Argument callArgumentNode(Call c) {
   result = c.(Php::NullsafeMemberCallExpression).getArguments().getChild(_) or
   result = c.(Php::ScopedCallExpression).getArguments().getChild(_) or
   result = c.(Php::ObjectCreationExpression).getChild(_).(Php::Arguments).getChild(_)
+}
+
+/** Holds if call `c` passes any named argument (`f(x: …)`). */
+private predicate hasNamedArgument(Call c) {
+  exists(Php::Argument a | a = callArgumentNode(c) and exists(a.getName()))
+}
+
+/**
+ * Gets the argument EXPRESSION of call `c` bound to parameter `i` of `callee` — the per-call-site node
+ * (never a node shared inside the callee). Matches a named argument by parameter name, or a positional
+ * argument by index when the call uses no named arguments. Used so mutation flow-back steps read the
+ * exact argument for this call (no cross-instance merge, correct for reordered named args).
+ */
+private Expr argBoundToParam(Call c, AstNode callee, int i) {
+  exists(Php::Argument a |
+    a = callArgumentNode(c) and
+    a.getName().toString() = calleeParam(callee, i).getName().getChild().getValue() and
+    result = a.getChild()
+  )
+  or
+  not hasNamedArgument(c) and result = c.getArgument(i)
 }
 
 /**
@@ -238,6 +299,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       bodyRead.getName() = capture.getName() and
       cl.getBody() = bodyRead.(Php::AstNode).getParent+() and
       not cl.getBody() = w.(Php::AstNode).getParent*() and
+      // The captured assignment must live in the closure's DEFINING scope (a `use($x)` closure captures
+      // `$x` from where the closure is written) — not a same-named variable in an unrelated scope/file.
+      sameScope(w, cl) and
       nodeFrom.asExpr() = a.getRhs() and
       nodeTo.asExpr() = bodyRead
     )
@@ -278,6 +342,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     exists(Php::DynamicVariableName dv, Php::AssignmentExpression a, VariableAccess read |
       a.getLeft() = dv and
       read.getName() = resolvedStringOf(dv.getChild()) and
+      // Same scope only — a `$$n` write in one function must not taint a same-named plain variable
+      // in an unrelated function that happens to share the file.
+      sameScope(dv, read) and
       nodeFrom.asExpr() = a.getRight() and
       nodeTo.asExpr() = read
     )
@@ -332,11 +399,10 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // Constructor property promotion `new C($v)` with `__construct(public $f)`: the constructor argument
     // IS the promoted field, so it flows to reads of `$o->f` on the constructed object `$o = new C($v)`.
     exists(
-      NewExpr ne, ClassLike cls, Method ctor, Php::PropertyPromotionParameter pp, int i,
+      NewExpr ne, Method ctor, Php::PropertyPromotionParameter pp, int i,
       AssignExpr objAssign, VariableAccess objVar, Php::MemberAccessExpression fieldRead, string f
     |
-      cls.getName() = ne.getClassName() and
-      ctor = cls.getAMethod() and
+      ctor = TI::exprClass(ne).getAMethod() and
       ctor.getName() = "__construct" and
       pp = ctor.(Php::MethodDeclaration).getParameters().getChild(i) and
       f = pp.getName().(Php::VariableName).getChild().getValue() and
@@ -345,7 +411,15 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       fieldRead.getObject().(VariableAccess).getName() = objVar.getName() and
       fieldRead.getName().(Php::Name).getValue() = f and
       sameScope(fieldRead, objVar) and
-      nodeFrom.asExpr() = ne.getArgument(i) and
+      // the promoted parameter's name IS the field name `f`: match a named argument `f: …` or, for a
+      // purely positional call, the argument at index `i` (per-call-site node — no cross-instance leak).
+      (
+        exists(Php::Argument a | a = callArgumentNode(ne) and a.getName().toString() = f |
+          nodeFrom.asExpr() = a.getChild()
+        )
+        or
+        not hasNamedArgument(ne) and nodeFrom.asExpr() = ne.getArgument(i)
+      ) and
       nodeTo.asExpr() = fieldRead
     )
     or
@@ -400,6 +474,10 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       st.getName() = "__set" and
       a.getLhs() = ma and
       objectCandidate(ma.getObject()) and
+      // Type-gated like `__toString`: dispatch to the receiver's `__set` when its class is inferred,
+      // falling back to any `__set` only when the type is unknown — so `$plain->x = $v` on a class with
+      // no `__set` is not routed into an unrelated class's `__set` (a false positive).
+      (st = TI::exprClass(ma.getObject()).getAMethod() or not exists(TI::exprClass(ma.getObject()))) and
       nodeFrom.asExpr() = a.getRhs() and
       nodeTo.asExpr() = paramReadInBody(st, 1)
     )
@@ -431,21 +509,20 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       outerRead.getName().(Php::Name).getValue() = fld and
       sameScope(outerRead, recv) and
       outerRead != innerStore and
-      nodeFrom.asExpr() = call.getArgument(i) and
+      nodeFrom.asExpr() = argBoundToParam(call, m, i) and
       nodeTo.asExpr() = outerRead
     )
     or
     // Constructor mutation flow-back: `$o = new C($a)` where `__construct` stores a parameter into
-    // `$this->f` makes reads of `$o->f` tainted (the constructor acts as a field setter). Mirrors the
-    // setter step for `new`; the source is the parameter READ, so it fires for positional args (engine
-    // parameter passing) and named args (the named-arg step taints the parameter) alike.
+    // `$this->f` makes reads of `$o->f` tainted (the constructor acts as a field setter). The class is
+    // resolved namespace-aware (TI::exprClass — not by short name), and the source is the per-call-site
+    // argument bound to the stored parameter (argBoundToParam), so a DIFFERENT `new C(...)` instance and
+    // a same-named class in another namespace do not leak into this field read.
     exists(
-      NewExpr call, ClassLike cls, Method ctor, int i, AssignExpr innerAssign,
-      Php::MemberAccessExpression innerStore, AssignExpr objAssign, VariableAccess objVar,
-      Php::MemberAccessExpression outerRead, string fld
+      NewExpr call, Method ctor, int i, AssignExpr innerAssign, Php::MemberAccessExpression innerStore,
+      AssignExpr objAssign, VariableAccess objVar, Php::MemberAccessExpression outerRead, string fld
     |
-      cls.getName() = call.getClassName() and
-      ctor = cls.getAMethod() and
+      ctor = TI::exprClass(call).getAMethod() and
       ctor.getName() = "__construct" and
       innerAssign.getLhs() = innerStore and
       innerStore.getObject().(VariableAccess).getName() = "this" and
@@ -458,7 +535,7 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       outerRead.getName().(Php::Name).getValue() = fld and
       sameScope(outerRead, objVar) and
       outerRead != innerStore and
-      (nodeFrom.asExpr() = call.getArgument(i) or nodeFrom.asExpr() = innerAssign.getRhs()) and
+      nodeFrom.asExpr() = argBoundToParam(call, ctor, i) and
       nodeTo.asExpr() = outerRead
     )
     or
@@ -474,7 +551,10 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       n2 = ra.getRight().(VariableAccess).getName() and
       av.getLhs() = aw and
       (aw.getName() = n1 and br.getName() = n2 or aw.getName() = n2 and br.getName() = n1) and
-      aw.getLocation().getFile() = br.getLocation().getFile() and
+      // A `$b =& $a` alias is scope-local: require the alias, the write and the read to share a scope,
+      // not merely the same file (same-named locals in unrelated functions must not cross-link).
+      sameScope(ra, aw) and
+      sameScope(aw, br) and
       nodeFrom.asExpr() = av.getRhs() and
       nodeTo.asExpr() = br
     )
@@ -512,6 +592,31 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       pRead.getName() = pn and
       pRead.(Php::AstNode).getParent+() = cl.getBody() and
       nodeFrom.asExpr() = c.getArgument(j) and
+      nodeTo.asExpr() = pRead
+    )
+    or
+    // `call_user_func[_array]` — the invoked callable's RETURN flows to the call result.
+    exists(FunctionCall c, AstNode callee |
+      callee = cufCallee(c) and
+      nodeFrom.asExpr() = anyCalleeReturnValue(callee) and
+      nodeTo.asExpr() = c
+    )
+    or
+    // `call_user_func[_array]` — each passed argument flows to the callable's parameters. For
+    // `call_user_func` the passed args are positions 1.. ; for `call_user_func_array` they are the
+    // elements of the array at position 1 (element→position not tracked — recall-first, whole array).
+    exists(FunctionCall c, AstNode callee, VariableAccess pRead |
+      callee = cufCallee(c) and
+      pRead.getName() = anyCalleeParam(callee).getName().getChild().getValue() and
+      // getParent* (reflexive) so an arrow whose whole body IS the parameter read (`fn($a) => $a`) matches.
+      pRead.(Php::AstNode).getParent*() = anyCalleeBody(callee) and
+      (
+        c.getName() = "call_user_func" and nodeFrom.asExpr() = c.getArgument(any(int k | k >= 1))
+        or
+        c.getName() = "call_user_func_array" and
+        nodeFrom.asExpr() =
+          c.getArgument(1).(Php::ArrayCreationExpression).getChild(_).(Php::ArrayElementInitializer).getChild(_)
+      ) and
       nodeTo.asExpr() = pRead
     )
     or
@@ -572,10 +677,11 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
 private predicate structuralPropagator(AstNode e) {
   e instanceof Php::MemberAccessExpression or
   e instanceof Php::NullsafeMemberAccessExpression or
-  e instanceof Php::MemberCallExpression or
-  e instanceof Php::NullsafeMemberCallExpression or
+  // NOTE: method/static CALL expressions are deliberately NOT here. A call's argument→return flow is
+  // decided by the callee body (real interprocedural summaries via `viableCallable`) or by a Models-as-
+  // Data `stepModel` row for library methods — never a blanket "every argument taints the result", which
+  // would defeat every method-based sanitizer (e.g. `$db->quote($x)`, `$purifier->purify($x)`).
   e instanceof Php::ScopedPropertyAccessExpression or
-  e instanceof Php::ScopedCallExpression or
   e instanceof Php::CastExpression or
   e instanceof Php::UnaryOpExpression or
   e instanceof Php::BinaryExpression or

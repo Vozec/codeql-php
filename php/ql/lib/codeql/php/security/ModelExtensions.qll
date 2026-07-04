@@ -112,7 +112,11 @@ private class DataStep extends AdditionalTaintStep {
       stepModel(sk, nm, fromArg, toArg) and callMatches(c, sk, nm)
     |
       pred.asExpr() = argOf(c, fromArg) and
-      (toArg = -1 and succ.asExpr() = c or succ.asExpr() = argOf(c, toArg))
+      (
+        toArg = -1 and succ.asExpr() = c
+        or
+        toArg >= 0 and succ.asExpr() = argOf(c, toArg)
+      )
     )
   }
 }
