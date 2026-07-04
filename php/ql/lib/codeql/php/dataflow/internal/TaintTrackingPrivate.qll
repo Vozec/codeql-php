@@ -120,22 +120,6 @@ private predicate hasNamedArgument(Call c) {
 }
 
 /**
- * Gets the argument EXPRESSION of call `c` bound to parameter `i` of `callee` — the per-call-site node
- * (never a node shared inside the callee). Matches a named argument by parameter name, or a positional
- * argument by index when the call uses no named arguments. Used so mutation flow-back steps read the
- * exact argument for this call (no cross-instance merge, correct for reordered named args).
- */
-private Expr argBoundToParam(Call c, AstNode callee, int i) {
-  exists(Php::Argument a |
-    a = callArgumentNode(c) and
-    a.getName().toString() = calleeParam(callee, i).getName().getChild().getValue() and
-    result = a.getChild()
-  )
-  or
-  not hasNamedArgument(c) and result = c.getArgument(i)
-}
-
-/**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
  * "no inferred receiver" (as in `viableCallable`) avoids matching a same-named method on an unrelated

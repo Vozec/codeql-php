@@ -34,6 +34,22 @@ private predicate needsPostUpdate(Cfg::CfgNode n) {
   exists(Php::AugmentedAssignmentExpression a, Php::MemberAccessExpression m |
     a.getLeft() = m and n.getAstNode() = m.getObject()
   )
+  or
+  // base of an array store `$a[k] = v` — so an appended/keyed element folds onto the base's post-update
+  // (interprocedural array-field mutation, e.g. a method doing `$this->items[] = $v`).
+  exists(AssignExpr a, Php::SubscriptExpression sub | a.getLhs() = sub and n.getAstNode() = sub.getChild(0))
+  or
+  // The OBJECT of a nested store base (`$o` in `$o->f->g = v` / `$o->f[] = v`) also needs a post-update,
+  // so the inner access's mutation folds up one more level onto `$o` — the two-level interprocedural
+  // carry-out (a method doing `$this->items[] = $v` or `$this->other->f = $v`).
+  exists(Php::MemberAccessExpression m | m = nestedStoreBase() and n.getAstNode() = m.getObject())
+}
+
+/** Gets a member access that is the base of a nested store (`$o->f->g = v` or `$o->f[] = v`). */
+private Php::MemberAccessExpression nestedStoreBase() {
+  exists(AssignExpr a, Php::MemberAccessExpression outer | a.getLhs() = outer and result = outer.getObject())
+  or
+  exists(AssignExpr a, Php::SubscriptExpression sub | a.getLhs() = sub and result = sub.getChild(0))
 }
 
 newtype TNode =
@@ -563,7 +579,8 @@ predicate storeStep(Node node1, ContentSet c, Node node2) {
   // `$a[k] = v` — stores into the base variable, which is an SSA update definition and therefore
   // flows to subsequent reads of `$a`.
   exists(AssignExpr a, Php::SubscriptExpression sub |
-    a.getLhs() = sub and node1.asExpr() = a.getRhs() and node2.asExpr() = sub.getChild(0) and
+    a.getLhs() = sub and node1.asExpr() = a.getRhs() and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = sub.getChild(0) and
     c = TArrayContent()
   )
   or
@@ -594,6 +611,17 @@ predicate storeStep(Node node1, ContentSet c, Node node2) {
   exists(Php::AugmentedAssignmentExpression a, Php::MemberAccessExpression m, string f |
     a.getLeft() = m and
     node1.asExpr() = a.getRight() and
+    node2.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject() and
+    f = m.getName().(Php::Name).getValue() and
+    c = TFieldContent(f)
+  )
+  or
+  // Two-level fold: the post-update of a nested store base `$o->f` (holding the inner mutation from
+  // `$o->f->g = v` or `$o->f[] = v`) is stored back onto `$o`'s post-update at field `f`, so the nested
+  // mutation reaches later `$o->f` reads (and, interprocedurally, the receiver of a method that did it).
+  exists(Php::MemberAccessExpression m, string f |
+    m = nestedStoreBase() and
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = m and
     node2.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject() and
     f = m.getName().(Php::Name).getValue() and
     c = TFieldContent(f)

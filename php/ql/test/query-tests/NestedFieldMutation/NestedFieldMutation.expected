@@ -1,0 +1,71 @@
+edges
+| test.php:6:46:6:47 | VariableName | test.php:6:69:6:70 | VariableName | provenance |  |
+| test.php:6:52:6:56 | [post] VariableName [.items, []] | test.php:6:33:6:73 | $this in add [Return] [.items, []] | provenance |  |
+| test.php:6:52:6:63 | [post] MemberAccessExpression [[]] | test.php:6:52:6:56 | [post] VariableName [.items, []] | provenance |  |
+| test.php:6:69:6:70 | VariableName | test.php:6:52:6:63 | [post] MemberAccessExpression [[]] | provenance |  |
+| test.php:8:1:8:4 | [post] VariableName [.items, []] | test.php:9:8:9:11 | VariableName [.items, []] | provenance |  |
+| test.php:8:11:8:15 | VariableName | test.php:8:11:8:20 | SubscriptExpression | provenance |  |
+| test.php:8:11:8:20 | SubscriptExpression | test.php:6:46:6:47 | VariableName | provenance |  |
+| test.php:8:11:8:20 | SubscriptExpression | test.php:8:1:8:4 | [post] VariableName [.items, []] | provenance |  |
+| test.php:9:8:9:11 | VariableName [.items, []] | test.php:9:8:9:18 | MemberAccessExpression [[]] | provenance |  |
+| test.php:9:8:9:18 | MemberAccessExpression [[]] | test.php:9:8:9:21 | SubscriptExpression | provenance |  |
+| test.php:12:55:12:56 | VariableName | test.php:12:78:12:79 | VariableName | provenance |  |
+| test.php:12:61:12:72 | [post] MemberAccessExpression [[]] | test.php:12:61:12:65 | [post] VariableName [.items, []] | provenance |  |
+| test.php:12:78:12:79 | VariableName | test.php:12:61:12:72 | [post] MemberAccessExpression [[]] | provenance |  |
+| test.php:13:9:13:28 | ObjectCreationExpression [.items, []] | test.php:14:8:14:12 | VariableName [.items, []] | provenance |  |
+| test.php:13:18:13:22 | VariableName | test.php:13:18:13:27 | SubscriptExpression | provenance |  |
+| test.php:13:18:13:27 | SubscriptExpression | test.php:12:55:12:56 | VariableName | provenance |  |
+| test.php:13:18:13:27 | SubscriptExpression | test.php:13:9:13:28 | ObjectCreationExpression [.items, []] | provenance |  |
+| test.php:14:8:14:12 | VariableName [.items, []] | test.php:14:8:14:19 | MemberAccessExpression [[]] | provenance |  |
+| test.php:14:8:14:19 | MemberAccessExpression [[]] | test.php:14:8:14:22 | SubscriptExpression | provenance |  |
+| test.php:18:98:18:99 | VariableName | test.php:18:122:18:123 | VariableName | provenance |  |
+| test.php:18:104:18:108 | [post] VariableName [.inner, .f] | test.php:18:85:18:126 | $this in set [Return] [.inner, .f] | provenance |  |
+| test.php:18:104:18:115 | [post] MemberAccessExpression [.f] | test.php:18:104:18:108 | [post] VariableName [.inner, .f] | provenance |  |
+| test.php:18:122:18:123 | VariableName | test.php:18:104:18:115 | [post] MemberAccessExpression [.f] | provenance |  |
+| test.php:20:1:20:6 | [post] VariableName [.inner, .f] | test.php:21:8:21:13 | VariableName [.inner, .f] | provenance |  |
+| test.php:20:13:20:17 | VariableName | test.php:20:13:20:22 | SubscriptExpression | provenance |  |
+| test.php:20:13:20:22 | SubscriptExpression | test.php:18:98:18:99 | VariableName | provenance |  |
+| test.php:20:13:20:22 | SubscriptExpression | test.php:20:1:20:6 | [post] VariableName [.inner, .f] | provenance |  |
+| test.php:21:8:21:13 | VariableName [.inner, .f] | test.php:21:8:21:20 | MemberAccessExpression [.f] | provenance |  |
+| test.php:21:8:21:20 | MemberAccessExpression [.f] | test.php:21:8:21:23 | MemberAccessExpression | provenance |  |
+nodes
+| test.php:6:33:6:73 | $this in add [Return] [.items, []] | semmle.label | $this in add [Return] [.items, []] |
+| test.php:6:46:6:47 | VariableName | semmle.label | VariableName |
+| test.php:6:52:6:56 | [post] VariableName [.items, []] | semmle.label | [post] VariableName [.items, []] |
+| test.php:6:52:6:63 | [post] MemberAccessExpression [[]] | semmle.label | [post] MemberAccessExpression [[]] |
+| test.php:6:69:6:70 | VariableName | semmle.label | VariableName |
+| test.php:8:1:8:4 | [post] VariableName [.items, []] | semmle.label | [post] VariableName [.items, []] |
+| test.php:8:11:8:15 | VariableName | semmle.label | VariableName |
+| test.php:8:11:8:20 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:9:8:9:11 | VariableName [.items, []] | semmle.label | VariableName [.items, []] |
+| test.php:9:8:9:18 | MemberAccessExpression [[]] | semmle.label | MemberAccessExpression [[]] |
+| test.php:9:8:9:21 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:12:55:12:56 | VariableName | semmle.label | VariableName |
+| test.php:12:61:12:65 | [post] VariableName [.items, []] | semmle.label | [post] VariableName [.items, []] |
+| test.php:12:61:12:72 | [post] MemberAccessExpression [[]] | semmle.label | [post] MemberAccessExpression [[]] |
+| test.php:12:78:12:79 | VariableName | semmle.label | VariableName |
+| test.php:13:9:13:28 | ObjectCreationExpression [.items, []] | semmle.label | ObjectCreationExpression [.items, []] |
+| test.php:13:18:13:22 | VariableName | semmle.label | VariableName |
+| test.php:13:18:13:27 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:14:8:14:12 | VariableName [.items, []] | semmle.label | VariableName [.items, []] |
+| test.php:14:8:14:19 | MemberAccessExpression [[]] | semmle.label | MemberAccessExpression [[]] |
+| test.php:14:8:14:22 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:18:85:18:126 | $this in set [Return] [.inner, .f] | semmle.label | $this in set [Return] [.inner, .f] |
+| test.php:18:98:18:99 | VariableName | semmle.label | VariableName |
+| test.php:18:104:18:108 | [post] VariableName [.inner, .f] | semmle.label | [post] VariableName [.inner, .f] |
+| test.php:18:104:18:115 | [post] MemberAccessExpression [.f] | semmle.label | [post] MemberAccessExpression [.f] |
+| test.php:18:122:18:123 | VariableName | semmle.label | VariableName |
+| test.php:20:1:20:6 | [post] VariableName [.inner, .f] | semmle.label | [post] VariableName [.inner, .f] |
+| test.php:20:13:20:17 | VariableName | semmle.label | VariableName |
+| test.php:20:13:20:22 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:21:8:21:13 | VariableName [.inner, .f] | semmle.label | VariableName [.inner, .f] |
+| test.php:21:8:21:20 | MemberAccessExpression [.f] | semmle.label | MemberAccessExpression [.f] |
+| test.php:21:8:21:23 | MemberAccessExpression | semmle.label | MemberAccessExpression |
+subpaths
+| test.php:8:11:8:20 | SubscriptExpression | test.php:6:46:6:47 | VariableName | test.php:6:33:6:73 | $this in add [Return] [.items, []] | test.php:8:1:8:4 | [post] VariableName [.items, []] |
+| test.php:13:18:13:27 | SubscriptExpression | test.php:12:55:12:56 | VariableName | test.php:12:61:12:65 | [post] VariableName [.items, []] | test.php:13:9:13:28 | ObjectCreationExpression [.items, []] |
+| test.php:20:13:20:22 | SubscriptExpression | test.php:18:98:18:99 | VariableName | test.php:18:85:18:126 | $this in set [Return] [.inner, .f] | test.php:20:1:20:6 | [post] VariableName [.inner, .f] |
+#select
+| test.php:9:8:9:21 | SubscriptExpression | test.php:8:11:8:15 | VariableName | test.php:9:8:9:21 | SubscriptExpression | This shell command depends on a $@. | test.php:8:11:8:15 | VariableName | user-provided value |
+| test.php:14:8:14:22 | SubscriptExpression | test.php:13:18:13:22 | VariableName | test.php:14:8:14:22 | SubscriptExpression | This shell command depends on a $@. | test.php:13:18:13:22 | VariableName | user-provided value |
+| test.php:21:8:21:23 | MemberAccessExpression | test.php:20:13:20:17 | VariableName | test.php:21:8:21:23 | MemberAccessExpression | This shell command depends on a $@. | test.php:20:13:20:17 | VariableName | user-provided value |
