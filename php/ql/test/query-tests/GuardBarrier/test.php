@@ -28,3 +28,9 @@ system($c);                         // 25: BUG (no guard)
 $d = $_GET['w'];
 if (ctype_alnum($d)) { /* ... */ }
 system($d);                         // 30: BUG (use is outside the guarded branch)
+
+// array-element guard: is_numeric on $octet[i] sanitizes that element's reads on the branch (DVWA-style)
+$octet = explode(".", $_GET['ip']);
+if (is_numeric($octet[0]) && is_numeric($octet[1])) {
+    system($octet[0] . $octet[1]);  // 36: safe (each element guarded by is_numeric)
+}

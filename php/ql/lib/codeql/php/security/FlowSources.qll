@@ -62,13 +62,34 @@ predicate isSanitizerGuardFunction(string name) {
  * still reported (recall-first) — modelling it is a one-row data addition, no engine change.
  */
 predicate isGuardedRead(DataFlow::Node n) {
-  exists(Php::IfStatement ifs, FunctionCall g, VariableAccess checked, VariableAccess use |
+  exists(Php::IfStatement ifs, FunctionCall g, Expr checked, Expr use |
     g.(Php::AstNode).getParent*() = ifs.getCondition() and
     isSanitizerGuardFunction(g.getName()) and
     checked = g.getAnArgument() and
     use.(Php::AstNode).getParent*() = ifs.getBody() and
-    use.getName() = checked.getName() and
+    sameAccessPath(checked, use) and
+    use != checked and
     n.asExpr() = use
+  )
+}
+
+/**
+ * Holds if `a` and `b` denote the same access path — the same simple variable (`$x`/`$x`), or the same
+ * array element with a constant key (`$arr[0]`/`$arr[0]`, `$arr['k']`/`$arr['k']`). Lets a guard on an
+ * array element (`if (is_numeric($octet[0])) …`) sanitize that element's reads, not just plain variables.
+ */
+private predicate sameAccessPath(Expr a, Expr b) {
+  a.(VariableAccess).getName() = b.(VariableAccess).getName()
+  or
+  exists(Php::SubscriptExpression sa, Php::SubscriptExpression sb |
+    sa = a and sb = b and
+    sameAccessPath(sa.getChild(0), sb.getChild(0)) and
+    sa.getChild(1).(Php::Integer).getValue() = sb.getChild(1).(Php::Integer).getValue()
+    or
+    sa = a and sb = b and
+    sameAccessPath(sa.getChild(0), sb.getChild(0)) and
+    sa.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue() =
+      sb.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue()
   )
 }
 
