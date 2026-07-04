@@ -37,6 +37,46 @@ private Expr methodReturnValue(Method m) {
   )
 }
 
+/** Gets the body of any callable kind (function, method, closure, arrow). */
+private AstNode anyCalleeBody(AstNode callee) {
+  result = callee.(Php::FunctionDefinition).getBody() or
+  result = callee.(Php::MethodDeclaration).getBody() or
+  result = callee.(Php::AnonymousFunction).getBody() or
+  result = callee.(Php::ArrowFunction).getBody()
+}
+
+/** Gets a formal parameter of any callable kind (function, method, closure, arrow). */
+private Php::SimpleParameter anyCalleeParam(AstNode callee) {
+  result = callee.(Php::FunctionDefinition).getParameters().getChild(_) or
+  result = callee.(Php::MethodDeclaration).getParameters().getChild(_) or
+  result = callee.(Php::AnonymousFunction).getParameters().getChild(_) or
+  result = callee.(Php::ArrowFunction).getParameters().getChild(_)
+}
+
+/** Gets the value returned by any callable kind (a `return` operand, or an arrow's body expression). */
+private Expr anyCalleeReturnValue(AstNode callee) {
+  exists(Php::ReturnStatement ret |
+    ret.(Php::AstNode).getParent+() = anyCalleeBody(callee) and result = ret.getChild()
+  )
+  or
+  result = callee.(Php::ArrowFunction).getBody()
+}
+
+/**
+ * Gets the callable that a `call_user_func` / `call_user_func_array` call `c` invokes: a string function
+ * name (`call_user_func('f', …)`) or an inline closure/arrow (`call_user_func(fn(…) => …, …)`) at arg 0.
+ * (Array `[obj, 'method']` and variable-held callables are a further refinement.)
+ */
+private AstNode cufCallee(FunctionCall c) {
+  c.getName() = ["call_user_func", "call_user_func_array"] and
+  (
+    result.(Php::FunctionDefinition).getName().getValue() = c.getArgument(0).(StringLiteral).getValue()
+    or
+    result = c.getArgument(0) and
+    (result instanceof Php::AnonymousFunction or result instanceof Php::ArrowFunction)
+  )
+}
+
 /** Gets the callable body (function/method/closure/arrow) that transitively contains `n`. */
 cached
 private AstNode enclosingCallableBody(AstNode n) {
@@ -552,6 +592,31 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       pRead.getName() = pn and
       pRead.(Php::AstNode).getParent+() = cl.getBody() and
       nodeFrom.asExpr() = c.getArgument(j) and
+      nodeTo.asExpr() = pRead
+    )
+    or
+    // `call_user_func[_array]` — the invoked callable's RETURN flows to the call result.
+    exists(FunctionCall c, AstNode callee |
+      callee = cufCallee(c) and
+      nodeFrom.asExpr() = anyCalleeReturnValue(callee) and
+      nodeTo.asExpr() = c
+    )
+    or
+    // `call_user_func[_array]` — each passed argument flows to the callable's parameters. For
+    // `call_user_func` the passed args are positions 1.. ; for `call_user_func_array` they are the
+    // elements of the array at position 1 (element→position not tracked — recall-first, whole array).
+    exists(FunctionCall c, AstNode callee, VariableAccess pRead |
+      callee = cufCallee(c) and
+      pRead.getName() = anyCalleeParam(callee).getName().getChild().getValue() and
+      // getParent* (reflexive) so an arrow whose whole body IS the parameter read (`fn($a) => $a`) matches.
+      pRead.(Php::AstNode).getParent*() = anyCalleeBody(callee) and
+      (
+        c.getName() = "call_user_func" and nodeFrom.asExpr() = c.getArgument(any(int k | k >= 1))
+        or
+        c.getName() = "call_user_func_array" and
+        nodeFrom.asExpr() =
+          c.getArgument(1).(Php::ArrayCreationExpression).getChild(_).(Php::ArrayElementInitializer).getChild(_)
+      ) and
       nodeTo.asExpr() = pRead
     )
     or
