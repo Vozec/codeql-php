@@ -374,9 +374,35 @@ class Content extends TContent {
 
 predicate forceHighPrecision(Content c) { none() }
 
-class ContentApprox = Content;
+/**
+ * A coarse approximation of `Content`, used by the shared engine's early (over-approximate) flow stages
+ * to prune the search cheaply before the precise stage. Field contents are bucketed by their name's
+ * first character (thousands of distinct field names collapse to a few dozen buckets), which keeps the
+ * coarse stages fast on field-heavy object-oriented code while the precise `Content` recovers accuracy.
+ */
+private newtype TContentApprox =
+  TArrayContentApprox() or
+  TFieldContentApprox(string prefix) { prefix = fieldNamePrefix(_) }
 
-ContentApprox getContentApprox(Content c) { result = c }
+/** Gets the one-character bucket of a field name (the approximation key). */
+private string fieldNamePrefix(string name) {
+  name = any(Php::MemberAccessExpression m).getName().(Php::Name).getValue() and
+  result = name.prefix(1)
+}
+
+class ContentApprox extends TContentApprox {
+  string toString() {
+    this = TArrayContentApprox() and result = "[]"
+    or
+    exists(string p | this = TFieldContentApprox(p) and result = "." + p + "*")
+  }
+}
+
+ContentApprox getContentApprox(Content c) {
+  c = TArrayContent() and result = TArrayContentApprox()
+  or
+  exists(string n | c = TFieldContent(n) and result = TFieldContentApprox(n.prefix(1)))
+}
 
 // --- Positions ----------------------------------------------------------------------------------
 
