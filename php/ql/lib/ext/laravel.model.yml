@@ -29,6 +29,20 @@ extensions:
       - ["staticmethod", "all", "laravel-request"]
       - ["staticmethod", "get", "laravel-request"]
 
+  # Class-qualified request accessors: a source ONLY on a `Request` receiver, so the generic names
+  # (`get`/`header`/`cookie`/`boolean`/`file`) that collide with ordinary objects no longer FP.
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Request", "get", "laravel-request"]
+      - ["Request", "header", "laravel-request"]
+      - ["Request", "cookie", "laravel-request"]
+      - ["Request", "boolean", "laravel-request"]
+      - ["Request", "file", "laravel-request"]
+      - ["Request", "input", "laravel-request"]
+      - ["Request", "query", "laravel-request"]
+      - ["Request", "post", "laravel-request"]
+      - ["Request", "all", "laravel-request"]
+
   # ---- Sinks: Eloquent / DB raw SQL --------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:

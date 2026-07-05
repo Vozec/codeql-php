@@ -18,6 +18,14 @@ private import codeql.php.dataflow.internal.SsaImpl as SsaImpl
 /** A function/method whose result is a remote source of `sourceType`. */
 extensible predicate sourceModel(string subjectKind, string name, string sourceType);
 
+/**
+ * A method that is a remote source ONLY when called on a receiver whose inferred class is `className`
+ * (e.g. `Request::get`/`Request::input`), so a bare `$obj->get()` on an unrelated class is NOT a
+ * source. The precise form of a `sourceModel` method row — avoids the false positives that forced the
+ * bare method-name request sources to be dropped.
+ */
+extensible predicate typedSourceModel(string className, string methodName, string sourceType);
+
 /** An argument (`argIndex`) of a function/method that is a `vulnKind` sink. */
 extensible predicate sinkModel(string subjectKind, string name, int argIndex, string vulnKind);
 

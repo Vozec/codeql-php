@@ -4,6 +4,7 @@ private import codeql.php.AST
 private import codeql.php.ast.internal.TreeSitter
 private import codeql.php.DataFlow
 private import codeql.php.dataflow.internal.SsaImpl as SsaImpl
+private import codeql.php.dataflow.internal.TypeInference as TI
 import codeql.php.Concepts
 import codeql.php.security.ModelExtensions
 
@@ -238,6 +239,26 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     n.asExpr() = c.getArgument(cb) and
     kind = "code injection"
   )
+}
+
+/**
+ * A class-qualified method source (`typedSourceModel`): `$request->get()` is a source only when the
+ * receiver's inferred class matches, so `$someOtherObject->get()` is not. Re-arms the framework request
+ * accessors that a bare method name could not model without false positives.
+ */
+private class TypedRemoteSource extends RemoteFlowSource {
+  string sourceType;
+
+  TypedRemoteSource() {
+    exists(MethodCall c, string cls, string m |
+      typedSourceModel(cls, m, sourceType) and
+      c.getMethodName() = m and
+      TI::exprClass(c.getReceiver()).getName() = cls and
+      this.asExpr() = c
+    )
+  }
+
+  override string getSourceType() { result = sourceType }
 }
 
 /** The built-in remote sources become `RemoteFlowSource` instances (extensible via QL/data). */
