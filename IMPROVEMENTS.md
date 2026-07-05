@@ -149,9 +149,10 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 ## Ordre recommandé (reste)
 
 1. **symfony non-literal-redirect (2)** — source `$request->query->get()`/`$session->get()` (typedSourceModel + stubs).
-2. **doctrine dangerous-query (dbal)** — nécessite def-use du `$sql` variable (concat en amont) ; le sous-cas
-   inline-concat seul donne +0/+1 FP (essayé, reverté). weak-crypto : idem, précision (les `ok:` du corpus
-   testent `md5(...)===` strict) — pas de version présence-based sans FP.
+2. **doctrine dbal-prepare** — bloqué des DEUX côtés : sink `prepare` par nom → FP sur `$wpdb->prepare()`
+   (le sanitizer) ; sink qualifié-classe (`typedSinkModel`, symétrique de D2) → pas d'info de type sur `$conn`
+   sans stubs. Même blocage que symfony-redirect. Le sous-cas orm inline-concat donne +0/+1 FP (reverté).
+   weak-crypto : précision (les `ok:` testent `md5(...)===` strict) — pas de présence-based sans FP.
 3. **A7 (clés de tableau)** 🔴 — nécessite de rendre l'étape taint générique `base→subscript` key-sensitive
    (porteuse pour `$_GET['x']`) — gros chantier moteur, risque élevé.
 4. **F1 (élargir corpus : OWASP Benchmark PHP)** · **C1/C2 (perf) · B1/B2 (instance-sensitivity)** ·
