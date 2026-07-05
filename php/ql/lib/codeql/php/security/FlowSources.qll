@@ -45,14 +45,7 @@ predicate isRemoteSource(DataFlow::Node n) {
  * branch the guard controls (its result is a boolean, not a sanitized value). The NAMES are data (to be
  * migrated to MAD in Phase C); the barrier STRUCTURE (`isGuardedRead`) is general.
  */
-predicate isSanitizerGuardFunction(string name) {
-  name =
-    [
-      "ctype_alnum", "ctype_digit", "ctype_alpha", "ctype_xdigit", "ctype_upper", "ctype_lower",
-      "is_numeric", "is_int", "is_integer", "is_float", "is_double", "in_array", "array_key_exists",
-      "preg_match"
-    ]
-}
+predicate isSanitizerGuardFunction(string name) { sanitizerGuardModel(name) }
 
 /**
  * Holds if `n` is a read of a variable validated by a sanitizer guard on the branch it controls, e.g.
@@ -99,9 +92,8 @@ private string subscriptConstKey(Php::SubscriptExpression sub) {
 
 /** Holds if `n` is the result of a sanitizer call (a taint barrier) not already covered by MAD. */
 predicate isSanitizer(DataFlow::Node n) {
-  exists(MethodCall c | c.getMethodName() = ["quote", "escape", "real_escape_string"] and n.asExpr() = c)
-  or
-  // Numeric casts sanitize.
+  // Method sanitizers (`$pdo->quote()`, `$db->escape()`, …) are DATA — `sanitizerModel` method rows.
+  // A `(int)`/`(float)`/`(bool)` cast is a language construct (not a call), so it stays structural here.
   exists(CastExpr cast | cast.getTypeName() = ["int", "integer", "float", "double", "bool", "boolean"] and n.asExpr() = cast)
 }
 

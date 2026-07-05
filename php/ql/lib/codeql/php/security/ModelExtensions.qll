@@ -28,6 +28,13 @@ extensible predicate stepModel(string subjectKind, string name, int fromArg, int
 extensible predicate sanitizerModel(string subjectKind, string name);
 
 /**
+ * A validator function used as a branch GUARD: `if (g($x)) { … }` establishes that `$x` is safe on the
+ * controlled branch (its result is a boolean, not a sanitized value). The NAMES are data here; the
+ * barrier STRUCTURE (`isGuardedRead`) stays in QL.
+ */
+extensible predicate sanitizerGuardModel(string name);
+
+/**
  * A method that sanitizes ONLY when called on a receiver of class `className` (e.g. `wpdb::prepare`
  * is safe, but a user's custom `MyClass::prepare` is not). Avoids the false-negatives of matching a
  * sanitizer purely by method name. Receiver type is resolved via SSA (`$o = new C()`) or, for the

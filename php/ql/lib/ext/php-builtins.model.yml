@@ -120,6 +120,30 @@ extensions:
       - ["function", "md5"]
       - ["function", "sha1"]
       - ["function", "hash"]
+      # Method escapers on a driver handle (`$pdo->quote($x)`, `$mysqli->real_escape_string($x)`).
+      - ["method", "quote"]
+      - ["method", "escape"]
+      - ["method", "real_escape_string"]
+
+  # ---- Sanitizer GUARDS: validators used as `if (g($x)) { …safe… }` branch conditions ----------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: sanitizerGuardModel
+    data:
+      - ["ctype_alnum"]
+      - ["ctype_digit"]
+      - ["ctype_alpha"]
+      - ["ctype_xdigit"]
+      - ["ctype_upper"]
+      - ["ctype_lower"]
+      - ["is_numeric"]
+      - ["is_int"]
+      - ["is_integer"]
+      - ["is_float"]
+      - ["is_double"]
+      - ["in_array"]
+      - ["array_key_exists"]
+      - ["preg_match"]
 
   # ---- Taint steps: string built-ins that propagate any argument to the result ----------------
   - addsTo:
