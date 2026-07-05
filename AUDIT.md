@@ -705,3 +705,27 @@ d'interface, first-class-callable.
 - **`Fiber`** (PHP 8.1) : `$f->start($x)` passe les args au callback de la fibre — API spécifique, quasi
   jamais dans du code exploitable.
 - **`Closure::bind`** : rebinding de `$this` — rare.
+
+## §16 — Vérification couverture constructs (moteur PROD) + adaptation CMS (2026-07-06)
+
+### Découverte clé : DEUX moteurs de taint
+Le pack a deux moteurs, et l'audit §15 mesurait le MAUVAIS :
+- `codeql.php.dataflow.TaintTracking` — **v1 standalone** (prédicat `taintStep` local), **utilisé uniquement par des tests legacy**, divergent.
+- `codeql.php.TaintTracking` — **moteur PARTAGÉ de production** (`TaintFlowMake<…>` → `defaultAdditionalTaintStep`), utilisé par **toutes** les vraies queries (CommandInjection.ql, etc.).
+
+Un test `ConstructCoverage` construit sur le v1 (`hasTaintFlow`) montrait de faux « trous » (elvis/match/closures/arrow/spread) qui n'existent QUE dans le v1. **Sur le moteur de production, les 25 constructs testés portent TOUS le taint.** Nouveau test `php/ql/test/query-tests/ConstructCoverage/` (config identique à CommandInjection.ql) = garde-fou permanent, 25/25.
+
+### Seul vrai trou corrigé
+`call_user_func('strtoupper', $t)` — callee **builtin** (nom string, sans corps PHP) : `cufCallee` ne le résout pas, donc le `stepModel` du builtin ne s'appliquait pas via le callback. Fix : 1 disjonction dans `defaultAdditionalTaintStep` qui forward les args→résultat quand le callee nommé est un `stepModel("function", …)`. Testé (ConstructCoverage #22).
+
+### Adaptation CMS = data, moteur inchangé (confirmé)
+Le test `library-tests/frameworks` prouve déjà l'agnosticité : WordPress / Symfony / Doctrine / PrestaShop / TYPO3, chacun = un fichier `ext/<cms>.model.yml` (sources/sinks/sanitizers), **zéro QL**. Ajouter un CMS demain = un fichier data. Enrichi cette session (data pure) :
+- **PrestaShop** : sinks open-redirect `Tools::redirect`/`redirectLink`/`redirectAdmin`. Cas de test `ps3`.
+- **WordPress** : sanitizers `sanitize_textarea_field`/`sanitize_title`/`wp_kses_data`/`esc_textarea`/`esc_url_raw`.
+- Précision : `Tools::safeOutput` (XSS) volontairement PAS ajouté en sanitizer — le modèle est kind-agnostique, ça masquerait des SQLi (faux négatif).
+
+### Perf (axe 1) — conclusion
+Vrai code (corpus/apps) rapide ; full-suite sur src de framework (1648 fichiers) ~15 min = **inhérent** (14 queries × dataflow interprocédural), PAS corrigé par les stats (prouvé : 900s avec anciennes ET nouvelles stats), PAS une régression de mes changements (HEAD 139s ≈ revert 155s). Stats régénérées depuis une DB représentative (hygiène ; recall/FP/bench inchangés).
+
+### Reste (dette)
+Le moteur v1 (`codeql.php.dataflow.TaintTracking`) est stale/divergent — à supprimer ou resynchroniser (aucune query de prod n'en dépend ; seuls quelques library-tests). Bench inchangé : 164/232 (70%), FP 40. Suite 99/99.

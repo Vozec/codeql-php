@@ -1,15 +1,29 @@
 # PrestaShop Models-as-Data.
+#
+# Adapting the analyser to PrestaShop is purely data: request accessors are sources, Db raw-SQL and
+# redirect helpers are sinks, escaping helpers are sanitizers. No QL, no engine change — the same
+# shape works for any CMS (compare wordpress/typo3/laravel/symfony models).
 extensions:
+  # ---- Sources: request input -------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sourceModel }
     data:
-      - ["staticmethod", "getValue", "prestashop-input"]
-      - ["staticmethod", "getAllValues", "prestashop-input"]
+      - ["staticmethod", "getValue", "prestashop-input"]        # Tools::getValue('x')
+      - ["staticmethod", "getAllValues", "prestashop-input"]    # Tools::getAllValues()
+
+  # ---- Sinks: raw SQL + redirects ---------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
-      # Db::getInstance()->executeS() / ExecuteS (PrestaShop-specific)
+      # Db::getInstance()->executeS()/ExecuteS() — the raw-SQL query methods (PrestaShop-specific names,
+      # so matching by method name is precise). The whole SQL string (any arg) is the sink.
       - ["method", "executeS", -1, "SQL injection"]
       - ["method", "ExecuteS", -1, "SQL injection"]
+      # Open redirect: Tools::redirect / redirectLink / redirectAdmin take the destination URL at arg 0.
+      - ["staticmethod", "redirect", 0, "open redirect"]
+      - ["staticmethod", "redirectLink", 0, "open redirect"]
+      - ["staticmethod", "redirectAdmin", 0, "open redirect"]
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["function", "pSQL"]
-      - ["function", "bqSQL"]
+      - ["function", "pSQL"]                                    # SQL-escape (PrestaShop)
+      - ["function", "bqSQL"]                                   # backquote-escape (identifiers)

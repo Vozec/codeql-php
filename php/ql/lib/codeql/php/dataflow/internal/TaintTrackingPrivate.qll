@@ -567,6 +567,24 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = c
     )
     or
+    // `call_user_func('builtin', $x, …)` where the named function is a taint-propagating library
+    // builtin (a `stepModel` row) with no PHP body: forward the data args to the call result, mirroring
+    // the step a direct `builtin($x)` call gets from `DataStep` (Phase C). `cufCallee` cannot resolve a
+    // bodyless builtin, so this is needed for callback dispatch to builtins.
+    exists(FunctionCall c, string fname |
+      c.getName() = ["call_user_func", "call_user_func_array"] and
+      fname = c.getArgument(0).(StringLiteral).getValue() and
+      stepModel("function", fname, _, _) and
+      (
+        c.getName() = "call_user_func" and nodeFrom.asExpr() = c.getArgument(any(int k | k >= 1))
+        or
+        c.getName() = "call_user_func_array" and
+        nodeFrom.asExpr() =
+          c.getArgument(1).(Php::ArrayCreationExpression).getChild(_).(Php::ArrayElementInitializer).getChild(_)
+      ) and
+      nodeTo.asExpr() = c
+    )
+    or
     // `call_user_func[_array]` — each passed argument flows to the callable's parameters. For
     // `call_user_func` the passed args are positions 1.. ; for `call_user_func_array` they are the
     // elements of the array at position 1 (element→position not tracked — recall-first, whole array).

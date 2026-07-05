@@ -12,3 +12,5 @@ function ps1($db) { $db->executeS("SELECT * FROM ps WHERE id=" . Tools::getValue
 function ps2($db) { $db->executeS("SELECT * FROM ps WHERE id=" . pSQL(Tools::getValue('id'))); }  // ok: pSQL
 // TYPO3
 function t3a($q) { $q->sql_query("SELECT * FROM x WHERE u=" . GeneralUtility::_GP('u')); }         // BUG SQLi (14)
+// PrestaShop redirect (data-modelled open-redirect sink)
+function ps3() { Tools::redirect(Tools::getValue('url')); }                                        // BUG open redirect (16)

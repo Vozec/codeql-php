@@ -42,11 +42,16 @@ extensions:
       - ["function", "esc_js"]
       - ["function", "esc_sql"]
       - ["function", "sanitize_text_field"]
+      - ["function", "sanitize_textarea_field"]
       - ["function", "sanitize_email"]
       - ["function", "sanitize_key"]
+      - ["function", "sanitize_title"]
       - ["function", "sanitize_file_name"]
       - ["function", "wp_kses"]
       - ["function", "wp_kses_post"]
+      - ["function", "wp_kses_data"]
+      - ["function", "esc_textarea"]
+      - ["function", "esc_url_raw"]
       - ["function", "absint"]
   # Type-scoped: `$wpdb->prepare()` sanitizes ONLY on a real wpdb (a custom ->prepare() does not).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }

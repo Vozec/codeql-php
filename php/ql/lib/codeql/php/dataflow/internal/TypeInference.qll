@@ -143,11 +143,6 @@ private Callable callTarget(FunctionCall fc) {
 }
 
 /**
- * Gets the method that a `$recv->m(...)` call dispatches to, resolved by the inferred class of the
- * receiver (and its ancestors/traits via `getAMethod`). Empty when the receiver type is unknown —
- * callers then fall back to name-based resolution.
- */
-/**
  * Gets the method name dispatched to by `mc`: its literal name, or — for a variable method name
  * `$o->$m()` — the constant string that `$m` resolves to via SSA (`$m = 'run'; $o->$m()`).
  */
@@ -162,6 +157,11 @@ private string methodNameOf(MethodCall mc) {
   )
 }
 
+/**
+ * Gets the method that a `$recv->m(...)` call dispatches to, resolved by the inferred class of the
+ * receiver (and its ancestors/traits via `getAMethod`). Empty when the receiver type is unknown —
+ * callers then fall back to name-based resolution.
+ */
 cached
 Method inferredMethod(MethodCall mc) {
   exists(ClassLike c |
