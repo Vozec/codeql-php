@@ -218,6 +218,37 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   |
     n.asExpr() = c.getName() and kind = "code injection"
   )
+  or
+  // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
+  // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
+  exists(Php::ObjectCreationExpression oc |
+    (
+      oc.getChild(0) instanceof Php::VariableName or
+      oc.getChild(0) instanceof Php::SubscriptExpression
+    ) and
+    n.asExpr() = oc.getChild(0) and
+    kind = "code injection"
+  )
+  or
+  // A tainted CALLBACK argument to a higher-order built-in (`usort($a, $_GET['f'])`,
+  // `array_map($_GET['f'], $a)`, `call_user_func($_GET['f'])`) lets the attacker name the function
+  // that runs — arbitrary code execution. Callback position depends on the built-in.
+  exists(FunctionCall c, int cb |
+    (
+      c.getName() =
+        ["call_user_func", "call_user_func_array", "array_map", "register_shutdown_function"] and
+      cb = 0
+      or
+      c.getName() =
+        [
+          "usort", "uasort", "uksort", "array_walk", "array_walk_recursive", "array_filter",
+          "array_reduce", "preg_replace_callback"
+        ] and
+      cb = 1
+    ) and
+    n.asExpr() = c.getArgument(cb) and
+    kind = "code injection"
+  )
 }
 
 /** The built-in remote sources become `RemoteFlowSource` instances (extensible via QL/data). */

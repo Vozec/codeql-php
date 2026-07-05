@@ -1,0 +1,28 @@
+edges
+| test.php:5:11:5:15 | VariableName | test.php:5:11:5:22 | SubscriptExpression | provenance |  |
+| test.php:6:6:6:11 | VariableName | test.php:7:11:7:12 | VariableName | provenance |  |
+| test.php:11:15:11:19 | VariableName | test.php:11:15:11:26 | SubscriptExpression | provenance |  |
+| test.php:12:11:12:15 | VariableName | test.php:12:11:12:21 | SubscriptExpression | provenance |  |
+| test.php:13:22:13:26 | VariableName | test.php:13:22:13:34 | SubscriptExpression | provenance |  |
+| test.php:14:30:14:34 | VariableName | test.php:14:30:14:40 | SubscriptExpression | provenance |  |
+nodes
+| test.php:5:11:5:15 | VariableName | semmle.label | VariableName |
+| test.php:5:11:5:22 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:6:6:6:11 | VariableName | semmle.label | VariableName |
+| test.php:7:11:7:12 | VariableName | semmle.label | VariableName |
+| test.php:11:15:11:19 | VariableName | semmle.label | VariableName |
+| test.php:11:15:11:26 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:12:11:12:15 | VariableName | semmle.label | VariableName |
+| test.php:12:11:12:21 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:13:22:13:26 | VariableName | semmle.label | VariableName |
+| test.php:13:22:13:34 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:14:30:14:34 | VariableName | semmle.label | VariableName |
+| test.php:14:30:14:40 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:5:11:5:22 | SubscriptExpression | test.php:5:11:5:15 | VariableName | test.php:5:11:5:22 | SubscriptExpression | This code evaluation depends on a $@. | test.php:5:11:5:15 | VariableName | user-provided value |
+| test.php:7:11:7:12 | VariableName | test.php:6:6:6:11 | VariableName | test.php:7:11:7:12 | VariableName | This code evaluation depends on a $@. | test.php:6:6:6:11 | VariableName | user-provided value |
+| test.php:11:15:11:26 | SubscriptExpression | test.php:11:15:11:19 | VariableName | test.php:11:15:11:26 | SubscriptExpression | This code evaluation depends on a $@. | test.php:11:15:11:19 | VariableName | user-provided value |
+| test.php:12:11:12:21 | SubscriptExpression | test.php:12:11:12:15 | VariableName | test.php:12:11:12:21 | SubscriptExpression | This code evaluation depends on a $@. | test.php:12:11:12:15 | VariableName | user-provided value |
+| test.php:13:22:13:34 | SubscriptExpression | test.php:13:22:13:26 | VariableName | test.php:13:22:13:34 | SubscriptExpression | This code evaluation depends on a $@. | test.php:13:22:13:26 | VariableName | user-provided value |
+| test.php:14:30:14:40 | SubscriptExpression | test.php:14:30:14:34 | VariableName | test.php:14:30:14:40 | SubscriptExpression | This code evaluation depends on a $@. | test.php:14:30:14:34 | VariableName | user-provided value |
