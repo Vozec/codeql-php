@@ -202,6 +202,18 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // `include $x` / `require $x` (language construct, not a function call) — file inclusion.
   exists(IncludeExpr inc | n.asExpr() = inc.getPath() and kind = "file inclusion")
   or
+  // `header('Location: '.$url)` is an open-redirect sink — but ONLY for a `Location:` header, not
+  // `header('X-Request-Uri: '.$x)`. Fire when the argument carries a `Location:` string literal.
+  exists(FunctionCall c |
+    c.getName() = "header" and
+    exists(Php::StringContent sc |
+      sc.(Php::AstNode).getParent+() = c.getArgument(0) and
+      sc.getValue().toLowerCase().matches("location:%")
+    ) and
+    n.asExpr() = c.getArgument(0) and
+    kind = "open redirect"
+  )
+  or
   // Dynamic callable injection: if the *callee* itself is attacker-controlled, the attacker can
   // invoke an arbitrary function/method (`$fn($x)`, `$arr[0]()`, `$o->$m()`) — arbitrary code exec.
   exists(Php::FunctionCallExpression c |

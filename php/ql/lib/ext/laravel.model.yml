@@ -32,19 +32,20 @@ extensions:
   # ---- Sinks: Eloquent / DB raw SQL --------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
-      - ["staticmethod", "raw", -1, "SQL injection"]           # DB::raw
-      - ["staticmethod", "select", -1, "SQL injection"]        # DB::select
-      - ["staticmethod", "statement", -1, "SQL injection"]     # DB::statement
-      - ["staticmethod", "unprepared", -1, "SQL injection"]    # DB::unprepared
-      - ["method", "whereRaw", -1, "SQL injection"]
-      - ["method", "orWhereRaw", -1, "SQL injection"]
-      - ["method", "havingRaw", -1, "SQL injection"]
-      - ["method", "orHavingRaw", -1, "SQL injection"]
-      - ["method", "orderByRaw", -1, "SQL injection"]
-      - ["method", "groupByRaw", -1, "SQL injection"]
-      - ["method", "selectRaw", -1, "SQL injection"]
-      - ["method", "fromRaw", -1, "SQL injection"]
-      - ["method", "whereRaw", -1, "SQL injection"]
+      # Only the SQL-string argument (index 0) is the sink; index 1 is the parameterised
+      # bindings array (`selectRaw('a = ?', [$x])`) which is SAFE — so NOT arg -1.
+      - ["staticmethod", "raw", 0, "SQL injection"]            # DB::raw
+      - ["staticmethod", "select", 0, "SQL injection"]         # DB::select
+      - ["staticmethod", "statement", 0, "SQL injection"]      # DB::statement
+      - ["staticmethod", "unprepared", 0, "SQL injection"]     # DB::unprepared
+      - ["method", "whereRaw", 0, "SQL injection"]
+      - ["method", "orWhereRaw", 0, "SQL injection"]
+      - ["method", "havingRaw", 0, "SQL injection"]
+      - ["method", "orHavingRaw", 0, "SQL injection"]
+      - ["method", "orderByRaw", 0, "SQL injection"]
+      - ["method", "groupByRaw", 0, "SQL injection"]
+      - ["method", "selectRaw", 0, "SQL injection"]
+      - ["method", "fromRaw", 0, "SQL injection"]
       # redirects (open redirect)
       - ["function", "redirect", 0, "open redirect"]
       - ["method", "away", 0, "open redirect"]

@@ -62,7 +62,8 @@ extensions:
       - ["function", "scandir", -1, "path traversal"]
       - ["function", "opendir", -1, "path traversal"]
       # open redirect
-      - ["function", "header", -1, "open redirect"]
+      # NOTE: `header()` is an open-redirect sink ONLY for a `Location:` header — modelled
+      # structurally in FlowSources (a blanket arg row also flagged `header('X-Foo: '.$x)`).
       - ["function", "http_redirect", -1, "open redirect"]
       # server-side request forgery
       - ["function", "curl_setopt", -1, "server-side request forgery"]

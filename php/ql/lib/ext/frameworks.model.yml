@@ -37,23 +37,10 @@ extensions:
       pack: codeql/php-all
       extensible: sinkModel
     data:
-      # Laravel raw SQL
-      - ["method", "whereRaw", -1, "SQL injection"]
-      - ["method", "orWhereRaw", -1, "SQL injection"]
-      - ["method", "groupByRaw", -1, "SQL injection"]
-      - ["method", "havingRaw", -1, "SQL injection"]
-      - ["method", "orHavingRaw", -1, "SQL injection"]
-      - ["method", "orderByRaw", -1, "SQL injection"]
-      - ["method", "selectRaw", -1, "SQL injection"]
-      - ["method", "fromRaw", -1, "SQL injection"]
-      - ["staticmethod", "raw", -1, "SQL injection"]
-      # Laravel redirect / views
-      - ["function", "redirect", 0, "open redirect"]
-      - ["method", "away", 0, "open redirect"]
-      # Symfony controller redirect (AbstractController::redirect)
-      - ["method", "redirect", 0, "open redirect"]
-      # Twig / Blade raw output
-      - ["function", "e", -1, "reflected XSS"]
+      # NOTE: Laravel raw-SQL sinks (whereRaw/selectRaw/... at arg 0) live in laravel.model.yml, and
+      # the Symfony/Laravel redirect sinks in their own files — kept there to avoid duplicate rows with
+      # a divergent argIndex (a -1 duplicate here silently re-widened selectRaw's SAFE bindings arg).
+      # `e()` is the Blade ESCAPER — a sanitizer (below), never an XSS sink.
       # Symfony process
       - ["method", "mustRun", -1, "command injection"]
 
