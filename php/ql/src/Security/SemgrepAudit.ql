@@ -172,6 +172,14 @@ private predicate weakHashFinding(AstNode n) {
     not exists(ComparisonExpr cmp | cmp.getAnOperand() = c) and
     n = c
   )
+  or
+  // `hash('sha224', …)` / `hash_hmac('sha512/224', …)` — the 224-bit SHA family is too short
+  // (sha224 / sha512/224 / sha3-224). A strong algo (sha384/sha512) does not match "224".
+  exists(FunctionCall c |
+    c.getName() = ["hash", "hash_hmac"] and
+    normStr(c.getArgument(0)).matches("%224%") and
+    n = c
+  )
 }
 
 /** `ldap_bind` with no password argument, or a NULL/empty password (anonymous/unauthenticated bind). */

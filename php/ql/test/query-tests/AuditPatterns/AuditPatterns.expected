@@ -6,3 +6,5 @@
 | test.php:14:9:14:29 | ArrayElementInitializer | Debug mode enabled (laravel-active-debug-code). |
 | test.php:15:1:15:24 | FunctionCallExpression | Debug mode enabled (laravel-active-debug-code). |
 | test.php:19:1:19:40 | FunctionCallExpression | Permissive CORS wildcard origin (symfony-permissive-cors). |
+| test.php:24:1:24:21 | FunctionCallExpression | Weak hash primitive (weak-crypto / md5-used-as-password). |
+| test.php:25:1:25:25 | FunctionCallExpression | Weak hash primitive (weak-crypto / md5-used-as-password). |

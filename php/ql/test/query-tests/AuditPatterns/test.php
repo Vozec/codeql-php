@@ -19,3 +19,8 @@ config(['app.debug' => 'false']);       // safe: disabled
 header("Access-Control-Allow-Origin: *");   // BUG
 header("Access-Control-Allow-Origin: *evil*"); // safe: not a bare wildcard
 header("X-Frame-Options: DENY");            // safe: different header
+
+// Weak SHA-224 family (too short); strong algos are safe.
+hash('sha224', $data);                  // BUG
+hash('sha512/224', $data);              // BUG
+hash('sha384', $data);                  // safe: strong algo
