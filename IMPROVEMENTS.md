@@ -51,7 +51,7 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 | A9 | **Flow summaries pour builtins en first-class-callable** `strval(...)` / `$f='strval'; $f($t)` — le callable résout vers une fonction SANS corps, donc pas de flux arg→retour | 🟠 | L |
 | A10 | **Spread positionnel → variadic** `f(...[$t])` avec `$a[0]` — le contenu du tableau ne rejoint pas les lectures de `$a` (le spread à clé string marche) | 🟢 | M |
 | A6 | **`use A\{B,C}` groupé** — `resolveClassReference` ignore le préfixe de groupe (dégrade au fallback nom) | 🟠 | M |
-| A7 | **Clés de tableau** — `$a['x']=$t; $a['y']` : `TArrayContent()` conflate les clés → passer à `TArrayContent(key)` pour clés constantes | 🟠 | L |
+| A7 | **Clés de tableau** — `$a['x']=$t; $a['y']` FP (clés conflées). **Investigué** : un modèle de contenu key-sensitive (`TKnownArrayContent(key)` + wildcard) NE SUFFIT PAS — l'étape taint générique `base→subscript` (TaintTrackingPrivate:214) re-taint toute lecture d'élément et est **porteuse pour `$_GET['x']`** (le pattern source dominant). Fix réel = rendre cette étape key-sensitive ET faire que les sources-tableau (`$_GET`) teintent au contenu wildcard. Plus gros qu'estimé, risque élevé | 🔴 | L |
 | A8 | **PHPDoc / génériques** dans `TypeInference` (`@param`/`@return`/`@var`, collections Laravel) → dispatch parfois raté | 🟠 | L |
 
 ---
