@@ -147,12 +147,27 @@ private Callable callTarget(FunctionCall fc) {
  * receiver (and its ancestors/traits via `getAMethod`). Empty when the receiver type is unknown —
  * callers then fall back to name-based resolution.
  */
+/**
+ * Gets the method name dispatched to by `mc`: its literal name, or — for a variable method name
+ * `$o->$m()` — the constant string that `$m` resolves to via SSA (`$m = 'run'; $o->$m()`).
+ */
+private string methodNameOf(MethodCall mc) {
+  result = mc.getMethodName()
+  or
+  exists(VariableAccess mv, VariableAccess w, AssignExpr a |
+    mc.(Php::MemberCallExpression).getName() = mv and
+    w = ssaWriteReaching(mv) and
+    a.getLhs() = w and
+    result = a.getRhs().(Php::String).getChild(_).(Php::StringContent).getValue()
+  )
+}
+
 cached
 Method inferredMethod(MethodCall mc) {
   exists(ClassLike c |
     c = exprClass(mc.getReceiver()) and
     result = c.getAMethod() and
-    result.getName() = mc.getMethodName()
+    result.getName() = methodNameOf(mc)
   )
   or
   // Virtual dispatch: the receiver's inferred type is a base class or interface (e.g. a parameter typed
@@ -162,7 +177,7 @@ Method inferredMethod(MethodCall mc) {
     base = exprClass(mc.getReceiver()) and
     base = sub.getAnAncestor() and
     result = sub.getADeclaredMethod() and
-    result.getName() = mc.getMethodName()
+    result.getName() = methodNameOf(mc)
   )
 }
 

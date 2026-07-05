@@ -1,0 +1,23 @@
+edges
+| test.php:4:18:4:19 | VariableName | test.php:4:31:4:32 | VariableName | provenance |  |
+| test.php:6:23:6:24 | VariableName | test.php:6:36:6:37 | VariableName | provenance |  |
+| test.php:11:8:11:12 | VariableName | test.php:11:8:11:17 | SubscriptExpression | provenance |  |
+| test.php:11:8:11:17 | SubscriptExpression | test.php:4:18:4:19 | VariableName | provenance |  |
+| test.php:14:16:14:20 | VariableName | test.php:14:16:14:25 | SubscriptExpression | provenance |  |
+| test.php:14:16:14:25 | SubscriptExpression | test.php:6:23:6:24 | VariableName | provenance |  |
+| test.php:14:16:14:25 | SubscriptExpression | test.php:14:8:14:26 | MemberCallExpression | provenance |  |
+nodes
+| test.php:4:18:4:19 | VariableName | semmle.label | VariableName |
+| test.php:4:31:4:32 | VariableName | semmle.label | VariableName |
+| test.php:6:23:6:24 | VariableName | semmle.label | VariableName |
+| test.php:6:36:6:37 | VariableName | semmle.label | VariableName |
+| test.php:11:8:11:12 | VariableName | semmle.label | VariableName |
+| test.php:11:8:11:17 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:14:8:14:26 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:14:16:14:20 | VariableName | semmle.label | VariableName |
+| test.php:14:16:14:25 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+| test.php:14:16:14:25 | SubscriptExpression | test.php:6:23:6:24 | VariableName | test.php:6:36:6:37 | VariableName | test.php:14:8:14:26 | MemberCallExpression |
+#select
+| test.php:4:31:4:32 | VariableName | test.php:11:8:11:12 | VariableName | test.php:4:31:4:32 | VariableName | This shell command depends on a $@. | test.php:11:8:11:12 | VariableName | user-provided value |
+| test.php:14:8:14:26 | MemberCallExpression | test.php:14:16:14:20 | VariableName | test.php:14:8:14:26 | MemberCallExpression | This shell command depends on a $@. | test.php:14:16:14:20 | VariableName | user-provided value |
