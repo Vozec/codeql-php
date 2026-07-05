@@ -226,3 +226,21 @@ extensions:
       - ["function", "end", -1, -1]
       - ["function", "array_shift", -1, -1]
       - ["function", "array_pop", -1, -1]
+
+  # ---- Higher-order callbacks: which arg is the callable, and where the data begins --------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: callbackModel
+    data:
+      - ["call_user_func", 0, 1]
+      - ["call_user_func_array", 0, 1]
+      - ["array_map", 0, 1]
+      - ["register_shutdown_function", 0, 1]
+      - ["array_walk", 1, 0]
+      - ["array_walk_recursive", 1, 0]
+      - ["array_filter", 1, 0]
+      - ["array_reduce", 1, 0]
+      - ["usort", 1, 0]
+      - ["uasort", 1, 0]
+      - ["uksort", 1, 0]
+      - ["preg_replace_callback", 1, 2]

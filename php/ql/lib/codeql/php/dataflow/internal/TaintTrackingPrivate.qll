@@ -9,6 +9,7 @@ private import codeql.php.ast.internal.TreeSitter
 private import codeql.php.DataFlow
 private import codeql.php.Concepts
 private import codeql.php.security.FlowSources as FS
+private import codeql.php.security.ModelExtensions
 private import codeql.php.dataflow.internal.SsaImpl as Ssa
 private import codeql.php.dataflow.internal.TypeInference as TI
 private import DataFlowPrivate
@@ -524,11 +525,7 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // argument reaches the inline closure's parameter. Handles both argument orders (callback-first
     // and array-first) by pairing any inline closure with any other argument.
     exists(FunctionCall c, Php::AnonymousFunction cl, int i, int j, string pn, VariableAccess pRead |
-      c.getName() =
-        [
-          "array_map", "array_walk", "array_filter", "array_reduce", "usort", "uasort", "uksort",
-          "call_user_func", "call_user_func_array"
-        ] and
+      callbackModel(c.getName(), _, _) and
       cl = c.getArgument(i) and
       exists(c.getArgument(j)) and
       j != i and

@@ -35,6 +35,14 @@ extensible predicate sanitizerModel(string subjectKind, string name);
 extensible predicate sanitizerGuardModel(string name);
 
 /**
+ * A higher-order built-in that invokes a callback: `name` calls the callable at argument
+ * `callbackArg`, passing the value(s) from `dataArg` onward. Drives (a) data→callback-parameter taint,
+ * (b) the string-callee sink dispatch (`array_map('system', $x)`), and (c) the tainted-callback sink
+ * (`usort($a, $_GET['f'])`) — one data table instead of three hardcoded QL lists.
+ */
+extensible predicate callbackModel(string name, int callbackArg, int dataArg);
+
+/**
  * A method that sanitizes ONLY when called on a receiver of class `className` (e.g. `wpdb::prepare`
  * is safe, but a user's custom `MyClass::prepare` is not). Avoids the false-negatives of matching a
  * sanitizer purely by method name. Receiver type is resolved via SSA (`$o = new C()`) or, for the

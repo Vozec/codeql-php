@@ -168,19 +168,15 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = sinkFunctionKind(resolvedDynamicCallName(c)) and n.asExpr() = c.getAnArgument()
   )
   or
-  // `call_user_func('system', $x)` / `call_user_func_array('system', [$x])`.
-  exists(FunctionCall c, int i |
-    c.getName() = ["call_user_func", "call_user_func_array"] and
-    kind = sinkFunctionKind(constantStringValue(c.getArgument(0))) and
-    i >= 1 and
-    n.asExpr() = c.getArgument(i)
-  )
-  or
-  // `array_map('system', $arr)` / `array_walk` / `array_filter`: elements flow to the callback.
-  exists(FunctionCall c |
-    c.getName() = ["array_map", "array_walk", "array_filter"] and
-    kind = sinkFunctionKind(constantStringValue(c.getArgument(0))) and
-    n.asExpr() = c.getArgument(1)
+  // A known-dangerous function named (as a constant string) as the CALLBACK of a higher-order
+  // built-in — `array_map('system', $x)`, `call_user_func('system', $x)`, `usort($x, 'system')` —
+  // so the data argument(s) flow into that sink. Function + positions are DATA (`callbackModel`).
+  exists(FunctionCall c, int cb, int da, int k |
+    callbackModel(c.getName(), cb, da) and
+    kind = sinkFunctionKind(constantStringValue(c.getArgument(cb))) and
+    k >= da and
+    k != cb and
+    n.asExpr() = c.getArgument(k)
   )
   or
   // NOTE: raw SQL query METHODS (PDO/mysqli `query`/`exec`, Laravel `whereRaw`, Doctrine
@@ -238,18 +234,7 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // `array_map($_GET['f'], $a)`, `call_user_func($_GET['f'])`) lets the attacker name the function
   // that runs — arbitrary code execution. Callback position depends on the built-in.
   exists(FunctionCall c, int cb |
-    (
-      c.getName() =
-        ["call_user_func", "call_user_func_array", "array_map", "register_shutdown_function"] and
-      cb = 0
-      or
-      c.getName() =
-        [
-          "usort", "uasort", "uksort", "array_walk", "array_walk_recursive", "array_filter",
-          "array_reduce", "preg_replace_callback"
-        ] and
-      cb = 1
-    ) and
+    callbackModel(c.getName(), cb, _) and
     n.asExpr() = c.getArgument(cb) and
     kind = "code injection"
   )
