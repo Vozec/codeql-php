@@ -187,8 +187,25 @@ private predicate ldapBindFinding(AstNode n) {
   )
 }
 
+/** Laravel debug mode enabled in code: `config(['app.debug' => 'true'])` / `putenv("APP_DEBUG=true")`. */
+private predicate debugEnabledFinding(AstNode n) {
+  exists(Php::ArrayElementInitializer el |
+    normStr(el.getChild(0)) = ["app.debug", "app_debug"] and
+    normStr(el.getChild(1)) = "true" and
+    n = el
+  )
+  or
+  exists(FunctionCall c |
+    c.getName().toLowerCase() = "putenv" and
+    normStr(c.getArgument(0)) = "app_debug=true" and
+    n = c
+  )
+}
+
 predicate auditFinding(AstNode n, string msg) {
   corsFinding(n) and msg = "Permissive CORS wildcard origin (symfony-permissive-cors)."
+  or
+  debugEnabledFinding(n) and msg = "Debug mode enabled (laravel-active-debug-code)."
   or
   weakHashFinding(n) and msg = "Weak hash primitive (weak-crypto / md5-used-as-password)."
   or
