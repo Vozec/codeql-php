@@ -87,13 +87,13 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 
 | # | Dette | Impact | Effort |
 |---|---|---|---|
-| D1 | **Dispatch HO-callback hardcodé × 3** — `array_map`/`usort`/`call_user_func` énumérés dans TaintTrackingPrivate:503 + FlowSources:156/164 (triplé, incohérent). Créer `callbackModel(kind,name,callbackArg,dataArg)` extensible + 1 step générique | 🔴 | M |
-| D2 | **Sources/sinks `method` par nom bare** — besoin d'un schéma **qualifié-classe** dans `callMatches` (ModelExtensions) → `Request::get`/`$request->input` précis, remet les sources retirées (cf. §0) | 🔴 | M |
-| D3 | **Guards `ctype_*`/`is_*` hardcodés** (FlowSources:48) → extensible `sanitizerGuardModel` + MAD | 🟠 | S |
-| D4 | **Sanitizers-méthode hardcodés** `quote`/`escape` (FlowSources:77) → `sanitizerModel`/`typedSanitizerModel` en DATA | 🟠 | S |
+| ~~D3~~ ✅ | **FAIT** — `sanitizerGuardModel(name)` extensible ; les 14 noms ctype_/is_/in_array/preg_match en MAD ; structure `isGuardedRead` reste en QL | 🟠 | S |
+| ~~D4~~ ✅ | **FAIT** — escapers-méthode `quote`/`escape`/`real_escape_string` → `sanitizerModel` method rows ; `isSanitizer` ne garde que le cast (construct) | 🟠 | S |
+| D1 | **Dispatch HO-callback hardcodé × 3** — `array_map`/`usort`/`call_user_func` énumérés dans TaintTrackingPrivate + FlowSources ×2. Créer `callbackModel(name,callbackArg,dataArg)` + 1 step générique. **Note** : c'est une énumération STABLE de builtins (pas du bricolage) ; refactor DRY à faire prudemment (3 usages de flux délicats) | 🟠 | M |
+| D2 | **Sources/sinks `method` par nom bare** — schéma **qualifié-classe** dans `callMatches` → `Request::get`/`$request->input` précis. Bénéfice corpus limité sans stubs de types (résolution du receveur) | 🟠 | M |
 | D5 | **`parse_str` out-ref hardcodé** → extensible `outRefModel(kind,name,fromArg,toRefArg)` | 🟢 | M |
-| D6 | **Double mécanisme inter-objets** — modèle générique (PostUpdate) + heuristiques recall (instance-field, promotion). Documenter OU unifier (promotion via store implicite) | 🟠 | M |
-| D7 | **Phase D — `Php::*` privé incomplet** — API AST publique existe mais `Php::*` fuit dans certains corps/utilitaires ; finir pour la mergeabilité upstream | 🟠 | L |
+| D6 | **frameworks.model.yml redondant** — recouvre laravel/symfony/wordpress (doublons `e`/`esc_*`/`createQuery`/…). Les BUGS (e-sink, selectRaw arg -1) sont corrigés ; dédup complète = surface de bug en moins | 🟠 | S |
+| D7 | **Phase D — `Php::*` privé incomplet** — API AST publique existe mais `Php::*` fuit dans certains corps ; finir pour la mergeabilité upstream | 🟠 | L |
 
 ---
 
@@ -111,8 +111,8 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 
 | # | Item | Impact | Effort |
 |---|---|---|---|
-| F1 | **Élargir la vérité-terrain** — le corpus semgrep-rules existe (232/176) ; ajouter OWASP Benchmark PHP + apps CVE réelles, et **automatiser la re-mesure** (garde-fou anti-régression de rappel — cf. §0 qui serait passée inaperçue sans ça) | 🔴 | M |
-| F2 | **CI** — workflow : build extracteur → suite → analyse d'un projet de référence + score bench, à chaque commit | 🟠 | M |
+| ~~F2~~ ✅ | **FAIT** — `.github/workflows/php-qltest.yml` : job `qltest` (suite) + job `benchmark` (échoue si rappel < `bench/baseline.txt`). `bench/run.sh` = extract+analyse(security+audit)+score en 1 commande | 🟠 | M |
+| F1 | **Élargir la vérité-terrain** — corpus semgrep-rules en place (232/176, baseline committée) ; ajouter OWASP Benchmark PHP + apps CVE réelles | 🟠 | M |
 | F3 | **Suite de tests** — beaucoup de query-tests mono-fichier ; élargir les cas inter-fichiers (1 ajouté) et par-query | 🟠 | M |
 | F4 | **Comparatif Semgrep/Psalm** sur les mêmes cibles pour repérer les trous de couverture | 🟢 | M |
 
@@ -129,10 +129,19 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 
 ---
 
-## Ordre recommandé
+## Fait cette session (2026-07-05)
 
-1. **§0 + A1 (couverture framework WordPress/Laravel/Symfony)** 🔴 — récupère le rappel perdu ; re-mesurer après chaque ajout.
-2. **D2 + D1 (sources qualifiées-classe + callbackModel)** 🔴 — résorbe le layering, ré-arme la recall SANS FP, **et** accélère (§C1).
-3. **F1/F2 (bench automatisé + CI)** 🔴 — garde-fou : une régression de rappel comme §0 doit échouer la CI.
-4. **C1/C2 (perf steps OO) · A7 (clés tableau) · B1/B2 (instance-sensitivity)** 🟠 — précision & vitesse.
-5. **D7 (Phase D) · G (packaging)** 🟠 — mergeabilité upstream.
+✅ Benchmark corrigé (artefact SemgrepAudit) + baseline committée + **CI garde-fou** (F2). Couverture :
+WordPress complet, `include`/`require`, array-callables, `new $c()`, callback HO teinté, `clone`,
+injection nom-de-colonne Laravel (A1++). Précision : `e`/selectRaw/header (B). Layering : guards +
+sanitizers-méthode en MAD (D3/D4). Validation : Symfony réel (0 erreur parse, 2s/6s), syntaxe exotique
+9.5/11, suite 87→92. **Rappel 113→126 (48%→54%), FP 44→40 — dépasse la baseline sur les 2 axes.**
+
+## Ordre recommandé (suite)
+
+1. **A7 (clés de tableau `TArrayContent(key)`) · A4 (`extract`/`compact`)** 🟠 — FN structurels restants.
+2. **Nouvelles queries pattern** (weak-crypto lang, symfony csrf/cors, doctrine dangerous-query) 🟠 —
+   ~50 positifs corpus non-taint ; augmente le rappel mais présence-based (surveiller FP).
+3. **D1 (callbackModel) · D6 (dédup frameworks.model.yml)** 🟠 — DRY, prudemment (guardrails bench+suite).
+4. **D2 (sources qualifiées-classe) + stubs de types** 🟠 — précision framework (Laravel/Symfony taint).
+5. **C1/C2 (perf steps OO) · B1/B2 (instance-sensitivity)** 🟠 · **D7 (Phase D) · G (packaging)** — mergeabilité.
