@@ -201,6 +201,17 @@ cached
 predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nodeTo, string model) {
   model = "" and
   (
+    // `define('C', $v)` then a reference to the constant `C` — a runtime constant carries its value's
+    // taint to every use of it (constants are global, so no scope guard). `const C = …` cannot hold a
+    // tainted runtime value (compile-time expression), so only `define` needs this.
+    exists(FunctionCall def, string cname, AstNode use |
+      def.getName() = "define" and
+      cname = def.getArgument(0).(StringLiteral).getValue() and
+      use.(Php::Name).getValue() = cname and
+      nodeFrom.asExpr() = def.getArgument(1) and
+      nodeTo.getAstNode() = use
+    )
+    or
     // GENERIC RECURSIVE PROPAGATION: taint flows from any sub-expression to its containing
     // structural/operator/access expression. This composes to arbitrary depth, so nested chains
     // like `$a[1][0]->$m()`, `($x ?? $y)[0]`, `"..{$a->b}.."` are all handled without per-case rules.
