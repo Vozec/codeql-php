@@ -15,6 +15,11 @@ extensions:
       - ["method", "executeQuery", -1, "SQL injection"]
       - ["method", "executeStatement", -1, "SQL injection"]
       - ["method", "executeUpdate", -1, "SQL injection"]
+      # Doctrine QueryBuilder DQL fragments (distinctive names — Laravel uses whereRaw, not andWhere)
+      - ["method", "andWhere", -1, "SQL injection"]
+      - ["method", "orWhere", -1, "SQL injection"]
+      - ["method", "andHaving", -1, "SQL injection"]
+      - ["method", "orHaving", -1, "SQL injection"]
       # Symfony controller redirect
       - ["method", "redirect", 0, "open redirect"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }

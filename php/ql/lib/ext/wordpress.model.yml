@@ -7,15 +7,33 @@ extensions:
       - ["function", "stripslashes_deep", "wordpress-request"]
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
-      # $wpdb read helpers (fairly WP-specific names)
+      # $wpdb query helpers (fairly WP-specific names)
       - ["method", "get_results", -1, "SQL injection"]
       - ["method", "get_var", -1, "SQL injection"]
       - ["method", "get_col", -1, "SQL injection"]
       - ["method", "get_row", -1, "SQL injection"]
-      - ["function", "wp_redirect", 0, "open redirect"]
-      - ["function", "wp_safe_redirect", 0, "open redirect"]
+      - ["method", "query", -1, "SQL injection"]
+      # HTTP fetch helpers — every WP remote wrapper is an SSRF sink on its URL argument.
       - ["function", "wp_remote_get", 0, "server-side request forgery"]
       - ["function", "wp_remote_post", 0, "server-side request forgery"]
+      - ["function", "wp_remote_head", 0, "server-side request forgery"]
+      - ["function", "wp_remote_request", 0, "server-side request forgery"]
+      - ["function", "wp_remote_fopen", 0, "server-side request forgery"]
+      - ["function", "wp_safe_remote_get", 0, "server-side request forgery"]
+      - ["function", "wp_safe_remote_post", 0, "server-side request forgery"]
+      - ["function", "wp_safe_remote_head", 0, "server-side request forgery"]
+      - ["function", "wp_safe_remote_request", 0, "server-side request forgery"]
+      - ["function", "vip_safe_wp_remote_get", 0, "server-side request forgery"]
+      - ["function", "wp_oembed_get", 0, "server-side request forgery"]
+      - ["function", "download_url", 0, "server-side request forgery"]
+      # Redirects
+      - ["function", "wp_redirect", 0, "open redirect"]
+      - ["function", "wp_safe_redirect", 0, "open redirect"]
+      # Filesystem
+      - ["function", "wp_delete_file", 0, "path traversal"]
+      - ["function", "filesize", -1, "path traversal"]
+      # Object injection
+      - ["function", "maybe_unserialize", 0, "unsafe deserialization"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["function", "esc_html"]

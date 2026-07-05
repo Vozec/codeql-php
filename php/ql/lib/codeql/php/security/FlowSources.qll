@@ -199,6 +199,9 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // `print $x` / `print($x)` is a language construct (PrintIntrinsic), not a function call.
   exists(Php::PrintIntrinsic p | n.asExpr() = p.getChild() and kind = "reflected XSS")
   or
+  // `include $x` / `require $x` (language construct, not a function call) — file inclusion.
+  exists(IncludeExpr inc | n.asExpr() = inc.getPath() and kind = "file inclusion")
+  or
   // Dynamic callable injection: if the *callee* itself is attacker-controlled, the attacker can
   // invoke an arbitrary function/method (`$fn($x)`, `$arr[0]()`, `$o->$m()`) — arbitrary code exec.
   exists(Php::FunctionCallExpression c |
