@@ -161,6 +161,7 @@ extensions:
       - ["function", "substr", -1, -1]
       - ["function", "str_replace", -1, -1]
       - ["function", "str_ireplace", -1, -1]
+      - ["function", "str_contains", 0, -1]
       - ["function", "preg_replace", -1, -1]
       - ["function", "preg_replace_callback", -1, -1]
       - ["function", "sprintf", -1, -1]

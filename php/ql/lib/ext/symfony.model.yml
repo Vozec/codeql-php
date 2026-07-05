@@ -22,6 +22,8 @@ extensions:
       - ["method", "orHaving", -1, "SQL injection"]
       # Symfony controller redirect
       - ["method", "redirect", 0, "open redirect"]
+      # Symfony Process — `$process->mustRun()` runs the (possibly tainted) command line.
+      - ["method", "mustRun", -1, "command injection"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["staticmethod", "escape"]
