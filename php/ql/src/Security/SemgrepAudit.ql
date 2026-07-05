@@ -78,7 +78,69 @@ private predicate auditMethod(string name, string ruleId) {
   ruleId = "wp-sql-injection-audit"
 }
 
+/** A string literal's value with whitespace stripped and lower-cased (for header-name matching). */
+private string normStr(AstNode e) {
+  result =
+    e.(Php::String).getChild(_).(Php::StringContent).getValue().regexpReplaceAll("\\s+", "").toLowerCase()
+}
+
+/** A `'Access-Control-Allow-Origin' => '*'` array element (case/whitespace-insensitive). */
+private predicate permissiveCorsElement(Php::ArrayElementInitializer el) {
+  normStr(el.getChild(0)) = "access-control-allow-origin" and
+  normStr(el.getChild(1)) = "*"
+}
+
+/**
+ * Symfony permissive-CORS misconfiguration: a wildcard `Access-Control-Allow-Origin: *`. Precise —
+ * only on a `*Response` constructor argument or a `->headers->set(...)`, and only for value `*`, so a
+ * specific origin or a non-Response class does not fire.
+ */
+private predicate corsFinding(AstNode n) {
+  exists(NewExpr ne, Php::ArrayElementInitializer el |
+    ne.getClassName().toLowerCase().matches("%response") and
+    el.(Php::AstNode).getParent+() = ne and
+    permissiveCorsElement(el) and
+    n = el
+  )
+  or
+  exists(MethodCall c |
+    c.getMethodName() = "set" and
+    c.getReceiver().(FieldAccess).getFieldName() = "headers" and
+    normStr(c.getArgument(0)) = "access-control-allow-origin" and
+    normStr(c.getArgument(1)) = "*" and
+    n = c
+  )
+}
+
+/** A value that disables CSRF: the literal `false`, or a variable (which may hold `false`). */
+private predicate csrfDisabledValue(AstNode v) {
+  v.(Php::Boolean).getValue().toLowerCase() = "false"
+  or
+  v instanceof Php::VariableName
+}
+
+/**
+ * `'csrf_protection' => false` in a Symfony config array — but NOT `=> true`/`=> null`, and NOT under
+ * `prependExtensionConfig('something_else', …)`/`loadFromExtension` for a non-`framework` extension.
+ */
+private predicate csrfFinding(AstNode n) {
+  exists(Php::ArrayElementInitializer el |
+    normStr(el.getChild(0)) = "csrf_protection" and
+    csrfDisabledValue(el.getChild(1)) and
+    not exists(MethodCall c |
+      c.getMethodName() = ["prependExtensionConfig", "loadFromExtension"] and
+      el.(Php::AstNode).getParent+() = c and
+      normStr(c.getArgument(0)) != "framework"
+    ) and
+    n = el
+  )
+}
+
 predicate auditFinding(AstNode n, string msg) {
+  corsFinding(n) and msg = "Permissive CORS wildcard origin (symfony-permissive-cors)."
+  or
+  csrfFinding(n) and msg = "CSRF protection disabled (symfony-csrf-protection-disabled)."
+  or
   exists(FunctionCall c, string ruleId |
     auditFunction(c.getName(), ruleId) and n = c and
     msg = "Call to '" + c.getName() + "' (" + ruleId + ")."
