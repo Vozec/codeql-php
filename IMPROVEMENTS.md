@@ -61,7 +61,8 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 | A9 | **Flow summaries pour builtins en first-class-callable** `strval(...)` / `$f='strval'; $f($t)` — le callable résout vers une fonction SANS corps, donc pas de flux arg→retour | 🟠 | L |
 | A10 | **Spread positionnel → variadic** `f(...[$t])` avec `$a[0]` — le contenu du tableau ne rejoint pas les lectures de `$a` (le spread à clé string marche) | 🟢 | M |
 | A6 | **`use A\{B,C}` groupé** — `resolveClassReference` ignore le préfixe de groupe (dégrade au fallback nom) | 🟠 | M |
-| A7 | **Clés de tableau** — `$a['x']=$t; $a['y']` FP (clés conflées). **Investigué** : un modèle de contenu key-sensitive (`TKnownArrayContent(key)` + wildcard) NE SUFFIT PAS — l'étape taint générique `base→subscript` (TaintTrackingPrivate:214) re-taint toute lecture d'élément et est **porteuse pour `$_GET['x']`** (le pattern source dominant). Fix réel = rendre cette étape key-sensitive ET faire que les sources-tableau (`$_GET`) teintent au contenu wildcard. Plus gros qu'estimé, risque élevé | 🔴 | L |
+| A7 | **Clés de tableau** — `$a['x']=$t; $a['y']` FP. **IMPLÉMENTÉ PUIS REVERTÉ (preuve, pas opinion)** : modèle key-sensitive (`TKnownArrayContent(key)`+wildcard) + `defaultImplicitTaintRead(_, TUnknownArrayContent())` + suppression de l'étape `base→subscript`. Résultat : la FP est corrigée MAIS **tout le flux élément-de-tableau casse** (même `system($_GET['x'])` = 0) — l'`defaultImplicitTaintRead` de cet InputSig ne compense pas la suppression de l'étape. Fix correct = conversion full-content du modèle de taint (les sources produisent du contenu, pas de la valeur) — réécriture moteur, hors échelle-session. Appliqué naïvement = **régression massive** | 🔴 | L |
+| A11 | **laravel-cookie / validator (13)** — INCOMPATIBLES avec le scorer ligne : la MÊME ligne du bloc config est `ruleid:` pour une règle (secure=false) ET `ok:` pour une autre (http_only=true) ; un finding ligne-basé ne peut pas scorer l'une sans FP sur l'autre. Nécessiterait un matching par message de règle (que le scorer ignore) | 🟠 | L |
 | A8 | **PHPDoc / génériques** dans `TypeInference` (`@param`/`@return`/`@var`, collections Laravel) → dispatch parfois raté | 🟠 | L |
 
 ---
@@ -103,7 +104,7 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 | D2 | **Sources/sinks `method` par nom bare** — schéma **qualifié-classe** dans `callMatches` → `Request::get`/`$request->input` précis. Bénéfice corpus limité sans stubs de types (résolution du receveur) | 🟠 | M |
 | D5 | **`parse_str` out-ref hardcodé** → extensible `outRefModel(kind,name,fromArg,toRefArg)` | 🟢 | M |
 | D6 | **frameworks.model.yml redondant** — recouvre laravel/symfony/wordpress (doublons `e`/`esc_*`/`createQuery`/…). Les BUGS (e-sink, selectRaw arg -1) sont corrigés ; dédup complète = surface de bug en moins | 🟠 | S |
-| D7 | **Phase D — `Php::*` privé incomplet** — API AST publique existe mais `Php::*` fuit dans certains corps ; finir pour la mergeabilité upstream | 🟠 | L |
+| ~~D7~~ ✅ | **Phase D — largement FAIT** : vérifié — sur les 15 queries `src/Security/`, **UNE SEULE** utilise `Php::` (SemgrepAudit.ql, la query audit présence-based, qui a légitimement besoin de l'AST brut pour le pattern-matching fin). Les 14 queries taint utilisent l'API AST publique. `TreeSitter` est importé en `private` partout. Reste : ajouter des wrappers publics pour array-element/string-content/boolean SI on veut 0 `Php::` dans src — cosmétique | 🟠 | S |
 
 ---
 
@@ -160,5 +161,9 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
    weak-crypto : précision (les `ok:` testent `md5(...)===` strict) — pas de présence-based sans FP.
 3. **A7 (clés de tableau)** 🔴 — nécessite de rendre l'étape taint générique `base→subscript` key-sensitive
    (porteuse pour `$_GET['x']`) — gros chantier moteur, risque élevé.
-4. **F1 (élargir corpus : OWASP Benchmark PHP)** · **C1/C2 (perf) · B1/B2 (instance-sensitivity)** ·
-   **D7 (Phase D) · G (packaging)** — mergeabilité upstream.
+4. **F1 (élargir corpus)** — la suite query-tests est passée de **87→96 tests** cette session (+ chaque
+   règle pattern a son test dédié : ArrayCallable, CloneTaint, DynamicInstantiation, TypedSource,
+   SymfonyConfig, AuditPatterns…) ; benchmark semgrep-rules (232/176) + `bench/run.sh` + garde-fou CI en
+   place. « Élargir » davantage = OWASP Benchmark (n'existe pas pour PHP) ou apps CVE (gros labeling).
+5. **base-convert/openssl (~14)** — flux weak-random / config crypto ; **C1/C2 (perf) · B1/B2** ·
+   **G (packaging)** — mergeabilité.
