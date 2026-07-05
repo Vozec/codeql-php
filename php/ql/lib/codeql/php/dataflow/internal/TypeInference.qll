@@ -171,6 +171,33 @@ cached
 predicate hasInferredReceiver(MethodCall mc) { exists(exprClass(mc.getReceiver())) }
 
 /**
+ * Gets the method denoted by a 2-element array callable `[receiver, 'name']`:
+ *  - instance callable `[$obj, 'm']` — resolved by the receiver's inferred class (with virtual
+ *    dispatch to subtype implementors, recall-first);
+ *  - class-name callable `['C', 'm']` — resolved by the literal class name.
+ * Models the PHP `[obj|class, method]` callable so it participates in first-class-callable flow
+ * (`lambdaCreation`) and the `call_user_func([$o,'m'], …)` step, without enumerating call sites.
+ */
+cached
+Method arrayCallableMethod(Php::ArrayCreationExpression arr) {
+  exists(Expr recv, string name |
+    recv = arr.getChild(0).(Php::ArrayElementInitializer).getChild(0) and
+    name = arr.getChild(1).(Php::ArrayElementInitializer).getChild(0).(StringLiteral).getValue() and
+    result.getName() = name and
+    (
+      // instance `[$obj, 'm']`
+      result = exprClass(recv).getAMethod()
+      or
+      // virtual dispatch: receiver typed as a base/interface, implementation on a subtype
+      exists(ClassLike sub | exprClass(recv) = sub.getAnAncestor() and result = sub.getADeclaredMethod())
+      or
+      // class-name string `['C', 'm']`
+      exists(ClassLike c | c.getName() = recv.(StringLiteral).getValue() and result = c.getAMethod())
+    )
+  )
+}
+
+/**
  * Gets the method a static call `C::m()` / `self::m()` / `static::m()` / `parent::m()` dispatches to,
  * resolving the scope to a concrete class (namespace-aware for explicit class names).
  */

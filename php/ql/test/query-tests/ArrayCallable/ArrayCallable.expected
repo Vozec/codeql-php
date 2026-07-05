@@ -1,0 +1,31 @@
+edges
+| test.php:4:25:4:26 | VariableName | test.php:4:38:4:39 | VariableName | provenance |  |
+| test.php:6:43:6:44 | VariableName | test.php:22:8:22:51 | FunctionCallExpression | provenance |  |
+| test.php:12:29:12:33 | VariableName | test.php:12:29:12:38 | SubscriptExpression | provenance |  |
+| test.php:12:29:12:38 | SubscriptExpression | test.php:4:38:4:39 | VariableName | provenance |  |
+| test.php:16:5:16:9 | VariableName | test.php:16:5:16:14 | SubscriptExpression | provenance |  |
+| test.php:16:5:16:14 | SubscriptExpression | test.php:4:25:4:26 | VariableName | provenance |  |
+| test.php:19:37:19:41 | VariableName | test.php:19:37:19:46 | SubscriptExpression | provenance |  |
+| test.php:19:37:19:46 | SubscriptExpression | test.php:5:46:5:47 | VariableName | provenance |  |
+| test.php:22:41:22:45 | VariableName | test.php:22:41:22:50 | SubscriptExpression | provenance |  |
+| test.php:22:41:22:50 | SubscriptExpression | test.php:6:43:6:44 | VariableName | provenance |  |
+nodes
+| test.php:4:25:4:26 | VariableName | semmle.label | VariableName |
+| test.php:4:38:4:39 | VariableName | semmle.label | VariableName |
+| test.php:5:46:5:47 | VariableName | semmle.label | VariableName |
+| test.php:6:43:6:44 | VariableName | semmle.label | VariableName |
+| test.php:12:29:12:33 | VariableName | semmle.label | VariableName |
+| test.php:12:29:12:38 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:16:5:16:9 | VariableName | semmle.label | VariableName |
+| test.php:16:5:16:14 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:19:37:19:41 | VariableName | semmle.label | VariableName |
+| test.php:19:37:19:46 | SubscriptExpression | semmle.label | SubscriptExpression |
+| test.php:22:8:22:51 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:22:41:22:45 | VariableName | semmle.label | VariableName |
+| test.php:22:41:22:50 | SubscriptExpression | semmle.label | SubscriptExpression |
+subpaths
+#select
+| test.php:4:38:4:39 | VariableName | test.php:12:29:12:33 | VariableName | test.php:4:38:4:39 | VariableName | This shell command depends on a $@. | test.php:12:29:12:33 | VariableName | user-provided value |
+| test.php:4:38:4:39 | VariableName | test.php:16:5:16:9 | VariableName | test.php:4:38:4:39 | VariableName | This shell command depends on a $@. | test.php:16:5:16:9 | VariableName | user-provided value |
+| test.php:5:46:5:47 | VariableName | test.php:19:37:19:41 | VariableName | test.php:5:46:5:47 | VariableName | This shell command depends on a $@. | test.php:19:37:19:41 | VariableName | user-provided value |
+| test.php:22:8:22:51 | FunctionCallExpression | test.php:22:41:22:45 | VariableName | test.php:22:8:22:51 | FunctionCallExpression | This shell command depends on a $@. | test.php:22:41:22:45 | VariableName | user-provided value |

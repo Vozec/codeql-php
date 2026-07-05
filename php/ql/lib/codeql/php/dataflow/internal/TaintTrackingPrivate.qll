@@ -74,6 +74,9 @@ private AstNode cufCallee(FunctionCall c) {
     or
     result = c.getArgument(0) and
     (result instanceof Php::AnonymousFunction or result instanceof Php::ArrowFunction)
+    or
+    // array callable `call_user_func([$obj, 'm'], …)` / `[…, 'm']` — the resolved method.
+    result = TI::arrayCallableMethod(c.getArgument(0))
   )
 }
 

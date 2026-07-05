@@ -729,6 +729,10 @@ predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c)
       sc.getMethodName() = "fromCallable" and
       c.getName() = sc.getArgument(0).(StringLiteral).getValue()
     )
+    or
+    // Array callable `[$obj, 'm']` / `['C', 'm']`: the callable is the resolved method. Stored in a
+    // variable and invoked later (`$cb($x)`) — handled generally via `lambdaCall`.
+    c = TI::arrayCallableMethod(creation.asExpr())
   )
 }
 
