@@ -493,6 +493,11 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
     node1 = TThisParameterNode(m) and node2.asExpr() = thisAccess(m)
   )
   or
+  // `clone $x` copies the object's fields, so field taint on the source carries to the clone
+  // (value-preserving — content/fields flow, `$b = clone $a; $b->f` observes `$a->f`).
+  model = "" and
+  node1.asExpr() = node2.asExpr().(Php::CloneExpression).getChild()
+  or
   // Caller-side leg of interprocedural field mutation: the POST-UPDATE of a variable read (an argument /
   // receiver / store base whose object a callee may have mutated) flows to a LATER read of the same SSA
   // variable, so `fill($o); … $o->f` observes a mutation `fill` made to `$o`. CFG-ordered so a

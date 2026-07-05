@@ -39,17 +39,20 @@ désormais `SemgrepAudit.ql` pour une mesure de parité fidèle.
 
 ## A. Couverture / faux négatifs (chemins ratés)
 
+**Recheck syntaxe exotique (fait cette session)** — 9.5/11 constructs PHP 8.x OK : `match`, args nommés,
+nullsafe, arrow / static arrow, heredoc, throw-expression, `list()` imbriqué, classe anonyme, générateur,
+interpolation avec appel de méthode, ternaire, `[...$a]` (clé string). Inter-objets exotiques OK : trait,
+factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable (A2 ✅), `include/require`
+(✅), `new $c()` + callback HO teinté (✅), **`clone $a` préserve le taint des champs (✅)**.
+
 | # | Manque | Impact | Effort |
 |---|---|---|---|
-| A1 | **Sinks/sources framework** (WordPress `wp_remote_*`/`$wpdb`, Laravel Eloquent `DB::raw`/`whereRaw`, Symfony) — cf. §0 | 🔴 | M |
-| A2 | **`call_user_func([$obj,'m'], $t)`** (callable tableau `[obj,method]`/`[class,method]`) | 🟠 | M |
-| A3 | **FCC stocké en array** `$a=[f(...)]; $a[0]($t)` ; **arrow imbriqué** `fn()=>fn()=>$x` | 🟢 | M |
-| A4 | **`compact()` / `extract()`** (résolution variable↔nom dynamique) | 🟠 | L |
-| A5 | **`parent::method()` / `parent::$prop`** (self/static faits, parent non) | 🟠 | S |
+| A4 | **`compact()` / `extract()`** (résolution variable↔nom dynamique) — confirmé FN | 🟠 | L |
+| A9 | **Flow summaries pour builtins en first-class-callable** `strval(...)` / `$f='strval'; $f($t)` — le callable résout vers une fonction SANS corps, donc pas de flux arg→retour | 🟠 | L |
+| A10 | **Spread positionnel → variadic** `f(...[$t])` avec `$a[0]` — le contenu du tableau ne rejoint pas les lectures de `$a` (le spread à clé string marche) | 🟢 | M |
 | A6 | **`use A\{B,C}` groupé** — `resolveClassReference` ignore le préfixe de groupe (dégrade au fallback nom) | 🟠 | M |
 | A7 | **Clés de tableau** — `$a['x']=$t; $a['y']` : `TArrayContent()` conflate les clés → passer à `TArrayContent(key)` pour clés constantes | 🟠 | L |
 | A8 | **PHPDoc / génériques** dans `TypeInference` (`@param`/`@return`/`@var`, collections Laravel) → dispatch parfois raté | 🟠 | L |
-| A9 | **Flow summaries riches** (arg→champ, arg→arg) pour libs sans corps — au-delà des `stepModel` simples | 🟠 | L |
 
 ---
 
