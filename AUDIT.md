@@ -575,3 +575,48 @@ analyse le code applicatif (src+vendor), pas les tests du framework.
 ### Limites connues (documentées)
 tree-sitter-php ne parse pas `function readonly()` (WP) — 2/1927 fichiers partiellement extraits. Perf : le
 coût CFG sur très gros projets reste minutes (inhérent, comme tout pack CodeQL).
+
+## §12 — Session couverture + précision + garde-fou CI (2026-07-05)
+
+### Correction majeure : la « régression 48%→25% » était un ARTEFACT DE MESURE
+`SemgrepAudit.ql` est taggé `@tags audit` → le sélecteur `security-extended` l'exclut. Une re-mesure
+`database analyze` de la suite seule ne comptait donc pas les ~77 positifs `*/security/audit/` (dont
+wordpress 42/42 vient à 100%). En ré-incluant l'audit : pas de régression. `bench/run.sh` inclut
+maintenant `SemgrepAudit.ql`, et une baseline committée (`bench/baseline.txt`) sert de garde-fou.
+
+### Progression rappel/précision (corpus semgrep-rules, 232 pos / 176 nég)
+| Étape | Rappel | FP |
+|---|---|---|
+| Baseline historique | 113/232 (48%) | 44 |
+| **Fin de session** | **126/232 (54%)** | **40** |
+Dépasse la baseline sur les DEUX axes. Suite unitaire 87→92 tests.
+
+### Faux négatifs corrigés (structurel / MAD, pas de cas-par-cas)
+- Couverture WordPress complète : tous les wrappers HTTP (`wp_safe_remote_*`, `wp_oembed_get`,
+  `vip_safe_wp_remote_get`, `download_url`…) en SSRF, `$wpdb->query`, `wp_delete_file`, `maybe_unserialize`.
+- `include`/`require` — construct langage (pas un appel), donc jamais capté par la map nom→kind ; ajouté
+  comme sink structurel « file inclusion ».
+- Array-callables `[obj|class, 'method']` : résolus vers la méthode (`TI::arrayCallableMethod`), modélisés
+  comme first-class-callable (`lambdaCreation`) + étape `call_user_func`. Couvre variable-held + retour.
+- `new $c()` (instanciation dynamique) et callback HO teinté (`usort($a,$_GET['f'])`) → code injection.
+- `clone $x` préserve le taint des champs (étape locale value-preserving).
+- Laravel : injection de NOM DE COLONNE (`->orderBy/pluck/where/select($col)`, arg 0 — la valeur reste
+  paramétrée/sûre).
+
+### Faux positifs corrigés (bugs réels de modèle)
+- `e()` (échappeur Blade) était modélisé comme SINK XSS — supprimé (c'est un sanitizer).
+- `selectRaw('a = ?', [$t])` flaguait le tableau de bindings SÛR — un doublon arg -1 dans
+  `frameworks.model.yml` ré-élargissait le fix arg 0 de `laravel.model.yml`. Doublons retirés.
+- `header('X-Request-Uri: '.$x)` flaguait comme open-redirect — restreint structurellement aux
+  en-têtes `Location:`.
+
+### CI (garde-fou institutionnalisé)
+`.github/workflows/php-qltest.yml` : job `qltest` (suite complète) + job `benchmark` (échoue si le rappel
+passe sous `bench/baseline.txt`). Absent auparavant ; c'est exactement ce qui aurait attrapé l'artefact
+de mesure ci-dessus.
+
+### Syntaxe exotique (recheck)
+9.5/11 constructs PHP 8.x portent le taint (match, args nommés, nullsafe, arrow/static-arrow, heredoc,
+throw-expression, `list()` imbriqué, classe anonyme, générateur, interpolation avec appel, ternaire,
+`[...$a]`), + inter-objets (trait, factory statique chaînée, dispatch d'interface). FN résiduels (niches,
+documentés IMPROVEMENTS §A) : FCC de builtin, `extract()`/`compact()`, spread positionnel→variadic.
