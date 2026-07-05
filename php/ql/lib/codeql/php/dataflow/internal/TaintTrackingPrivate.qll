@@ -103,6 +103,19 @@ private Php::SimpleParameter calleeParam(AstNode callee, int i) {
   result = callee.(Php::MethodDeclaration).getParameters().getChild(i)
 }
 
+/** Gets a parameter NAME (simple or variadic `...$a`) of function/method `callee`. */
+private string calleeParamName(AstNode callee) {
+  result = calleeParam(callee, _).getName().getChild().getValue()
+  or
+  exists(Php::VariadicParameter vp |
+    (
+      vp = callee.(Php::FunctionDefinition).getParameters().getChild(_) or
+      vp = callee.(Php::MethodDeclaration).getParameters().getChild(_)
+    ) and
+    result = vp.getName().getChild().getValue()
+  )
+}
+
 /** Gets the body of a function or method `callee`. */
 private AstNode calleeBody(AstNode callee) {
   result = callee.(Php::FunctionDefinition).getBody() or
@@ -578,7 +591,7 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     exists(Call call, Php::VariadicUnpacking vu, AstNode callee, VariableAccess pRead |
       vu = callArgumentNode(call).getChild() and
       resolvesToCallee(call, callee) and
-      pRead.getName() = calleeParam(callee, _).getName().getChild().getValue() and
+      pRead.getName() = calleeParamName(callee) and
       pRead.(Php::AstNode).getParent+() = calleeBody(callee) and
       nodeFrom.asExpr() = vu.getChild() and
       nodeTo.asExpr() = pRead
