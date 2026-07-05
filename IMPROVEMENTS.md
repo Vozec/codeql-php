@@ -5,32 +5,35 @@
 
 ---
 
-## ⚠️ 0. LE POINT N°1 — régression de rappel mesurée (à corriger en priorité)
+## 0. État du benchmark (mesuré, corrigé) — PAS de régression
 
-Mesure sur le corpus labellisé `github/semgrep-rules/php` (232 positifs, 176 négatifs), harnais
-`bench/score_semgrep.py` :
+Corpus labellisé `github/semgrep-rules/php` (232 positifs, 176 négatifs), harnais `bench/run.sh` :
 
-| | Rappel | FP sur `ok:` |
+| Configuration | Rappel | FP sur `ok:` |
 |---|---|---|
-| Ancienne baseline (AUDIT §6.1) | **113/232 (48%)** | 44/176 |
-| **Maintenant** | **60/232 (25%)** | **9/176** |
-| par cat. | wordpress **4/42** (était 42/42) · lang 51/137 · laravel 4/31 · symfony **0/18** · doctrine 1/4 |
+| Ancienne baseline (AUDIT §6.1) | 113/232 (48%) | 44/176 |
+| **Suite sécurité + `SemgrepAudit.ql`** (parité semgrep) | **122/232 (52%)** | 44/176 |
+| Queries taint SEULES (sans audit) | 75/232 (32%) | **9/176** |
+| par cat. (avec audit) | wordpress **42/42** · lang 75/137 · laravel 4/31 · symfony 0/18 · doctrine 1/4 |
 
-**Diagnostic** : la campagne de réduction des FP (retrait des sources `method` par nom bare —
-`->get()`/`->input()`/`->query()`… — et guards plus stricts) a **échangé ~la moitié du rappel contre la
-précision**. Deux causes concrètes :
+**La « régression 48%→25% » était un ARTEFACT DE MESURE** : `SemgrepAudit.ql` est taggé `@tags audit`,
+donc le sélecteur `security-extended` l'exclut ; ma re-mesure `database analyze` de la suite seule ne le
+comptait pas, alors que l'ancienne baseline l'incluait (le corpus a ~77 positifs en `*/security/audit/`,
+dont wordpress 42/42 vient à 100% de l'audit présence-based). En le ré-incluant : **52% > 48%**, même 44 FP,
+**plus** les gains taint de cette session (taint-seul 60→75, FP stable à 9). `bench/run.sh` inclut
+désormais `SemgrepAudit.ql` pour une mesure de parité fidèle.
 
-1. **Sinks framework manquants (🔴 la plus grosse perte, ~-38)** — les fonctions SSRF/SQLi WordPress ne
-   sont PAS dans les modèles MAD : `wp_remote_get`, `wp_safe_remote_get`, `wp_safe_remote_post`,
-   `wp_oembed_get`, `vip_safe_wp_remote_get`, `wp_remote_request`, etc. (le corpus wp-ssrf-audit en a 42).
-   Idem probable pour `$wpdb->get_results/query/prepare` (SQLi), `add_query_arg`/`esc_url` (XSS).
-   → **Ajouter une couverture MAD WordPress complète** (`ext/wordpress.model.yml`). Effort **M**, impact 🔴.
-2. **Sources framework retirées (Laravel/Symfony, ~-15)** — voir §D2 : le fix propre est la source
-   `method` **qualifiée-classe**, pas la suppression.
+**Vraies pistes de rappel restantes** (non-artefact) :
+1. **Taint framework Laravel/Symfony** (4/31, 0/18) — beaucoup de ces positifs sont des règles
+   NON-injection (mass-assignment, env-exposure, config) → nécessitent de **nouvelles queries** (pas des
+   modèles). Les sinks injection (DB::raw/whereRaw, andWhere, redirect) sont déjà couverts.
+2. **Audit doctrine/symfony/sha224** — `SemgrepAudit.ql` couvre WordPress+lang mais pas encore
+   `doctrine-*-dangerous-query`, `symfony-csrf/redirect/cors`, `sha224-hash`, `openssl-decrypt-validate`.
+3. **~99 positifs `lang` non-taint** (weak-crypto, random, debug) → queries pattern/audit à écrire.
 
-> **Action** : (a) construire `ext/wordpress.model.yml` (+ compléter laravel/symfony) ; (b) implémenter D2
-> (sources qualifiées-classe) pour ré-armer `->input()`/`->get()` sans FP ; (c) **re-mesurer après chaque
-> ajout** avec `bench/score_semgrep.py`. Viser un rappel > baseline avec FP < baseline.
+> **44 FP** = coût inhérent des règles audit présence-based (flaguent tout `eval`/`system`/… y compris sur
+> `ok:`). Sémantiquement identique au comportement de semgrep pour ces règles. Réductible en affinant
+> `SemgrepAudit.ql` (contexte), mais pas « faux » au sens strict.
 
 ---
 

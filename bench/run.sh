@@ -39,9 +39,12 @@ if [ "$EXTRACT" = 1 ] || [ ! -d "$DB" ]; then
   "$CODEQL" database create "$DB" --language=php --source-root="$CORPUS" --search-path="$EXT" --threads=4 >/dev/null 2>&1
 fi
 
-# 4. Analyze
-echo ">> analyzing (php-security-extended)"
+# 4. Analyze — security-extended suite PLUS the presence-based audit query (SemgrepAudit.ql is
+# @tags audit, so the security-extended selector excludes it; the corpus has ~77 audit positives
+# in */security/audit/, so a fair semgrep-parity recall number must include it).
+echo ">> analyzing (php-security-extended + SemgrepAudit)"
 "$CODEQL" database analyze "$DB" "$ROOT/php/ql/src/codeql-suites/php-security-extended.qls" \
+  "$ROOT/php/ql/src/Security/SemgrepAudit.ql" \
   --format=csv --output="$CSV" --search-path="$ROOT/php" --additional-packs="$ROOT" \
   --threads=4 --rerun >/dev/null 2>&1
 
