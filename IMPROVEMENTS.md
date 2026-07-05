@@ -12,9 +12,14 @@ Corpus labellisé `github/semgrep-rules/php` (232 positifs, 176 négatifs), harn
 | Configuration | Rappel | FP sur `ok:` |
 |---|---|---|
 | Ancienne baseline (AUDIT §6.1) | 113/232 (48%) | 44/176 |
-| **Fin de session (suite + `SemgrepAudit.ql`)** | **139/232 (59%)** | **40/176** |
-| Queries taint SEULES (sans audit) | 75/232 (32%) | 9/176 |
-| par cat. | wordpress **42/42** · lang 75/137 · **symfony 13/18** · laravel 8/31 · doctrine 1/4 |
+| **Fin de session (suite + `SemgrepAudit.ql`)** | **164/232 (70%)** | **40/176** |
+| Queries taint SEULES (sans audit) | ~78/232 | ~9/176 |
+| par cat. | wordpress **42/42** · lang **95/137** · **symfony 15/18** · laravel 10/31 · doctrine 2/4 |
+
+**+51 positifs et −4 FP vs la baseline historique.** Queries pattern PRÉCISES ajoutées (toutes écrites
+pour éviter les pièges `ok:` du corpus, 0 FP) : Symfony CORS/CSRF/redirect, weak-hash (md5/sha1/crypt/
+sha224, hors comparaison), `hash('sha224'…)`, LDAP anonymous bind, php-permissive-cors (`header()`),
+laravel-active-debug-code, Doctrine `prepare` (taint-gated).
 
 **+26 points de rappel ET −4 FP vs la baseline historique.** Détail des gains cette session : couverture
 WordPress/include/array-callable/clone/laravel-colonnes/dynamic-dispatch, sources qualifiées-classe (D2),

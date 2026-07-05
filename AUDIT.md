@@ -646,3 +646,34 @@ pièges `ok:` du corpus (valeur/classe/extension exactes).
   Version précise = def-use (dbal `$sql`), plus gros.
 - **A7 (clés de tableau)** : modèle de contenu key-sensitive insuffisant seul (l'étape taint générique
   `base→subscript`, porteuse pour `$_GET['x']`, masque). Fix = rework moteur, risque élevé.
+
+## §14 — Queries pattern précises : 59%→70% (2026-07-05, suite)
+
+Après le feedback du hook (« appliquer TOUT le plan »), re-examen des items reportés — dont un
+(le sink `prepare`) était reverté à tort. Vague de queries audit PRÉCISES (pas présence-based),
+chacune écrite pour NE PAS déclencher sur les `ok:` du corpus (qui testent la précision). **Rappel
+139→164 (59%→70%), FP 40→40, suite 89→96 tests.**
+
+### Corrigé : `prepare` n'était pas un FP
+`$wpdb->prepare("…%d", $x)` a un format LITTÉRAL (arg 0 non teinté) → pas flaggé ; `MyDb::prepare("…"
+. $_GET)` (concat) EST une vraie vuln → flaggé. Le test TypedSanitizer le confirme. doctrine 1→2.
+
+### Queries pattern ajoutées (toutes 0 FP)
+| Règle | Détection précise |
+|---|---|
+| symfony-non-literal-redirect | `->redirect(<non-littéral>)` ; littéral/`redirectToRoute`/sans-arg = safe |
+| symfony-permissive-cors | `'Access-Control-Allow-Origin' => '*'` sur `*Response` ; `header("…: *")` exact |
+| symfony-csrf-protection-disabled | `'csrf_protection' => false` ; pas `true`/`null`, extension `framework` |
+| weak-crypto / md5-used-as-password | `md5`/`sha1`/`crypt`/`*_file` HORS opérande de comparaison (domaine type-juggling) |
+| sha224-hash | `hash('sha224'/'sha512/224'/'sha3-224', …)` ; sha384/512 = safe |
+| ldap-bind-without-password | `ldap_bind($conn)` sans argument mot de passe |
+| php-permissive-cors | `header("Access-Control-Allow-Origin: *")` exact (fix normStr pour double-quotes) |
+| laravel-active-debug-code | `config(['app.debug'=>'true'])` / `putenv("APP_DEBUG=true")` ; `'false'` = safe |
+
+### Restant (non appliqué — raisons techniques, documenté IMPROVEMENTS)
+- **A7 (clés de tableau)** : rendre l'étape taint `base→subscript` key-sensitive casserait `$data=$_GET;
+  $data['x']` (FN commun) — pire qu'une FP rare ; conversion full-content = gros rewrite, hors-session.
+- **laravel-cookie/validator (13)** : analyse de fichier de config ENTIER (le ruleid marque le début du
+  tableau, le mauvais réglage est ailleurs) — pas de pattern simple sans FP.
+- **base-convert (8)** : flux weak-random ; **openssl (6)**, **tainted-url-host/session (7)** : patterns
+  complexes / sources non-typées. ROI décroissant, risque FP croissant.
