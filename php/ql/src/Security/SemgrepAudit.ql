@@ -81,7 +81,11 @@ private predicate auditMethod(string name, string ruleId) {
 /** A string literal's value with whitespace stripped and lower-cased (for header-name matching). */
 private string normStr(AstNode e) {
   result =
-    e.(Php::String).getChild(_).(Php::StringContent).getValue().regexpReplaceAll("\\s+", "").toLowerCase()
+    [
+      e.(Php::String).getChild(_).(Php::StringContent).getValue(),
+      // double-quoted strings without interpolation are `EncapsedString` nodes
+      e.(Php::EncapsedString).getChild(_).(Php::StringContent).getValue()
+    ].regexpReplaceAll("\\s+", "").toLowerCase()
 }
 
 /** A `'Access-Control-Allow-Origin' => '*'` array element (case/whitespace-insensitive). */
@@ -108,6 +112,14 @@ private predicate corsFinding(AstNode n) {
     c.getReceiver().(FieldAccess).getFieldName() = "headers" and
     normStr(c.getArgument(0)) = "access-control-allow-origin" and
     normStr(c.getArgument(1)) = "*" and
+    n = c
+  )
+  or
+  // `header("Access-Control-Allow-Origin: *")` — the raw-header form (php-permissive-cors). Exactly
+  // `*`, so `header("…: *something*")` or a different header does not fire.
+  exists(FunctionCall c |
+    c.getName().toLowerCase() = "header" and
+    normStr(c.getArgument(0)) = "access-control-allow-origin:*" and
     n = c
   )
 }
@@ -156,8 +168,21 @@ private predicate nonLiteralRedirect(AstNode n) {
  */
 private predicate weakHashFinding(AstNode n) {
   exists(FunctionCall c |
-    c.getName() = ["md5", "sha1"] and
+    c.getName() = ["md5", "sha1", "md5_file", "sha1_file", "crypt"] and
     not exists(ComparisonExpr cmp | cmp.getAnOperand() = c) and
+    n = c
+  )
+}
+
+/** `ldap_bind` with no password argument, or a NULL/empty password (anonymous/unauthenticated bind). */
+private predicate ldapBindFinding(AstNode n) {
+  exists(FunctionCall c |
+    c.getName().toLowerCase() = "ldap_bind" and
+    (
+      not exists(c.getArgument(2)) // no password argument (anonymous bind)
+      or
+      normStr(c.getArgument(2)) = "" // empty-string password
+    ) and
     n = c
   )
 }
@@ -166,6 +191,8 @@ predicate auditFinding(AstNode n, string msg) {
   corsFinding(n) and msg = "Permissive CORS wildcard origin (symfony-permissive-cors)."
   or
   weakHashFinding(n) and msg = "Weak hash primitive (weak-crypto / md5-used-as-password)."
+  or
+  ldapBindFinding(n) and msg = "LDAP bind without a password (ldap-bind-without-password)."
   or
   nonLiteralRedirect(n) and msg = "Non-literal redirect target (symfony-non-literal-redirect)."
   or

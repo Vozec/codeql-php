@@ -1,0 +1,5 @@
+| test.php:3:6:3:15 | FunctionCallExpression | Weak hash primitive (weak-crypto / md5-used-as-password). |
+| test.php:4:6:4:16 | FunctionCallExpression | Weak hash primitive (weak-crypto / md5-used-as-password). |
+| test.php:5:6:5:15 | FunctionCallExpression | Weak hash primitive (weak-crypto / md5-used-as-password). |
+| test.php:9:1:9:16 | FunctionCallExpression | LDAP bind without a password (ldap-bind-without-password). |
+| test.php:14:1:14:40 | FunctionCallExpression | Permissive CORS wildcard origin (symfony-permissive-cors). |
