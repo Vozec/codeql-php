@@ -1,0 +1,110 @@
+# Audit MAD — declarative STRUCTURAL audit rules, read by the generic engine SemgrepAudit.ql.
+# Adding a rule is a row here, never QL. Columns:
+#   auditPresence : subjectKind, name, guard, ruleId          (guard: "" | "not-comparison")
+#   auditArg      : subjectKind, name, argIndex, op, operand, ruleId
+#                     (op: equals | prefix | contains | nonliteral | isvar | absent)
+#   auditArrayKV  : keyOp, keyPat, valOp, valPat, context, ruleId   (context: "" | new-response | framework-ext)
+extensions:
+  # ---- F1: presence of a dangerous / audit-worthy call --------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: auditPresence }
+    data:
+      # lang built-ins
+      - ["function", "assert", "", "assert-use"]
+      - ["function", "eval", "", "eval-use"]
+      - ["function", "phpinfo", "", "phpinfo-use"]
+      - ["function", "unlink", "", "unlink-use"]
+      - ["function", "unserialize", "", "unserialize-use"]
+      - ["function", "exec", "", "exec-use"]
+      - ["function", "system", "", "exec-use"]
+      - ["function", "shell_exec", "", "exec-use"]
+      - ["function", "passthru", "", "exec-use"]
+      - ["function", "popen", "", "exec-use"]
+      - ["function", "proc_open", "", "exec-use"]
+      - ["function", "pcntl_exec", "", "exec-use"]
+      - ["function", "ftp_connect", "", "ftp-use"]
+      - ["function", "ftp_ssl_connect", "", "ftp-use"]
+      - ["function", "ftp_login", "", "ftp-use"]
+      - ["function", "mcrypt_encrypt", "", "mcrypt-use"]
+      - ["function", "mcrypt_decrypt", "", "mcrypt-use"]
+      - ["function", "mcrypt_create_iv", "", "mcrypt-use"]
+      - ["function", "mcrypt_generic", "", "mcrypt-use"]
+      - ["function", "mdecrypt_generic", "", "mcrypt-use"]
+      - ["function", "mcrypt_module_open", "", "mcrypt-use"]
+      # weak hashing (NOT as a comparison operand — that is the type-juggling query's domain)
+      - ["function", "md5", "not-comparison", "weak-crypto"]
+      - ["function", "sha1", "not-comparison", "weak-crypto"]
+      - ["function", "md5_file", "not-comparison", "weak-crypto"]
+      - ["function", "sha1_file", "not-comparison", "weak-crypto"]
+      - ["function", "crypt", "not-comparison", "weak-crypto"]
+      # WordPress audit families
+      - ["function", "assert", "", "wp-code-execution-audit"]
+      - ["function", "eval", "", "wp-code-execution-audit"]
+      - ["function", "call_user_func", "", "wp-code-execution-audit"]
+      - ["function", "call_user_func_array", "", "wp-code-execution-audit"]
+      - ["function", "create_function", "", "wp-code-execution-audit"]
+      - ["function", "exec", "", "wp-command-execution-audit"]
+      - ["function", "system", "", "wp-command-execution-audit"]
+      - ["function", "shell_exec", "", "wp-command-execution-audit"]
+      - ["function", "passthru", "", "wp-command-execution-audit"]
+      - ["function", "popen", "", "wp-command-execution-audit"]
+      - ["function", "proc_open", "", "wp-command-execution-audit"]
+      - ["function", "file", "", "wp-file-download-audit"]
+      - ["function", "file_get_contents", "", "wp-file-download-audit"]
+      - ["function", "readfile", "", "wp-file-download-audit"]
+      - ["function", "fopen", "", "wp-file-download-audit"]
+      - ["function", "fread", "", "wp-file-download-audit"]
+      - ["function", "fread", "", "wp-file-inclusion-audit"]
+      - ["function", "unlink", "", "wp-file-manipulation-audit"]
+      - ["function", "wp_delete_file", "", "wp-file-manipulation-audit"]
+      - ["function", "wp_redirect", "", "wp-open-redirect-audit"]
+      - ["function", "unserialize", "", "wp-php-object-injection-audit"]
+      - ["function", "maybe_unserialize", "", "wp-php-object-injection-audit"]
+      - ["function", "wp_remote_get", "", "wp-ssrf-audit"]
+      - ["function", "wp_remote_post", "", "wp-ssrf-audit"]
+      - ["function", "wp_remote_head", "", "wp-ssrf-audit"]
+      - ["function", "wp_remote_request", "", "wp-ssrf-audit"]
+      - ["function", "wp_safe_remote_get", "", "wp-ssrf-audit"]
+      - ["function", "wp_safe_remote_post", "", "wp-ssrf-audit"]
+      - ["function", "wp_safe_remote_head", "", "wp-ssrf-audit"]
+      - ["function", "wp_safe_remote_request", "", "wp-ssrf-audit"]
+      - ["function", "wp_oembed_get", "", "wp-ssrf-audit"]
+      - ["function", "vip_safe_wp_remote_get", "", "wp-ssrf-audit"]
+      - ["function", "download_url", "", "wp-ssrf-audit"]
+      - ["function", "is_admin", "", "wp-authorisation-checks-audit"]
+      - ["function", "is_user_logged_in", "", "wp-authorisation-checks-audit"]
+      - ["function", "current_user_can", "", "wp-authorisation-checks-audit"]
+      - ["function", "current_user_can_for_blog", "", "wp-authorisation-checks-audit"]
+      - ["function", "check_ajax_referer", "", "wp-csrf-audit"]
+      - ["function", "check_admin_referer", "", "wp-csrf-audit"]
+      - ["function", "wp_verify_nonce", "", "wp-csrf-audit"]
+      - ["function", "add_action", "", "wp-ajax-no-auth-and-auth-hooks-audit"]
+      # WordPress $wpdb raw SQL methods
+      - ["method", "query", "", "wp-sql-injection-audit"]
+      - ["method", "get_var", "", "wp-sql-injection-audit"]
+      - ["method", "get_row", "", "wp-sql-injection-audit"]
+      - ["method", "get_col", "", "wp-sql-injection-audit"]
+      - ["method", "get_results", "", "wp-sql-injection-audit"]
+      - ["method", "replace", "", "wp-sql-injection-audit"]
+
+  # ---- F2/F4: an argument satisfies op(operand) --------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: auditArg }
+    data:
+      # weak 224-bit SHA family (algo string contains "224")
+      - ["function", "hash", 0, "contains", "224", "sha224-hash"]
+      - ["function", "hash_hmac", 0, "contains", "224", "sha224-hash"]
+      # LDAP anonymous bind (no password argument)
+      - ["function", "ldap_bind", 2, "absent", "", "ldap-bind-without-password"]
+      # non-literal redirect target
+      - ["method", "redirect", 0, "nonliteral", "", "symfony-non-literal-redirect"]
+      # permissive CORS via raw header, and Laravel debug via putenv
+      - ["function", "header", 0, "equals", "access-control-allow-origin:*", "symfony-permissive-cors"]
+      - ["function", "putenv", 0, "equals", "app_debug=true", "laravel-active-debug-code"]
+
+  # ---- F3: an array element `key => value` in a context ------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: auditArrayKV }
+    data:
+      - ["equals", "access-control-allow-origin", "equals", "*", "new-response", "symfony-permissive-cors"]
+      - ["equals", "csrf_protection", "equals", "false", "framework-ext", "symfony-csrf-protection-disabled"]
+      - ["equals", "csrf_protection", "isvar", "", "framework-ext", "symfony-csrf-protection-disabled"]
+      - ["equals", "app.debug", "equals", "true", "", "laravel-active-debug-code"]
+      - ["equals", "app_debug", "equals", "true", "", "laravel-active-debug-code"]

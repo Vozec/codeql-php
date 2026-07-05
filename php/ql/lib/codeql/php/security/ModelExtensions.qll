@@ -65,6 +65,34 @@ extensible predicate outRefModel(string name, int fromArg, int toRefArg);
  */
 extensible predicate typedSanitizerModel(string className, string methodName);
 
+// ---- Audit MAD: declarative STRUCTURAL rules (a shape exists), separate from the taint MAD above.
+//      A generic engine (SemgrepAudit.ql) reads these; adding an audit rule is a data row, never QL.
+
+/**
+ * F1 — a call to `name` (subjectKind `function`/`method`) exists. `guard` is a small fixed vocabulary
+ * of extra conditions (`""`, or `"not-comparison"` = the call is not an operand of `==`/`===`).
+ */
+extensible predicate auditPresence(string subjectKind, string name, string guard, string ruleId);
+
+/**
+ * F2/F4 — the `argIndex`-th argument of a call to `name` satisfies `op operand`. `op` is a fixed
+ * vocabulary: `equals` / `prefix` / `contains` (against the normalised string value), `nonliteral`
+ * (not a plain string literal), `isvar` (a variable), `absent` (no such argument).
+ */
+extensible predicate auditArg(
+  string subjectKind, string name, int argIndex, string op, string operand, string ruleId
+);
+
+/**
+ * F3 — an array element `key => value` where the key satisfies `keyOp keyPat` and the value
+ * `valOp valPat`. `context` is a fixed vocabulary constraining the enclosing construct: `""` (any),
+ * `"new-response"` (inside a `new *Response(...)`), `"framework-ext"` (not inside a
+ * prependExtensionConfig/loadFromExtension for a non-`framework` extension).
+ */
+extensible predicate auditArrayKV(
+  string keyOp, string keyPat, string valOp, string valPat, string context, string ruleId
+);
+
 /** Gets the class name of the receiver `recv`, resolved via `new C()` (SSA) or a known global. */
 private string receiverClassName(VariableAccess recv) {
   // `$o = new C(); ... $o->m()`

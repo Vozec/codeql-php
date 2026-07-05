@@ -1,8 +1,8 @@
-| test.php:5:30:5:65 | ArrayElementInitializer | Permissive CORS wildcard origin (symfony-permissive-cors). |
-| test.php:6:34:6:69 | ArrayElementInitializer | Permissive CORS wildcard origin (symfony-permissive-cors). |
-| test.php:7:1:7:61 | MemberCallExpression | Permissive CORS wildcard origin (symfony-permissive-cors). |
-| test.php:13:25:13:50 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
-| test.php:14:25:14:50 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
-| test.php:15:50:15:75 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
-| test.php:22:29:22:47 | MemberCallExpression | Non-literal redirect target (symfony-non-literal-redirect). |
-| test.php:23:29:23:58 | MemberCallExpression | Non-literal redirect target (symfony-non-literal-redirect). |
+| test.php:5:30:5:65 | ArrayElementInitializer | Audit: symfony-permissive-cors. |
+| test.php:6:34:6:69 | ArrayElementInitializer | Audit: symfony-permissive-cors. |
+| test.php:7:1:7:61 | MemberCallExpression | Audit: symfony-permissive-cors. |
+| test.php:13:25:13:50 | ArrayElementInitializer | Audit: symfony-csrf-protection-disabled. |
+| test.php:14:25:14:50 | ArrayElementInitializer | Audit: symfony-csrf-protection-disabled. |
+| test.php:15:50:15:75 | ArrayElementInitializer | Audit: symfony-csrf-protection-disabled. |
+| test.php:22:29:22:47 | MemberCallExpression | Audit: symfony-non-literal-redirect. |
+| test.php:23:29:23:58 | MemberCallExpression | Audit: symfony-non-literal-redirect. |
