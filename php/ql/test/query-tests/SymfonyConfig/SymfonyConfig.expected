@@ -4,3 +4,5 @@
 | test.php:13:25:13:50 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
 | test.php:14:25:14:50 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
 | test.php:15:50:15:75 | ArrayElementInitializer | CSRF protection disabled (symfony-csrf-protection-disabled). |
+| test.php:22:29:22:47 | MemberCallExpression | Non-literal redirect target (symfony-non-literal-redirect). |
+| test.php:23:29:23:58 | MemberCallExpression | Non-literal redirect target (symfony-non-literal-redirect). |

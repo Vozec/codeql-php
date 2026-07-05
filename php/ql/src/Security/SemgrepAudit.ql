@@ -136,8 +136,24 @@ private predicate csrfFinding(AstNode n) {
   )
 }
 
+/**
+ * `$this->redirect(<non-literal>)` — a redirect to a computed target (variable, concatenation,
+ * interpolation). Precise: a plain string-literal URL, `redirectToRoute(...)`, or `redirect()` with no
+ * argument does NOT fire.
+ */
+private predicate nonLiteralRedirect(AstNode n) {
+  exists(MethodCall c |
+    c.getMethodName() = "redirect" and
+    exists(c.getArgument(0)) and
+    not c.getArgument(0) instanceof Php::String and
+    n = c
+  )
+}
+
 predicate auditFinding(AstNode n, string msg) {
   corsFinding(n) and msg = "Permissive CORS wildcard origin (symfony-permissive-cors)."
+  or
+  nonLiteralRedirect(n) and msg = "Non-literal redirect target (symfony-non-literal-redirect)."
   or
   csrfFinding(n) and msg = "CSRF protection disabled (symfony-csrf-protection-disabled)."
   or

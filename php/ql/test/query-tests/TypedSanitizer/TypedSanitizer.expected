@@ -5,6 +5,7 @@ edges
 | test.php:8:23:8:63 | BinaryExpression | test.php:4:29:4:32 | VariableName | provenance |  |
 | test.php:8:23:8:63 | BinaryExpression | test.php:8:10:8:64 | MemberCallExpression | provenance |  |
 | test.php:8:53:8:57 | VariableName | test.php:8:23:8:63 | BinaryExpression | provenance |  |
+| test.php:8:53:8:57 | VariableName | test.php:8:23:8:63 | BinaryExpression | provenance |  |
 nodes
 | test.php:4:29:4:32 | VariableName | semmle.label | VariableName |
 | test.php:4:44:4:47 | VariableName | semmle.label | VariableName |
@@ -12,8 +13,10 @@ nodes
 | test.php:5:61:5:64 | VariableName | semmle.label | VariableName |
 | test.php:8:10:8:64 | MemberCallExpression | semmle.label | MemberCallExpression |
 | test.php:8:23:8:63 | BinaryExpression | semmle.label | BinaryExpression |
+| test.php:8:23:8:63 | BinaryExpression | semmle.label | BinaryExpression |
 | test.php:8:53:8:57 | VariableName | semmle.label | VariableName |
 subpaths
 | test.php:8:23:8:63 | BinaryExpression | test.php:4:29:4:32 | VariableName | test.php:4:44:4:47 | VariableName | test.php:8:10:8:64 | MemberCallExpression |
 #select
 | test.php:5:61:5:64 | VariableName | test.php:8:53:8:57 | VariableName | test.php:5:61:5:64 | VariableName | This SQL query depends on a $@. | test.php:8:53:8:57 | VariableName | user-provided value |
+| test.php:8:23:8:63 | BinaryExpression | test.php:8:53:8:57 | VariableName | test.php:8:23:8:63 | BinaryExpression | This SQL query depends on a $@. | test.php:8:53:8:57 | VariableName | user-provided value |

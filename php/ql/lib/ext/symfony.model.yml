@@ -15,10 +15,10 @@ extensions:
       - ["method", "executeQuery", -1, "SQL injection"]
       - ["method", "executeStatement", -1, "SQL injection"]
       - ["method", "executeUpdate", -1, "SQL injection"]
-      # NOTE: `prepare` is intentionally NOT a bare-name sink — it collides with the `$wpdb->prepare()`
-      # SANITIZER (the safe parameterised form), causing false positives. A class-qualified sink
-      # (Connection/PDO::prepare, excluding wpdb) would be the correct form once the sink schema
-      # supports receiver types (cf. typedSourceModel / D2).
+      # `$conn->prepare($sql)` / PDO::prepare — arg 0 (the SQL string). Taint-gated: a literal
+      # `prepare("… ?")`/`prepare("… %d", $x)` is safe (arg 0 not tainted); only a CONCATENATED SQL
+      # string flags. `$wpdb->prepare("…%d", $x)` stays safe for the same reason (format is literal).
+      - ["method", "prepare", 0, "SQL injection"]
       # Doctrine QueryBuilder DQL fragments (distinctive names — Laravel uses whereRaw, not andWhere)
       - ["method", "andWhere", -1, "SQL injection"]
       - ["method", "orWhere", -1, "SQL injection"]

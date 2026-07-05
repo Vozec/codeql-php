@@ -16,3 +16,11 @@ $container->prependExtensionConfig('framework', ['csrf_protection' => false]); /
 $resolver->setDefaults(['csrf_protection' => true]);                        // safe: enabled
 $container->prependExtensionConfig('framework', ['csrf_protection' => null]);   // safe: null
 $container->prependExtensionConfig('other_bundle', ['csrf_protection' => false]); // safe: wrong ext
+
+// --- Non-literal redirect target ---
+class Ctrl {
+    function a($t) { return $this->redirect($t); }               // BUG: variable target
+    function b($t) { return $this->redirect('https://'.$t); }    // BUG: concatenation
+    function c() { return $this->redirect('https://safe.example'); } // safe: literal
+    function d($t) { return $this->redirectToRoute($t); }        // safe: route method
+}
