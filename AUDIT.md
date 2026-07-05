@@ -620,3 +620,29 @@ de mesure ci-dessus.
 throw-expression, `list()` imbriqué, classe anonyme, générateur, interpolation avec appel, ternaire,
 `[...$a]`), + inter-objets (trait, factory statique chaînée, dispatch d'interface). FN résiduels (niches,
 documentés IMPROVEMENTS §A) : FCC de builtin, `extract()`/`compact()`, spread positionnel→variadic.
+
+## §13 — Suite session : layering complet + queries pattern (2026-07-05)
+
+Poursuite après §12. **Rappel 126→139 (54%→59%), FP 40→40, suite 92→94.** Cumul session : **48%→59%
+rappel, 44→40 FP** (dépasse la baseline sur les deux axes).
+
+### Layering MAD COMPLET (D1–D6) — « couverture en DATA, moteur en QL »
+- **D1** `callbackModel(name, callbackArg, dataArg)` : la liste HO (array_map/usort/call_user_func…),
+  auparavant triplée (step + 2 sinks), est une seule table extensible.
+- **D2** `typedSourceModel(className, method, type)` : sources qualifiées-classe — `$request->get()` est une
+  source seulement sur un receveur `Request` (ré-arme les accesseurs génériques sans FP).
+- **D3** `sanitizerGuardModel`, **D4** sanitizers-méthode, **D5** `outRefModel` (parse_str/preg_match by-ref) :
+  tous les noms hardcodés → MAD. **D6** : `frameworks.model.yml` redondant supprimé (source des bugs
+  e-sink / selectRaw arg -1).
+
+### Queries pattern PRÉCISES (pas présence-based)
+Symfony **CORS** (`Access-Control-Allow-Origin: '*'` sur un `*Response`) + **CSRF** (`csrf_protection => false`,
+pas `true`/`null`, extension `framework`) : **+13 rappel, 0 FP** (symfony 0→13/18). Écrites pour éviter les
+pièges `ok:` du corpus (valeur/classe/extension exactes).
+
+### Investigué, honnêtement NON appliqué (documenté IMPROVEMENTS)
+- **doctrine-dangerous-query / weak-crypto** : les `ok:` du corpus testent la PRÉCISION (`md5(...)===`,
+  `$sql` littéral) → une règle présence-based donne du FP (essayé doctrine : +1 FP, +0 rappel, reverté).
+  Version précise = def-use (dbal `$sql`), plus gros.
+- **A7 (clés de tableau)** : modèle de contenu key-sensitive insuffisant seul (l'étape taint générique
+  `base→subscript`, porteuse pour `$_GET['x']`, masque). Fix = rework moteur, risque élevé.

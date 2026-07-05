@@ -12,9 +12,14 @@ Corpus labellisé `github/semgrep-rules/php` (232 positifs, 176 négatifs), harn
 | Configuration | Rappel | FP sur `ok:` |
 |---|---|---|
 | Ancienne baseline (AUDIT §6.1) | 113/232 (48%) | 44/176 |
-| **Suite sécurité + `SemgrepAudit.ql`** (parité semgrep) | **122/232 (52%)** | 44/176 |
-| Queries taint SEULES (sans audit) | 75/232 (32%) | **9/176** |
-| par cat. (avec audit) | wordpress **42/42** · lang 75/137 · laravel 4/31 · symfony 0/18 · doctrine 1/4 |
+| **Fin de session (suite + `SemgrepAudit.ql`)** | **139/232 (59%)** | **40/176** |
+| Queries taint SEULES (sans audit) | 75/232 (32%) | 9/176 |
+| par cat. | wordpress **42/42** · lang 75/137 · **symfony 13/18** · laravel 8/31 · doctrine 1/4 |
+
+**+26 points de rappel ET −4 FP vs la baseline historique.** Détail des gains cette session : couverture
+WordPress/include/array-callable/clone/laravel-colonnes/dynamic-dispatch, sources qualifiées-classe (D2),
+et **queries pattern précises Symfony CORS + CSRF (+13, 0 FP)** écrites pour éviter les pièges `ok:` du
+corpus (valeur `*`/`false` exacte, classe `*Response`, extension `framework`).
 
 **La « régression 48%→25% » était un ARTEFACT DE MESURE** : `SemgrepAudit.ql` est taggé `@tags audit`,
 donc le sélecteur `security-extended` l'exclut ; ma re-mesure `database analyze` de la suite seule ne le
@@ -131,17 +136,23 @@ factory statique chaînée, dispatch d'interface. **Corrigés** : array-callable
 
 ## Fait cette session (2026-07-05)
 
-✅ Benchmark corrigé (artefact SemgrepAudit) + baseline committée + **CI garde-fou** (F2). Couverture :
-WordPress complet, `include`/`require`, array-callables, `new $c()`, callback HO teinté, `clone`,
-injection nom-de-colonne Laravel (A1++). Précision : `e`/selectRaw/header (B). Layering : guards +
-sanitizers-méthode en MAD (D3/D4). Validation : Symfony réel (0 erreur parse, 2s/6s), syntaxe exotique
-9.5/11, suite 87→92. **Rappel 113→126 (48%→54%), FP 44→40 — dépasse la baseline sur les 2 axes.**
+✅ Benchmark corrigé (artefact SemgrepAudit) + baseline committée + **CI garde-fou** (F2).
+✅ Couverture : WordPress complet, `include`/`require`, array-callables, `new $c()`, callback HO teinté,
+   `clone`, injection nom-de-colonne Laravel.
+✅ Précision : `e`/selectRaw/header (B) — FP 44→40.
+✅ **Layering COMPLET** : D1 (callbackModel MAD), D2 (sources qualifiées-classe `typedSourceModel`),
+   D3 (guards MAD), D4 (sanitizers-méthode MAD), D5 (`outRefModel`), D6 (dédup frameworks.model.yml).
+✅ **Queries pattern précises** : Symfony CORS + CSRF (+13, 0 FP).
+✅ Validation : Symfony réel (0 erreur parse, 2s/6s), syntaxe exotique 9.5/11, suite 87→94.
+**Rappel 113→139 (48%→59%), FP 44→40.**
 
-## Ordre recommandé (suite)
+## Ordre recommandé (reste)
 
-1. **A7 (clés de tableau `TArrayContent(key)`) · A4 (`extract`/`compact`)** 🟠 — FN structurels restants.
-2. **Nouvelles queries pattern** (weak-crypto lang, symfony csrf/cors, doctrine dangerous-query) 🟠 —
-   ~50 positifs corpus non-taint ; augmente le rappel mais présence-based (surveiller FP).
-3. **D1 (callbackModel) · D6 (dédup frameworks.model.yml)** 🟠 — DRY, prudemment (guardrails bench+suite).
-4. **D2 (sources qualifiées-classe) + stubs de types** 🟠 — précision framework (Laravel/Symfony taint).
-5. **C1/C2 (perf steps OO) · B1/B2 (instance-sensitivity)** 🟠 · **D7 (Phase D) · G (packaging)** — mergeabilité.
+1. **symfony non-literal-redirect (2)** — source `$request->query->get()`/`$session->get()` (typedSourceModel + stubs).
+2. **doctrine dangerous-query (dbal)** — nécessite def-use du `$sql` variable (concat en amont) ; le sous-cas
+   inline-concat seul donne +0/+1 FP (essayé, reverté). weak-crypto : idem, précision (les `ok:` du corpus
+   testent `md5(...)===` strict) — pas de version présence-based sans FP.
+3. **A7 (clés de tableau)** 🔴 — nécessite de rendre l'étape taint générique `base→subscript` key-sensitive
+   (porteuse pour `$_GET['x']`) — gros chantier moteur, risque élevé.
+4. **F1 (élargir corpus : OWASP Benchmark PHP)** · **C1/C2 (perf) · B1/B2 (instance-sensitivity)** ·
+   **D7 (Phase D) · G (packaging)** — mergeabilité upstream.
