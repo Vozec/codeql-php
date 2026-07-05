@@ -51,6 +51,13 @@ extensible predicate sanitizerGuardModel(string name);
 extensible predicate callbackModel(string name, int callbackArg, int dataArg);
 
 /**
+ * A function that writes tainted data into a BY-REFERENCE output argument: `name` copies taint from
+ * `fromArg` into the variable passed by reference at `toRefArg` (`parse_str($tainted, $out)` fills
+ * `$out`). Later reads of that variable in the same scope are tainted.
+ */
+extensible predicate outRefModel(string name, int fromArg, int toRefArg);
+
+/**
  * A method that sanitizes ONLY when called on a receiver of class `className` (e.g. `wpdb::prepare`
  * is safe, but a user's custom `MyClass::prepare` is not). Avoids the false-negatives of matching a
  * sanitizer purely by method name. Receiver type is resolved via SSA (`$o = new C()`) or, for the

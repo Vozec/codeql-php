@@ -578,13 +578,13 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // closure step above (routing data INTO the callback body) stays engine logic.
     // `parse_str($tainted, $out)` / `mb_parse_str`: the by-ref output array is populated from the
     // tainted input string, so reads of `$out` in the same scope are tainted.
-    exists(FunctionCall c, VariableAccess outArg, VariableAccess outRead |
-      c.getName() = ["parse_str", "mb_parse_str"] and
-      outArg = c.getArgument(1) and
+    exists(FunctionCall c, int fromArg, int toRefArg, VariableAccess outArg, VariableAccess outRead |
+      outRefModel(c.getName(), fromArg, toRefArg) and
+      outArg = c.getArgument(toRefArg) and
       outRead.getName() = outArg.getName() and
       outRead != outArg and
       sameScope(outRead, outArg) and
-      nodeFrom.asExpr() = c.getArgument(0) and
+      nodeFrom.asExpr() = c.getArgument(fromArg) and
       nodeTo.asExpr() = outRead
     )
     or

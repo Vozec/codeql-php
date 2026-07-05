@@ -244,3 +244,14 @@ extensions:
       - ["uasort", 1, 0]
       - ["uksort", 1, 0]
       - ["preg_replace_callback", 1, 2]
+
+  # ---- By-reference output writers: taint a &$out argument from an input argument ---------------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: outRefModel
+    data:
+      - ["parse_str", 0, 1]         # parse_str($tainted, $out)
+      - ["mb_parse_str", 0, 1]
+      - ["preg_match", 1, 2]        # preg_match($pat, $subj, $matches) — $matches from $subj
+      - ["preg_match_all", 1, 2]
+      - ["sscanf", 0, 2]            # sscanf($str, $fmt, &$out)
