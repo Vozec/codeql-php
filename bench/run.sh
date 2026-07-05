@@ -9,7 +9,8 @@
 # without re-extracting the corpus (analysis reads the local pack via --search-path).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CODEQL="$ROOT/.tooling/codeql/codeql"
+# Prefer an explicit $CODEQL (CI puts the CLI on PATH); fall back to the vendored tooling copy.
+CODEQL="${CODEQL:-$ROOT/.tooling/codeql/codeql}"
 CORPUS="${CORPUS:-/tmp/semgrep-rules/php}"
 EXT="${EXT:-/tmp/php-ext}"
 DB="${DB:-/tmp/sr-db}"

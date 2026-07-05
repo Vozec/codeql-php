@@ -1,0 +1,74 @@
+name: "PHP: Run QL Tests"
+
+on:
+  push:
+    paths:
+      - "php/**"
+      - "shared/**"
+      - .github/workflows/php-qltest.yml
+      - .github/actions/fetch-codeql/action.yml
+    branches:
+      - main
+      - "rc/*"
+  pull_request:
+    paths:
+      - "php/**"
+      - "shared/**"
+      - .github/workflows/php-qltest.yml
+      - .github/actions/fetch-codeql/action.yml
+    branches:
+      - main
+      - "rc/*"
+
+permissions:
+  contents: read
+
+jobs:
+  qltest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Fetch CodeQL
+        uses: ./.github/actions/fetch-codeql
+
+      - name: Build PHP extractor + generate dbscheme/AST
+        shell: bash
+        run: ./php/build.sh
+
+      - name: Run QL library + query tests
+        shell: bash
+        run: |
+          codeql test run php/ql/test \
+            --search-path="${{ github.workspace }}/php" \
+            --additional-packs="${{ github.workspace }}" \
+            --threads=0
+
+  # Recall/precision guardrail: analyse the labelled semgrep-rules PHP corpus and fail if recall
+  # drops below the committed baseline (bench/baseline.txt). This is what would have caught the
+  # phantom "48%->25%" measurement issue automatically.
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Fetch CodeQL
+        uses: ./.github/actions/fetch-codeql
+
+      - name: Run recall/precision benchmark vs baseline
+        shell: bash
+        run: |
+          # bench/run.sh builds the extractor (cargo), clones the corpus, extracts, analyses
+          # (security-extended + audit) and scores. It stages the extractor pack under /tmp/php-ext
+          # (its default) so it never touches the checked-out php/ tree.
+          OUT="$(CODEQL="$(command -v codeql)" bash bench/run.sh --extract 2>&1)"
+          echo "$OUT"
+          NEW_RECALL="$(echo "$OUT" | grep -oE 'RECALL [0-9]+' | grep -oE '[0-9]+' | head -1)"
+          BASE_RECALL="$(grep -oE 'RECALL [0-9]+' bench/baseline.txt | grep -oE '[0-9]+' | head -1)"
+          echo "recall: new=$NEW_RECALL baseline=$BASE_RECALL"
+          if [ -z "$NEW_RECALL" ] || [ "$NEW_RECALL" -lt "$BASE_RECALL" ]; then
+            echo "::error::Recall regression: $NEW_RECALL < baseline $BASE_RECALL"
+            exit 1
+          fi
