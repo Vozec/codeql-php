@@ -677,3 +677,31 @@ chacune écrite pour NE PAS déclencher sur les `ok:` du corpus (qui testent la 
   tableau, le mauvais réglage est ailleurs) — pas de pattern simple sans FP.
 - **base-convert (8)** : flux weak-random ; **openssl (6)**, **tainted-url-host/session (7)** : patterns
   complexes / sources non-typées. ROI décroissant, risque FP croissant.
+
+## §15 — Audit systématique de la couverture des constructs PHP du moteur (2026-07-05)
+
+Suite à la question « le moteur supporte-t-il déjà proprement toutes les syntaxes/calls PHP ? », test
+systématique de ~24 constructs (source `$_GET` → construct → sink). **21/24 déjà OK ; 3 trous corrigés ;
+2 niches documentées.** Recall/FP corpus inchangés (164/40), suite 87→97.
+
+### Déjà supporté (21) — le moteur est très complet
+Assignation : simple, **chaînée** (`$a=$b=$t`), composée (`.=`), **référence** (`$b=&$a`) + **mutation
+par référence**, null-coalesce (`??=`), list/destructuring (plate, imbriquée, à clé). Array : `[]=`,
+lecture d'élément, spread `[...$a]`, littéral. Portée : **`$GLOBALS`**, **`global`**, **propriété
+statique** `C::$s`, **variables-variables** `$$k`. Objets : **readonly**, `clone` (préserve les champs),
+**`__invoke`**, closures (**`$this`**, `use`), **arrow** (capture auto), **enum** + méthode. Flux :
+**récursivité**, **static var**, **generators** (yield keyé), **exceptions** (message teinté), `match`,
+ternaire. Calls : args **nommés réordonnés**, nullsafe, trait, factory statique chaînée, dispatch
+d'interface, first-class-callable.
+
+### Trous CORRIGÉS cette session (3)
+| Construct | Avant | Fix |
+|---|---|---|
+| **`define('C',$t); C`** (constante runtime) | 0 | étape taint `define`-valeur → références de la constante (globales, clé-spécifique) |
+| **`$o->$m()`** (nom de méthode variable) | 0 | `methodNameOf` résout `$m` via SSA → dispatch sur la bonne méthode |
+| **`f(...[$t]); $a[0]`** (spread → variadic) | 0 | `calleeParamName` couvre les params **variadiques** (avant : SimpleParameter seulement) |
+
+### Niches NON corrigées (2, rares en code sécurité-sensible, documentées)
+- **`Fiber`** (PHP 8.1) : `$f->start($x)` passe les args au callback de la fibre — API spécifique, quasi
+  jamais dans du code exploitable.
+- **`Closure::bind`** : rebinding de `$this` — rare.
