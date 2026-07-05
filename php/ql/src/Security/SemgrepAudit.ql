@@ -150,8 +150,22 @@ private predicate nonLiteralRedirect(AstNode n) {
   )
 }
 
+/**
+ * A broken/weak hash primitive (`md5`/`sha1`) used directly — but NOT as an operand of a comparison
+ * (`md5($x) === $h`), which is the type-juggling query's domain (and strict `===` is safe there).
+ */
+private predicate weakHashFinding(AstNode n) {
+  exists(FunctionCall c |
+    c.getName() = ["md5", "sha1"] and
+    not exists(ComparisonExpr cmp | cmp.getAnOperand() = c) and
+    n = c
+  )
+}
+
 predicate auditFinding(AstNode n, string msg) {
   corsFinding(n) and msg = "Permissive CORS wildcard origin (symfony-permissive-cors)."
+  or
+  weakHashFinding(n) and msg = "Weak hash primitive (weak-crypto / md5-used-as-password)."
   or
   nonLiteralRedirect(n) and msg = "Non-literal redirect target (symfony-non-literal-redirect)."
   or
