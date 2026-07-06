@@ -73,3 +73,8 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:
       - ["Connection", "quote"]
+  # Attribute routing: `#[Route('/u/{id}')] public function show(int $id)` — the scalar action params
+  # are URL placeholders (user input). The attribute short-name is the data row.
+  - addsTo: { pack: codeql/php-all, extensible: routeAttributeModel }
+    data:
+      - ["Route"]

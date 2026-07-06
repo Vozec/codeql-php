@@ -37,3 +37,14 @@ class UserController
 Route::get('/u/{id}', [UserController::class, 'show']);
 Route::delete('/u/{id}', 'UserController@destroy');
 Route::get('/safe', [UserController::class, 'safe']);
+
+// Symfony attribute-routed controller: the #[Route] method's scalar param is a URL placeholder.
+class ProductController
+{
+    #[Route('/product/{slug}')]
+    public function view(string $slug, Connection $conn)
+    {
+        $conn->executeQuery("SELECT * FROM products WHERE slug = '$slug'");  // WANT SQLi (attribute route)
+    }
+}
+

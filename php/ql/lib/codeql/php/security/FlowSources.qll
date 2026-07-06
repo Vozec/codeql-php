@@ -381,6 +381,37 @@ private class RouteParamSource extends RemoteFlowSource {
   override string getSourceType() { result = "route parameter" }
 }
 
+/** Gets the short (last `\`-segment) name of an attribute `a` (`#[Route]` or `#[…\Route]` → "Route"). */
+private string attributeShortName(Php::Attribute a) {
+  result = a.getChild().(Php::Name).getValue()
+  or
+  result = a.getChild().(Php::QualifiedName).getChild().(Php::Name).getValue()
+}
+
+/**
+ * An attribute-routed controller parameter: a method annotated with a routing attribute
+ * (`routeAttributeModel`, e.g. Symfony `#[Route('/u/{id}')]`) receives its scalar parameters from URL
+ * path placeholders. A read of such a parameter in the method body is a source, tracked
+ * interprocedurally into the action. Class-typed params (autowired services) are excluded.
+ */
+private class AttributeRouteParamSource extends RemoteFlowSource {
+  AttributeRouteParamSource() {
+    exists(Php::MethodDeclaration meth, Php::SimpleParameter p, VariableAccess read |
+      exists(Php::Attribute a |
+        a.(Php::AstNode).getParent+() = meth.getAttributes() and
+        routeAttributeModel(attributeShortName(a))
+      ) and
+      p = meth.getParameters().getChild(_) and
+      not TI::hasClassParameterType(p) and
+      read.getName() = p.getName().getChild().getValue() and
+      read.(Php::AstNode).getParent+() = meth.getBody() and
+      this.asExpr() = read
+    )
+  }
+
+  override string getSourceType() { result = "route parameter" }
+}
+
 /** The built-in remote sources become `RemoteFlowSource` instances (extensible via QL/data). */
 private class BuiltinRemoteSource extends RemoteFlowSource {
   BuiltinRemoteSource() { isRemoteSource(this) }

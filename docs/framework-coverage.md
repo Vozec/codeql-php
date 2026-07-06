@@ -15,7 +15,7 @@ adapting a new framework is a data file, never an engine change. See
 | **Core PHP** (built-ins) | ✅ superglobals, `filter_input`, `getenv` | ✅ `mysql*/mysqli*/pg_query` | ✅ `echo`/`print` | ✅ `curl_*`/`fsockopen`/`get_headers` | ✅ `fopen`/`file`/`hash_file`/… | ✅ `header` | ✅ `unserialize` | ✅ `htmlspecialchars`/`intval`/`basename`/… | ✅ string built-ins | n/a |
 | **WordPress** | ✅ `$_*`, `wp_unslash`, `WP_REST_Request::get_*` | ✅ `$wpdb->query/get_*` | ✅ `_e`/`_ex`/`wp_die` | ✅ `wp_remote_*`/`download_url`/`fetch_feed` | ✅ `wp_delete_file` | ✅ `wp_redirect` | ✅ `maybe_unserialize` | ✅ `esc_*`/`sanitize_*`/`wp_kses*` + `$wpdb->prepare` | ✅ `add_query_arg`/`wp_unslash`/`map_deep` | ✅ `add_shortcode` atts |
 | **Laravel** | ✅ `request()`/`Request::*` (typed) | ✅ raw + column builders (`whereRaw`, `orderBy`, `max`…) | ⚠️ Blade `{!! !!}` is template syntax (❌) | ✅ `Http::get/post` (typed) | ✅ `Storage::get/put/download` (typed) | ✅ `redirect`/`->to`/`->away` | ✅ (`unserialize`) | ✅ `e`/`validate`/`Str::slug` | ✅ `Str::*`/`Arr::*`/Collection | ✅ `Route::get/…/match` closures |
-| **Symfony / Doctrine** | ✅ `Request` + bags (`InputBag`/`ParameterBag`/… typed) | ✅ DBAL `executeQuery`/`fetch*`/DQL `andWhere` | ⚠️ Twig `\|raw` is template syntax (❌) | ⚠️ `HttpClient::request` (name-only) | ✅ Filesystem `dumpFile`/`appendToFile`/`mirror` | ✅ `redirect`/`setTargetUrl` | ✅ (`unserialize`) | ✅ Twig `escape` + `Connection::quote` (typed) | ✅ String component `u()`/… | ❌ `#[Route]` attribute params (see gaps) |
+| **Symfony / Doctrine** | ✅ `Request` + bags (`InputBag`/`ParameterBag`/… typed) | ✅ DBAL `executeQuery`/`fetch*`/DQL `andWhere` | ⚠️ Twig `\|raw` is template syntax (❌) | ⚠️ `HttpClient::request` (name-only) | ✅ Filesystem `dumpFile`/`appendToFile`/`mirror` | ✅ `redirect`/`setTargetUrl` | ✅ (`unserialize`) | ✅ Twig `escape` + `Connection::quote` (typed) | ✅ String component `u()`/… | ✅ `#[Route]` attribute actions |
 | **Magento 2** 🧪 | ✅ `getParam`/`getPostValue` + `Http::getQuery` (typed) | ✅ `rawQuery` + `AdapterInterface::query` (typed) | ⚠️ `.phtml` echo (core PHP) | ✅ `Curl::get/post` (typed) + `makeRequest` | ✅ `fileGetContents`/`filePutContents`/… | ✅ `_redirect`/`setRedirect` | ✅ `SerializerInterface::unserialize` | ✅ `Escaper::escape*` + `quote` (typed) | ⚠️ `getData` (coarse) | n/a (declarative `routes.xml` → source is `getParam`) |
 | **Joomla 3/4/5** 🧪 | ✅ `getRaw`/`getHtml` + `Input::get` (typed, J3+J4) | ✅ `setQuery` | ⚠️ echo (core PHP) | ✅ `Http::get/post/request` (typed) | ✅ `File::read/delete` | ✅ `$app->redirect` | ✅ (`unserialize`) | ✅ `getInt/getUint/…` filters + `quote`/`escape` (typed) | ❌ | n/a (MVC `task` dispatch → source is `Input::get`) |
 | **PrestaShop** | ✅ `Tools::getValue` | ✅ `Db::executeS` | ❌ | ❌ | ❌ | ✅ `Tools::redirect*` | ❌ | ✅ `pSQL`/`bqSQL` | ❌ | n/a |
@@ -34,11 +34,11 @@ class (a DI service or model-bound object) are excluded.
 - ✅ **Controller handlers** — `Route::get('/u/{id}', [UserController::class, 'show'])`,
   `Route::delete('/u/{id}', 'UserController@destroy')`: the resolved action method's scalar parameters
   become sources, tracked interprocedurally into the action's call graph.
+- ✅ **Attribute/annotation routing** (Symfony `#[Route('/u/{id}')] public function show(int $id)`): the
+  scalar action parameters become sources via the generic `routeAttributeModel` (data row: the attribute
+  short-name, e.g. `Route`), tracked interprocedurally into the action.
 - ⚠️ **`Route::resource(...)` / `apiResource(...)`** — maps to conventional controller methods
   (`index`/`show`/`update`/…) by naming convention; those method params are not yet resolved (partial).
-- ❌ **Attribute/annotation routing** (Symfony `#[Route]` on a controller action): the placeholders bind
-  to method parameters with no call site (no `routeHandlerModel` shape), so this needs a dedicated
-  attribute-driven QL source. **Known gap.**
 - **n/a — declarative routing** (Magento `routes.xml`, Joomla `task=`, TYPO3): there is no per-route
   callable; user input enters through the request object (`getParam`/`Input::get`) which *is* modeled
   as a source, so no route mechanism is needed.
@@ -47,7 +47,8 @@ class (a DI service or model-bound object) are excluded.
 
 - **Template-engine output** (Blade `{!! !!}`, Twig `|raw`, `.phtml` unescaped echo of `getData()`):
   raw-output is template syntax, not a PHP call — needs template extraction / a template analyzer.
-- **Symfony `#[Route]` attribute parameters** as sources (structural, not data — see above).
+- **`Route::resource`/`apiResource` conventional actions** (Laravel): the RESTful methods
+  (`index`/`show`/`update`/…) are mapped by naming convention, not resolved yet.
 - **Class-property sources** (WordPress `WP::$query_vars`, `WP_Query::$query_vars`): field access, not
   a call, so not expressible as a method row.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),

@@ -82,6 +82,14 @@ extensible predicate typedSanitizerModel(string className, string methodName);
  */
 extensible predicate routeHandlerModel(string subjectKind, string name, int handlerArgIndex);
 
+/**
+ * A routing ATTRIBUTE (`attributeName`, e.g. `Route`) — a controller method annotated with it (Symfony
+ * `#[Route('/u/{id}')] public function show(int $id)`) receives its scalar parameters from URL path
+ * placeholders = attacker-controlled. Those params become sources. Generic: a new framework's routing
+ * attribute is just a data row. Matched by the attribute's short (last `\`-segment) name.
+ */
+extensible predicate routeAttributeModel(string attributeName);
+
 // ---- Audit MAD: declarative STRUCTURAL rules (a shape exists), separate from the taint MAD above.
 //      A generic engine (SemgrepAudit.ql) reads these; adding an audit rule is a data row, never QL.
 
