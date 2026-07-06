@@ -641,6 +641,20 @@ private class TryTree extends PostOrderTree instanceof Php::TryStatement {
       // try body throws -> a catch clause (any)
       last(t.getBody(), pred, c) and c instanceof RaiseCompletion and first(tryCatch(t), succ)
       or
+      // try body calls a function that can throw -> a catch clause (any). Calls do not produce a
+      // `RaiseCompletion` (the CFG does not track which callee raises), so a body containing a call to a
+      // throwing function is over-approximated as able to reach the catch on its normal exit — enough to
+      // linearise the catch binding (giving `$e` an SSA definition) and route the thrown value to it (see
+      // `DataFlowPrivate`). This mirrors the exceptional call edges other language packs build.
+      last(t.getBody(), pred, c) and
+      c instanceof NormalCompletion and
+      exists(Php::FunctionCallExpression call, Php::FunctionDefinition callee |
+        call.getParent+() = t.getBody() and
+        callee.getName().getValue() = call.getFunction().(Php::Name).getValue() and
+        exists(Php::ThrowExpression thr | thr.getParent+() = callee.getBody())
+      ) and
+      first(tryCatch(t), succ)
+      or
       // try body completes normally -> finally / exit
       last(t.getBody(), pred, c) and c instanceof NormalCompletion and tryToFinallyOrExit(t, succ)
       or
@@ -878,4 +892,15 @@ private class CallableTree extends PostOrderTree instanceof AstNode {
 /** A type declaration is a leaf in its enclosing scope (its methods are separate scopes). */
 private class TypeDeclarationLeaf extends LeafTree instanceof AstNode {
   TypeDeclarationLeaf() { isTypeDeclaration(this) }
+}
+
+/**
+ * The `$e` binding of a `catch (E $e)` is a leaf CFG node — a definition of `$e` reached first when the
+ * `try` raises (`TryTree` routes the raise to `first(catch)`). Without this the binding is not linearised
+ * into the CFG, so it never becomes a `variableWrite` and `$e` is an SSA orphan (taint cannot reach it
+ * through the engine). Making it a node gives `$e` a proper SSA definition, like a `foreach` value
+ * binding, so a thrown value routed to it (see `DataFlowPrivate`) flows to every `$e` read.
+ */
+private class CatchVarLeaf extends LeafTree instanceof Php::VariableName {
+  CatchVarLeaf() { this = any(Php::CatchClause c).getName() }
 }

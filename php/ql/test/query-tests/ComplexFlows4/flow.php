@@ -23,7 +23,7 @@ system(nl2br(ucwords(str_pad($_GET['a'], 20))));             // WANT string-tran
 
 // 6. exception message carrying tainted data
 function thrower6() { throw new \Exception($_GET['a']); }
-try { thrower6(); } catch (\Exception $e6) { system($e6->getMessage()); }  // known-gap exception-message (interprocedural throw/catch; local case works)
+try { thrower6(); } catch (\Exception $e6) { system($e6->getMessage()); }  // WANT exception-interproc (throw in called fn, caught in caller)
 
 // 7. named-argument call (reordered)
 function named7($a, $b) { system($b); }

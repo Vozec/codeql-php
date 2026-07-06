@@ -273,6 +273,11 @@ class ReturnNode extends Node {
   ReturnNode() {
     exists(Php::ReturnStatement r | this.(ExprNode).asExpr() = r.getChild())
     or
+    // A `throw X` propagates the thrown value out of the callable (an exceptional "return"): the engine
+    // carries it to the call's result node, from where `definitionReachingValue` routes it into a `catch`
+    // binding whose `try` calls this function — the interprocedural exceptional path.
+    exists(Php::ThrowExpression t | this.(ExprNode).asExpr() = t.getChild())
+    or
     // An arrow function `fn(...) => expr` has no `return` statement — its body expression IS the
     // returned value. Its enclosing CFG scope is the `ArrowFunctionScope`, so this return connects to
     // the arrow's invocations (direct call, stored-then-called, array_map, …) like any other callable.
@@ -471,6 +476,34 @@ private Expr definitionReachingValue(Ssa::Definition def) {
   // input is what lets taint survive an unrelated element/property assignment (AUDIT.md A.1).
   exists(Ssa::Definition inp |
     Ssa::Impl::uncertainWriteDefinitionInput(def, inp) and result = definitionReachingValue(inp)
+  )
+  or
+  // Try/catch modelled as a branch (like `if`/`else`): the `catch (E $e)` binding — now a real SSA
+  // definition (see `CatchVarLeaf` in the CFG) — is assigned what the `try` throws. That is either a
+  // direct `throw X` in the try body (X is the value), or the result of a call that can throw (`throw` is
+  // a ReturnNode, so the thrown value reaches the call result). The SSA local-flow then carries it to
+  // every `$e` read. Recall-first (any throw in the try / a called function reaches the catch).
+  exists(
+    VariableAccess w, Ssa::LocalVariable v, Ssa::Cfg::BasicBlock bbw, int iw, Php::CatchClause cat,
+    Php::TryStatement try
+  |
+    def.definesAt(v, bbw, iw) and
+    Ssa::variableAccessAt(bbw, iw, w) and
+    w = cat.getName() and
+    cat = try.getChild(_)
+  |
+    // a direct `throw X` in the try body — the thrown value
+    exists(Php::ThrowExpression thr |
+      thr.(Php::AstNode).getParent+() = try.getBody() and result = thr.getChild()
+    )
+    or
+    // a call in the try that can throw — the thrown value is on its result node (ReturnNode)
+    exists(Php::FunctionCallExpression call, Php::FunctionDefinition callee |
+      call.(Php::AstNode).getParent+() = try.getBody() and
+      callee.getName().getValue() = call.getFunction().(Php::Name).getValue() and
+      exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody()) and
+      result = call
+    )
   )
 }
 

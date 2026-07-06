@@ -71,39 +71,34 @@ and fully covered — pointing the scan at the compiled views is the practical w
   a call, so not expressible as a method row.
 - Every PHP **syntax** parses and extracts (tree-sitter-php 0.24, `syntaxcoverage` test green) — the
   limits below are advanced *semantic-flow* cases, not unsupported syntax.
-- ~57/61 patterns in the ComplexFlows test suite (6 batches) flow — constructor-promoted fields, private
+- ~59/61 patterns in the ComplexFlows test suite (6 batches) flow — constructor-promoted fields, private
   setter/getter, DI-typed request properties (on `vendor/` classes), fluent collection/string pipelines,
   magic `__get`/`__set`/`__toString`/`__invoke`, `ArrayAccess`, generators + `yield from`,
   `array_map`/`merge`/`column`, `parse_str` out-refs, interpolated method calls (incl. heredoc &
   `{$obj->prop}`), by-reference `foreach` write-back, `array_walk` by-ref callback, nullsafe `?->`
   chains, named args & named-key spread, array spread in literals, multi-condition `match`, `??=`,
   `data_get`, string-transform builtins, `extract`-free variable-variable, trait/interface dispatch,
-  closure `use` capture, first-class-callable to a builtin, static-local persistence, local
-  `throw`/`catch`, and controller/attribute/resource route params — with interprocedural tracking across
-  several call layers.
-  The remaining 3 gaps are engine/static-analysis-complexity limits, not data fixes:
+  closure `use` capture, first-class-callable to a builtin, static-local persistence, **local AND
+  interprocedural `throw`/`catch`**, and controller/attribute/resource route params — with
+  interprocedural tracking across several call layers.
+  The remaining 2 gaps are static-analysis-complexity limits, not data fixes:
   - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
     variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
-  - **Interprocedural `throw`/`catch`** (a `throw` inside a *called* function, caught in the caller): the
-    shared engine has no exceptional dataflow; a **local** `try { throw new Exception($x); } catch ($e) {
-    $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not. Root cause (from a
-    dedicated SSA diagnostic): a `catch (E $e)` variable gets **no SSA definition** — its reads are
-    orphans, tainted only by directly painting the read node (how the local case works). A cross-call fix
-    needs SSA-construction changes (give the catch variable a definition whose value is routed from the
-    `try`'s throws) plus the exceptional CFG edge — core-engine surgery shared by every query, with real
-    regression risk on the working local case, so deliberately not attempted. Modelling try/catch as an
-    if/else branch is the right shape but requires exactly those two construction-layer changes.
   - **Template-engine source syntax** (`.blade.php` / `.twig`) — see the Templating section (needs a
     template grammar in the extractor; compiled templates ARE covered).
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
     to the enum's declared constants (an allow-list), so it is not attacker-controlled.
 
   Now covered (previously gaps): by-reference `foreach` write-back, `array_walk` by-reference callback
-  write-back, local `throw`/`catch` message, first-class-callable to a builtin, **static-local
-  persistence across calls** (`static $s; $s = $tainted;` read on a later invocation — a function-scoped
-  jump step, like `$GLOBALS`), and **return-by-reference aliasing** (`function &m(){ return $this->P; }`
-  then `$r = &$o->m(); $r = $tainted;` taints `$o->P` — writing the returned reference writes the
-  property).
+  write-back, first-class-callable to a builtin, **static-local persistence across calls** (a
+  function-scoped jump step, like `$GLOBALS`), **return-by-reference aliasing** (`function &m(){ return
+  $this->P; }` then `$r = &$o->m(); $r = $tainted;` taints `$o->P`), and **`throw`/`catch` — both local
+  and interprocedural** (a `throw` inside a *called* function, caught in the caller, reaches the catch
+  variable). The last was a CFG/SSA consolidation: `catch (E $e)` now gets a real SSA definition (the
+  binding is a CFG node — `CatchVarLeaf`), a `try` whose body calls a throwing function routes to the
+  catch (an exceptional call edge, as Java/Ruby build), and the thrown value is routed to the catch
+  definition — so `try { risky(); } catch ($e) { echo $e->getMessage(); }` (the error-message→XSS
+  vector) is tracked across the call boundary, with the benchmark false-positive count unchanged.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.
