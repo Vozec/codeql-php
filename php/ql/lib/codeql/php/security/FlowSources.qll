@@ -307,6 +307,32 @@ private class RequestPropertySource extends RemoteFlowSource {
 }
 
 /**
+ * The Symfony/Drupal request-bag idiom: `$request->query->get('x')`, `$request->request->all()`,
+ * `$request->cookies->get(...)`, etc. The `query`/`request`/`attributes`/`cookies`/`files` properties of
+ * an HttpFoundation `Request` are `InputBag`/`ParameterBag`s whose accessors return user input. The bag
+ * is reached through an intermediate property whose type does not resolve, so this is matched
+ * structurally: a `get`/`all`/… call on a `<bag>` property of a `Request`-typed receiver.
+ */
+private class SymfonyBagSource extends RemoteFlowSource {
+  SymfonyBagSource() {
+    exists(Php::MemberCallExpression get, Php::MemberAccessExpression bag |
+      get.getObject() = bag and
+      bag.getName().(Php::Name).getValue() =
+        ["query", "request", "attributes", "cookies", "files"] and
+      (
+        TI::exprClass(bag.getObject()).getName() = "Request" or
+        TI::exprTypeName(bag.getObject()) = "Request"
+      ) and
+      get.getName().(Php::Name).getValue() =
+        ["get", "all", "getInt", "getBoolean", "getAlpha", "getAlnum", "getDigits", "getString", "filter"] and
+      this.asExpr() = get
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * A class-scoped sink (`typedSinkModel`): an argument is a sink only when the call's receiver type (for
  * `$obj->m()`) or static scope (for `C::m()`) is the named class — so generic method names like
  * `get`/`query`/`request`/`read` are sinks on the right framework class without mass false positives.
@@ -325,6 +351,14 @@ private class TypedSink extends Sink {
       exists(StaticMethodCall c |
         c.getMethodName() = m and
         c.getTargetName() = cls and
+        (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
+      )
+      or
+      // A `__construct` typed sink also matches `new Class($arg)` — the constructor argument of an
+      // object creation (e.g. `new RedirectResponse($url)`, `new SplFileObject($path)`).
+      m = "__construct" and
+      exists(NewExpr c |
+        c.getClassName() = cls and
         (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
       )
     )

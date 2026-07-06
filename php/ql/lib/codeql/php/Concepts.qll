@@ -38,6 +38,14 @@ abstract class Sink extends DataFlow::Node {
 abstract class Sanitizer extends DataFlow::Node { }
 
 /**
+ * A value sanitized for HTML/XSS output ONLY — it strips tags or HTML-encodes, but does NOT neutralise
+ * SQL, path, command, … contexts (e.g. WordPress `sanitize_text_field`, which drops tags but leaves
+ * quotes intact). It is a barrier for the reflected-XSS query only, so `sanitize_text_field($_GET[..])`
+ * reaching `$wpdb->query(...)` is still reported — the sanitize-then-SQLi class (CVE-2024-1071, …).
+ */
+abstract class XssSanitizer extends DataFlow::Node { }
+
+/**
  * An additional taint-propagation step (through a framework helper, a string/regex function, a
  * custom container, …). Extend this to add new steps.
  */

@@ -17,6 +17,11 @@ extensions:
     data:
       - ["Connection", "query", 0, "SQL injection"]            # $connection->query($sql)
       - ["Connection", "execute", 0, "SQL injection"]
+      # CVE-2023-22727: limit()/offset() concatenated their argument into SQL instead of binding it.
+      - ["Query", "limit", 0, "SQL injection"]
+      - ["Query", "offset", 0, "SQL injection"]
+      - ["SelectQuery", "limit", 0, "SQL injection"]
+      - ["SelectQuery", "offset", 0, "SQL injection"]
 
   # ---- Sanitizers -------------------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }

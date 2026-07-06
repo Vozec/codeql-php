@@ -122,7 +122,6 @@ extensions:
       - ["function", "esc_attr"]
       - ["function", "esc_url"]
       - ["function", "esc_js"]
-      - ["function", "sanitize_text_field"]
       - ["function", "sanitize_email"]
       - ["function", "wp_kses"]
       - ["function", "wp_kses_post"]

@@ -29,6 +29,9 @@ extensions:
       - ["function", "db_queryd", 0, "SQL injection"]
       # Drupal 7 redirect: drupal_goto($path).
       - ["function", "drupal_goto", 0, "open redirect"]
+      # Drupal fetches a remote file with no host validation — SSRF (e.g. SA-CONTRIB-2023-015).
+      - ["function", "system_retrieve_file", 0, "server-side request forgery"]
+      - ["function", "drupal_http_request", 0, "server-side request forgery"]
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
     data:
       # Drupal 8+ DBTNG: `\Drupal::database()->query($sql)` / a Connection::query — raw SQL at arg 0.

@@ -227,10 +227,39 @@ private class DataStep extends AdditionalTaintStep {
   }
 }
 
+/**
+ * Holds if a function named `name` is DEFINED in the analysed source. A name-based sanitizer model is a
+ * promise about EXTERNAL (framework) code; if the codebase ships its own function of that name, the
+ * dataflow engine can and must analyse its real body instead — otherwise a same-named no-op
+ * (`function sanitize_text_field($x){ return $x; }`) would be silently assumed to sanitize, hiding a real
+ * vulnerability (a false negative, the dangerous direction for a sanitizer).
+ */
+bindingset[name]
+private predicate functionDefinedInSource(string name) {
+  exists(Function f | f.getName().toLowerCase() = name.toLowerCase())
+}
+
 private class DataSanitizer extends Sanitizer {
   DataSanitizer() {
     exists(Call c, string sk, string nm |
-      sanitizerModel(sk, nm) and callMatches(c, sk, nm) and this.asExpr() = c
+      sanitizerModel(sk, nm) and
+      callMatches(c, sk, nm) and
+      this.asExpr() = c and
+      not (sk = "function" and functionDefinedInSource(nm))
+    )
+  }
+}
+
+/** A function/method that HTML-escapes / strips tags but does not neutralise SQL/path/command contexts. */
+extensible predicate weakXssSanitizerModel(string subjectKind, string name);
+
+private class DataXssSanitizer extends XssSanitizer {
+  DataXssSanitizer() {
+    exists(Call c, string sk, string nm |
+      weakXssSanitizerModel(sk, nm) and
+      callMatches(c, sk, nm) and
+      this.asExpr() = c and
+      not (sk = "function" and functionDefinedInSource(nm))
     )
   }
 }

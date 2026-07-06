@@ -64,4 +64,7 @@ extensions:
       - ["function", "wp_unslash", "remote"]
       - ["method", "input", "remote"]
       - ["method", "cookie", "remote"]
-      - ["method", "getClientOriginalName", "remote"]
+      - ["method", "getClientOriginalName", "remote"]         # Symfony/Laravel UploadedFile — attacker-set filename
+      - ["method", "getClientOriginalExtension", "remote"]     # (upload-RCE blocklist-bypass class)
+      - ["method", "getClientName", "remote"]                  # CodeIgniter4 UploadedFile
+      - ["method", "getClientFilename", "remote"]              # PSR-7 UploadedFileInterface

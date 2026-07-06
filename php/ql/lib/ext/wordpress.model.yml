@@ -41,8 +41,6 @@ extensions:
       - ["function", "esc_url"]
       - ["function", "esc_js"]
       - ["function", "esc_sql"]
-      - ["function", "sanitize_text_field"]
-      - ["function", "sanitize_textarea_field"]
       - ["function", "sanitize_email"]
       - ["function", "sanitize_key"]
       - ["function", "sanitize_title"]
@@ -53,6 +51,18 @@ extensions:
       - ["function", "esc_textarea"]
       - ["function", "esc_url_raw"]
       - ["function", "absint"]
+  # HTML-only: strips tags but leaves quotes — a barrier for XSS, NOT for SQL/path/command. Modelling
+  # these as full sanitizers would hide the sanitize-then-SQLi class (CVE-2024-1071, CVE-2023-6360).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "sanitize_text_field"]
+      - ["function", "sanitize_textarea_field"]
+  # ...but they still CARRY taint (arg -> return) so a non-XSS sink downstream (SQL, path) is reached.
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "sanitize_text_field", 0, -1]
+      - ["function", "sanitize_textarea_field", 0, -1]
+
   # Type-scoped: `$wpdb->prepare()` sanitizes ONLY on a real wpdb (a custom ->prepare() does not).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:
