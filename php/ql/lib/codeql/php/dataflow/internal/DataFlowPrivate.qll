@@ -589,6 +589,30 @@ predicate jumpStep(Node node1, Node node2) {
     node1.asExpr() = a.getRhs() and
     node2.asExpr() = r
   )
+  or
+  // A `static $s` local persists BETWEEN calls: assigning `$s = X` in one invocation flows to reads of
+  // `$s` in a later one. Modelled as a jump step (SSA-order-blind, like a global), scoped to the single
+  // function that declares the `static` — so it is not cross-linked to unrelated same-named locals.
+  exists(
+    Php::StaticVariableDeclaration sd, string sname, AssignExpr a, VariableAccess w, VariableAccess r,
+    AstNode fn
+  |
+    (
+      fn instanceof Php::FunctionDefinition or
+      fn instanceof Php::MethodDeclaration or
+      fn instanceof Php::AnonymousFunction
+    ) and
+    sd.(Php::AstNode).getParent+() = fn and
+    sname = sd.getName().(Php::VariableName).getChild().getValue() and
+    a.getLhs() = w and
+    w.getName() = sname and
+    w.(Php::AstNode).getParent+() = fn and
+    r.getName() = sname and
+    r.(Php::AstNode).getParent+() = fn and
+    r != w and
+    node1.asExpr() = a.getRhs() and
+    node2.asExpr() = r
+  )
 }
 
 // --- Content steps ------------------------------------------------------------------------------

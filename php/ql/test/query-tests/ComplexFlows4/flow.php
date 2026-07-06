@@ -12,7 +12,7 @@ $fn2 = strtoupper(...); system($fn2($_GET['a']));             // WANT first-clas
 
 // 3. static variable persisting a tainted value across calls
 function acc3($x) { static $s; if ($x) { $s = $x; } return $s; }
-acc3($_GET['a']); system(acc3(null));                         // known-gap static-var-persist
+acc3($_GET['a']); system(acc3(null));                         // WANT static-var-persist
 
 // 4. nullsafe method chain
 class Svc4 { public function data() { return $_GET['a']; } }
