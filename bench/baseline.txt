@@ -1,6 +1,6 @@
-RECALL 182/232 (78%) | FP-on-ok 40/176
+RECALL 183/232 (78%) | FP-on-ok 40/176
   doctrine: 2/4
   lang: 105/137
-  laravel: 18/31
+  laravel: 19/31
   symfony: 15/18
   wordpress-plugins: 42/42

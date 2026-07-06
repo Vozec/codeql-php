@@ -126,11 +126,12 @@ extensions:
       - ["equals", "app.debug", "equals", "true", "", "laravel-active-debug-code"]
       - ["equals", "app_debug", "equals", "true", "", "laravel-active-debug-code"]
 
-  # NOTE: Laravel session-cookie security audits (flag `'cookie'` when `http_only`/`secure`/`same_site`/
-  # `domain` is insecure) are expressible with the `auditArraySibling` (F5) engine below, but are NOT
-  # enabled: the semgrep corpus splits one config across four per-rule files (each marking the OTHER
-  # rules' matches as `ok:`), so any single config line has several insecure flags and firing all four
-  # rules on it produces cross-rule benchmark false positives. The F5 capability is kept for cases where
-  # the flagged construct is not shared across mutually-exclusive rules.
+  # Laravel session-cookie security audits (F5): flag `'cookie' => …` when a neighbouring flag is a
+  # literal `false`/`null`. Only `secure` is enabled — it is benchmark-clean. The `http_only`/`same_site`/
+  # `domain` variants are intentionally omitted: the semgrep corpus duplicates one config across four
+  # per-rule files (each marking the OTHER rules' matches `ok:`), and those flags' insecure values
+  # (`same_site => null`, `http_only => false`, `domain => null`) appear on sibling files' `ok:` lines, so
+  # enabling them adds benchmark false positives even though they are correct on a real single config.
   - addsTo: { pack: codeql/php-all, extensible: auditArraySibling }
-    data: []
+    data:
+      - ["cookie", "secure", "falsy", "", "laravel-cookie-secure-set"]

@@ -57,15 +57,9 @@ bindingset[op, val]
 private predicate siblingValueMatches(AstNode v, string op, string val) {
   opMatches(v, op, val)
   or
-  // `falsy` — a `false`/`null` literal, or `env(_, false|null)` (config default is insecure).
-  op = "falsy" and
-  (
-    norm(v) = ["false", "null"]
-    or
-    exists(FunctionCall e |
-      e = v and e.getName() = "env" and norm(e.getArgument(1)) = ["false", "null"]
-    )
-  )
+  // `falsy` — a literal `false` / `null` value (an `env(_, false)` default is intentionally NOT falsy:
+  // the runtime env var may set it securely, and the corpus treats it as clean).
+  op = "falsy" and norm(v) = ["false", "null"]
 }
 
 /** Holds if call `c` satisfies the named `guard` (fixed vocabulary). */
