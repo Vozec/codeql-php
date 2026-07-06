@@ -2,7 +2,7 @@
 // COMPLEX flows batch 5 — very common real-world patterns. Source $_GET, sink system()/DB.
 
 // 1. extract() imports the superglobal into local variables (classic dangerous pattern)
-extract($_GET); system($id ?? '');                             // known-gap extract (dynamic var creation)
+extract($_GET); system($id ?? '');                             // known-gap extract (dynamic var names)
 
 // 2. compact() then read back
 $name = $_GET['a']; $c2 = compact('name'); system($c2['name']);  // known-gap compact (dynamic var read)
@@ -22,7 +22,7 @@ function useI5(I5 $svc) { system($svc->run($_GET['a'])); }      // WANT interfac
 useI5(new Impl5());
 
 // 6. array_walk with by-ref callback mutating elements
-$a6 = ['x']; array_walk($a6, function (&$v) { $v = $_GET['a']; }); system($a6[0]);  // known-gap array-walk-byref
+$a6 = ['x']; array_walk($a6, function (&$v) { $v = $_GET['a']; }); system($a6[0]);  // WANT array-walk-byref
 
 // 7. preg_replace_callback where the callback returns tainted
 $r7 = preg_replace_callback('/x/', function ($m) { return $_GET['a']; }, 'xx'); system($r7);  // WANT preg-replace-callback
@@ -38,3 +38,6 @@ $e8 = E8::tryFrom($_GET['a']); system($e8->value);             // ok: enum value
 class Wrap10 { public $d; public function get() { return $this->d; } }
 $w10 = new Wrap10(); $w10->d = request('x');
 \DB::statement("SELECT " . $w10->get());                       // WANT deep-chain-db
+
+// 11. LOCAL throw/catch — thrown message flows to the catch variable
+try { throw new \RuntimeException($_GET['a']); } catch (\Exception $e11) { system($e11->getMessage()); }  // WANT local-throw-catch

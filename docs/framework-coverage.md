@@ -78,12 +78,16 @@ and fully covered — pointing the scan at the compiled views is the practical w
   The remaining gaps are engine/static-analysis-complexity limits, not data fixes:
   - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
     variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
-  - **`array_walk` by-reference callback write-back** (`array_walk($a, fn(&$v) => $v = $tainted)`):
-    aliased mutation through a callback (same family as by-ref `foreach`, but via a callback).
+  - **Interprocedural `throw`/`catch`** (a `throw` inside a *called* function, caught in the caller): the
+    shared engine has no exceptional dataflow; a **local** `try { throw new Exception($x); } catch ($e) {
+    $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not.
   - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): mutable cross-call
     state, not a value flow — would need a jump-step/global model (like `$GLOBALS`).
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
     to the enum's declared constants (an allow-list), so it is not attacker-controlled.
+
+  Now covered (previously gaps): by-reference `foreach` write-back, `array_walk` by-reference callback
+  write-back, local `throw`/`catch` message, first-class-callable to a builtin.
   - **Exception message across throw/catch** (`throw new Exception($tainted)` … `catch ($e) {
     $e->getMessage() }`): a *local* exception message flows (`new Exception($x); $e->getMessage()` is
     modelled), but the engine does not track throw→catch exceptional control flow, so the message is lost

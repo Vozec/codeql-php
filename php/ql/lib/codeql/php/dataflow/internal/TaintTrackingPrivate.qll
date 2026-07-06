@@ -624,6 +624,40 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = c
     )
     or
+    // `array_walk($a, function (&$v) { $v = X; })` — the by-reference callback param aliases each array
+    // element, so a tainted write to it taints the collection's later reads (same family as by-ref
+    // `foreach`, via a callback).
+    exists(
+      FunctionCall c, Php::AnonymousFunction cl, Php::SimpleParameter p, string vn, AssignExpr a,
+      VariableAccess arr, VariableAccess later
+    |
+      c.getName() = ["array_walk", "array_walk_recursive"] and
+      cl = c.getArgument(1) and
+      p = cl.getParameters().getChild(0) and
+      exists(p.getReferenceModifier()) and
+      vn = p.getName().getChild().getValue() and
+      a.getLhs().(VariableAccess).getName() = vn and
+      a.(Php::AstNode).getParent+() = cl.getBody() and
+      arr = c.getArgument(0) and
+      later.getName() = arr.(VariableAccess).getName() and
+      not later.(Php::AstNode).getParent*() = cl.getBody() and
+      later != arr and
+      nodeFrom.asExpr() = a.getRhs() and
+      nodeTo.asExpr() = later
+    )
+    or
+    // Local `throw`/`catch`: `try { throw X; } catch (E $e) { … $e … }` — the thrown value flows to the
+    // catch variable (the shared engine models no exceptional dataflow). Local throws only (a throw in a
+    // called function is not linked).
+    exists(Php::TryStatement try, Php::ThrowExpression thr, Php::CatchClause cat, VariableAccess eread |
+      thr.(Php::AstNode).getParent+() = try.getBody() and
+      cat = try.getChild(_) and
+      eread.getName() = cat.getName().(Php::VariableName).getChild().getValue() and
+      eread.(Php::AstNode).getParent+() = cat.getBody() and
+      nodeFrom.asExpr() = thr.getChild() and
+      nodeTo.asExpr() = eread
+    )
+    or
     // `call_user_func[_array]` — the invoked callable's RETURN flows to the call result.
     exists(FunctionCall c, AstNode callee |
       callee = cufCallee(c) and
