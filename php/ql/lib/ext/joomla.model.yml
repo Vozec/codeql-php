@@ -9,6 +9,9 @@ extensions:
     data:
       - ["method", "getRaw", "joomla-request"]                   # UNFILTERED — strongest source
       - ["method", "getHtml", "joomla-request"]                  # HTML allowed
+      # list-ordering / filter state pulled straight from the request (CVE-2025-22207 uses the 'cmd'
+      # filter that still permits SQL metacharacters via `filter_order_Dir`).
+      - ["method", "getUserStateFromRequest", "joomla-request"]
   # Generic get/getVar/getString — scope to the Input class (both legacy JInput and namespaced Input).
   - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
     data:

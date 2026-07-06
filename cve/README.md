@@ -18,7 +18,7 @@ cve/score.py                         # compares SARIF vs. the `// ruleid:` annot
 
 Run: `bash cve/run.sh` — reports DETECTED n/N annotated sinks + any un-annotated findings.
 
-## Status: 19 / 24 annotated sinks detected, 0 false positives
+## Status: 22 / 24 annotated sinks detected, 0 false positives
 
 ### Detected ✅
 
@@ -42,16 +42,16 @@ Run: `bash cve/run.sh` — reports DETECTED n/N annotated sinks + any un-annotat
 | CVE-2024-33266 | PrestaShop (deliveryorderautoupdate) | SQL injection | `Tools::getValue` → `Db::executeS` |
 | CVE-2024-28392 | PrestaShop (pscartabandonmentpro) | SQL injection | `Tools::getValue` → `Db::executeS` |
 | CVE-2023-24814 | TYPO3 core | persisted XSS | `getIndpEnv` → echo |
+| CVE-2023-6360 | WordPress (My Calendar) | SQL injection | `WP_REST_Request::get_params()['from']` → `$wpdb` (weak-XSS sanitizer) |
+| CVE-2025-22207 | Joomla (com_scheduler) | SQL injection | `getUserStateFromRequest` → `$query->order(...)` → `setQuery` (fluent-builder taint) |
+| CVE-2024-13297 | Drupal (Eloqua) | object injection | `$form_state['values'][...]` (D7 array) → `unserialize` |
 
 ### Not yet detected ⚠️ (documented limitations)
 
 | CVE | Framework | Class | Why missed |
 |-----|-----------|-------|------------|
-| CVE-2023-6360 | WordPress (My Calendar) | SQL injection | source is `$request->get_params()['from']` — array element of a WP_REST_Request method result (accessor + subscript not tracked) |
-| CVE-2025-22207 | Joomla (com_scheduler) | SQL injection | fluent taint: `$query->order($dir)` must carry taint into the query object read by `$db->setQuery($query)` |
-| CVE-2024-42485 | Laravel (filament-excel) | path traversal | `request()->route('path')` — taint through the `request()` helper's chained `route()` accessor |
-| CVE-2024-47186 | Laravel (Filament) | stored XSS | source is a persisted model property (`$record->color`), not a request accessor — needs stored-taint modelling |
-| CVE-2024-13297 | Drupal (Eloqua) | object injection | Drupal 7 array-shaped `$form_state['values'][...]` (not the D8 `FormState::getValue()` accessor) |
+| CVE-2024-42485 | Laravel (filament-excel) | path traversal | sink is `Storage::disk('x')->path($p)` — a generic `path()` on a **factory-returned** receiver (`disk()`), whose type the analyzer cannot resolve, so it is not a typed sink. Same factory-receiver gap across frameworks. |
+| CVE-2024-47186 | Laravel (Filament) | stored XSS | source is a **persisted** model property (`$record->color`) written from user input in a *different* request — genuine second-order/stored taint, out of scope for single-flow-from-request analysis. |
 
 ## Detection improvements driven by this corpus
 
@@ -64,3 +64,6 @@ unchanged at 40/176, full test suite green):
 - **CakePHP `Query::limit`/`offset` SQL sinks** (the exact CVE-2023-22727 vector); **Drupal `system_retrieve_file`/`drupal_http_request` SSRF sinks**.
 - **Kind-scoped sanitizers** — `sanitize_text_field`/`sanitize_textarea_field` are now XSS-only barriers that still carry taint to SQL/path sinks, so the sanitize-then-SQLi class (CVE-2024-1071, CVE-2023-6360) is no longer hidden.
 - **Soundness: a name-based sanitizer defers to a same-named function defined in the analyzed code** — a custom no-op `sanitize_text_field` is not blindly trusted; its real body is analyzed (regression test `ShadowedSanitizer`).
+- **Drupal-7 array form state** — a structural source for `$form_state['values'/'input'][...]`; **Joomla `getUserStateFromRequest`** request source.
+- **Fluent query-builder taint** — `$q->where($x)`/`->order($x)`/`->having($x)`/… taints the query object itself (receiver post-update), so a later whole-value read at `$db->setQuery($q)` / `$q->execute()` is a sink. Generalises to Doctrine/CakePHP/Joomla builders; inert unless the query reaches a SQL sink (benchmark FP unchanged).
+- **Laravel `request()->route('x')`** — receiver→return taint step for the route-parameter accessor of a tainted request.

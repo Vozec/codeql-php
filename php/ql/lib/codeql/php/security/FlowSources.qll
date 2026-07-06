@@ -307,6 +307,25 @@ private class RequestPropertySource extends RemoteFlowSource {
 }
 
 /**
+ * Drupal 7's array-shaped form state: `$form_state['values'][...]` / `['input'][...]` hold the
+ * user-submitted form data (the D7 analogue of the D8 `FormStateInterface::getValue()` accessor). Matched
+ * structurally on the well-known `$form_state` variable + `values`/`input` key so the subscripted element
+ * is user input (e.g. CVE-2024-13297: `unserialize($form_state['values']['user_headers'])`).
+ */
+private class DrupalFormStateArraySource extends RemoteFlowSource {
+  DrupalFormStateArraySource() {
+    exists(Php::SubscriptExpression sub |
+      sub.getChild(0).(VariableAccess).getName() = "form_state" and
+      sub.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue() =
+        ["values", "input", "user_input"] and
+      this.asExpr() = sub
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * The Symfony/Drupal request-bag idiom: `$request->query->get('x')`, `$request->request->all()`,
  * `$request->cookies->get(...)`, etc. The `query`/`request`/`attributes`/`cookies`/`files` properties of
  * an HttpFoundation `Request` are `InputBag`/`ParameterBag`s whose accessors return user input. The bag

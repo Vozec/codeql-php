@@ -131,6 +131,9 @@ extensions:
       - ["function", "str", 0, -1]
       - ["function", "data_get", 0, -1]
       - ["function", "value", 0, -1]
+      # `request()->route('x')` — the route parameter of an already-tainted request (receiver -> return);
+      # only fires when the receiver itself carries taint, so it does not taint unrelated `->route()` calls.
+      - ["method", "route", -2, -1]
       # Str::  (fluent string helpers)
       - ["staticmethod", "of", 0, -1]
       - ["staticmethod", "lower", 0, -1]

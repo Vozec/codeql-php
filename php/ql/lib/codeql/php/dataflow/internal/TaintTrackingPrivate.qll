@@ -240,6 +240,19 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeFrom.asExpr() = sub.getChild(0) and nodeTo.asExpr() = sub
     )
     or
+    // Fluent query-builder clause: `$q->where($x)` / `->order($x)` / … taints the query object itself
+    // (its POST-UPDATE), so a later WHOLE-VALUE read of `$q` — `$db->setQuery($q)`, `$q->execute()` —
+    // sees the taint. The builder body is un-extracted framework code, so the generic field-content model
+    // cannot observe the mutation; this models that library summary. It only yields an alert when `$q`
+    // later reaches a SQL sink, so a stray `->order()` on an unrelated object stays inert. (Doctrine
+    // `andWhere`/`orWhere`/`having`/`orderBy`, Joomla/CakePHP `where`/`order`/`group` — CVE-2025-22207.)
+    exists(Php::MemberCallExpression m |
+      m.getName().(Php::Name).getValue() =
+        ["where", "andWhere", "orWhere", "having", "order", "orderBy", "group", "groupBy"] and
+      nodeFrom.asExpr() = m.getArguments().getChild(_).(Php::Argument).getChild() and
+      nodeTo.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject()
+    )
+    or
     // Ternary `c ? a : b`: the BRANCHES propagate to the result, NOT the condition `c` (a tainted
     // condition doesn't taint the chosen value). Elvis `c ?: b` also propagates `c` (it is the value).
     exists(Php::ConditionalExpression ce |
