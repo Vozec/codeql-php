@@ -1,0 +1,64 @@
+# Joomla Models-as-Data (Joomla 3 legacy `J*` classes AND Joomla 4/5 namespaced short names).
+#
+# Data only, no engine change. Note Joomla's filtered input getters (getInt/getUint/getFloat/getBool)
+# neutralise taint → sanitizers; only the unfiltered/HTML-permissive getters (getRaw/getString/getHtml)
+# are true sources.
+extensions:
+  # ---- Sources: unfiltered / HTML-permissive request input --------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "getRaw", "joomla-request"]                   # UNFILTERED — strongest source
+      - ["method", "getHtml", "joomla-request"]                  # HTML allowed
+  # Generic get/getVar/getString — scope to the Input class (both legacy JInput and namespaced Input).
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Input", "get", "joomla-request"]
+      - ["Input", "getVar", "joomla-request"]
+      - ["Input", "getString", "joomla-request"]
+      - ["Input", "getArray", "joomla-request"]
+      - ["JInput", "get", "joomla-request"]
+      - ["JInput", "getVar", "joomla-request"]
+      - ["JInput", "getString", "joomla-request"]
+
+  # ---- Sinks: raw SQL / redirect / SSRF / filesystem --------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # setQuery(sql) is the key SQLi sink (execute() runs whatever was set). Distinctive name.
+      - ["method", "setQuery", 0, "SQL injection"]
+      - ["method", "replacePrefix", 0, "SQL injection"]
+      # Redirect — $app->redirect($url) (distinctive on the application).
+      - ["method", "redirect", 0, "open redirect"]
+
+  # Typed sinks: Http transport + File I/O — generic names (get/read/delete) scoped to their class.
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Http", "get", 0, "server-side request forgery"]
+      - ["Http", "post", 0, "server-side request forgery"]
+      - ["Http", "request", 1, "server-side request forgery"]   # request(method, URL, …)
+      - ["JHttp", "get", 0, "server-side request forgery"]
+      - ["JHttp", "post", 0, "server-side request forgery"]
+      - ["File", "read", 0, "path traversal"]                   # JFile::read / File::read
+      - ["File", "write", 0, "path traversal"]
+      - ["File", "delete", 0, "path traversal"]
+      - ["JFile", "read", 0, "path traversal"]
+      - ["JFile", "delete", 0, "path traversal"]
+      - ["Folder", "delete", 0, "path traversal"]
+      - ["JFolder", "delete", 0, "path traversal"]
+
+  # ---- Sanitizers: filtered getters (numeric = fully safe) + SQL quoting + output filter ---------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "getInt"]                                     # numeric — safe for all vuln classes
+      - ["method", "getUint"]
+      - ["method", "getFloat"]
+      - ["method", "getBool"]
+      - ["method", "cleanText"]                                  # JFilterOutput::cleanText (XSS)
+  # SQL escaping — scope quote/escape/quoteName to the DB driver (generic names).
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["DatabaseDriver", "quote"]
+      - ["DatabaseDriver", "escape"]
+      - ["DatabaseDriver", "quoteName"]
+      - ["JDatabaseDriver", "quote"]
+      - ["JDatabaseDriver", "escape"]
+      - ["JDatabaseDriver", "quoteName"]

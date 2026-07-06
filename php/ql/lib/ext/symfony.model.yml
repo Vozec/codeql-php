@@ -7,6 +7,26 @@ extensions:
       - ["method", "getClientIp", "symfony-request"]
       - ["method", "getPathInfo", "symfony-request"]
       - ["method", "getUri", "symfony-request"]
+      - ["method", "getRequestUri", "symfony-request"]
+      - ["method", "getHost", "symfony-request"]                 # Host header — trust-boundary input
+      - ["method", "getHttpHost", "symfony-request"]
+      - ["method", "getSchemeAndHttpHost", "symfony-request"]
+  # Class-scoped request accessors: `->query->get`, `->request->get`, `->headers->get`, … are `get`/`all`
+  # on Symfony's bag classes — generic names, so scope to the bag class (exact short name, no subtype walk;
+  # list InputBag AND ParameterBag to cover all versions).
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["InputBag", "get", "symfony-request"]
+      - ["InputBag", "all", "symfony-request"]
+      - ["InputBag", "getString", "symfony-request"]
+      - ["InputBag", "getInt", "symfony-request"]
+      - ["ParameterBag", "get", "symfony-request"]
+      - ["ParameterBag", "all", "symfony-request"]
+      - ["HeaderBag", "get", "symfony-request"]
+      - ["HeaderBag", "all", "symfony-request"]
+      - ["ServerBag", "get", "symfony-request"]
+      - ["FileBag", "get", "symfony-request"]
+      - ["Request", "get", "symfony-request"]                    # Request::get merges query+request+attributes
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       # Doctrine DBAL / ORM (framework-specific method names)
@@ -28,6 +48,28 @@ extensions:
       - ["method", "redirect", 0, "open redirect"]
       # Symfony Process — `$process->mustRun()` runs the (possibly tainted) command line.
       - ["method", "mustRun", -1, "command injection"]
+      - ["staticmethod", "fromShellCommandline", 0, "command injection"]  # Process::fromShellCommandline
+      # (`->run()` is deliberately NOT modelled by name — far too generic; `mustRun`/`fromShellCommandline`
+      #  are the distinctive Process entry points, and taint reaching the ctor array is caught there.)
+      # Doctrine DBAL convenience fetchers — all take the raw SQL at arg 0 (distinctive names).
+      - ["method", "fetchAllAssociative", 0, "SQL injection"]
+      - ["method", "fetchAllNumeric", 0, "SQL injection"]
+      - ["method", "fetchAllKeyValue", 0, "SQL injection"]
+      - ["method", "fetchAssociative", 0, "SQL injection"]
+      - ["method", "fetchNumeric", 0, "SQL injection"]
+      - ["method", "fetchFirstColumn", 0, "SQL injection"]
+      - ["method", "iterateAssociative", 0, "SQL injection"]
+      # Symfony Filesystem — distinctive path sinks (dumpFile/appendToFile/mirror).
+      - ["method", "dumpFile", 0, "path traversal"]
+      - ["method", "appendToFile", 0, "path traversal"]
+      - ["method", "mirror", 0, "path traversal"]
+      # RedirectResponse target URL setter (distinctive; __construct is too generic to model).
+      - ["method", "setTargetUrl", 0, "open redirect"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["staticmethod", "escape"]
+      - ["method", "quoteIdentifier"]                          # Doctrine Connection::quoteIdentifier
+  # Doctrine DBAL string/identifier quoting — SQL-escape; scope quote to Connection (generic name).
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["Connection", "quote"]

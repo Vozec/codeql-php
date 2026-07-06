@@ -14,3 +14,5 @@ function ps2($db) { $db->executeS("SELECT * FROM ps WHERE id=" . pSQL(Tools::get
 function t3a($q) { $q->sql_query("SELECT * FROM x WHERE u=" . GeneralUtility::_GP('u')); }         // BUG SQLi (14)
 // PrestaShop redirect (data-modelled open-redirect sink)
 function ps3() { Tools::redirect(Tools::getValue('url')); }                                        // BUG open redirect (16)
+// Route-parameter source: the untyped {id} closure param is user-controlled (routeHandlerModel)
+Route::get('/u/{id}', function ($id) { DB::statement("SELECT * FROM u WHERE id = $id"); });        // BUG SQLi (18)

@@ -42,6 +42,42 @@ extensions:
       - ["Request", "query", "laravel-request"]
       - ["Request", "post", "laravel-request"]
       - ["Request", "all", "laravel-request"]
+      - ["Request", "only", "laravel-request"]
+      - ["Request", "except", "laravel-request"]
+      - ["Request", "integer", "laravel-request"]
+      - ["Request", "float", "laravel-request"]
+      - ["Request", "date", "laravel-request"]
+      - ["Request", "enum", "laravel-request"]
+      - ["Request", "collect", "laravel-request"]
+      - ["Request", "segment", "laravel-request"]
+      - ["Request", "segments", "laravel-request"]
+      - ["Request", "path", "laravel-request"]
+      - ["Request", "url", "laravel-request"]
+      - ["Request", "fullUrl", "laravel-request"]
+      - ["Request", "allFiles", "laravel-request"]
+      - ["Request", "userAgent", "laravel-request"]         # header-derived, attacker-controlled
+      - ["Request", "ip", "laravel-request"]                # X-Forwarded-For, attacker-controlled
+      - ["Request", "server", "laravel-request"]
+
+  # ---- Typed sinks: HTTP client (SSRF) & filesystem (path) — precise, receiver/scope class-scoped ---
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      # Laravel HTTP client — Http::get($url) / $pending->post($url,...). URL is arg 0 (send: arg 1).
+      - ["Http", "get", 0, "server-side request forgery"]
+      - ["Http", "post", 0, "server-side request forgery"]
+      - ["Http", "put", 0, "server-side request forgery"]
+      - ["Http", "patch", 0, "server-side request forgery"]
+      - ["Http", "delete", 0, "server-side request forgery"]
+      - ["Http", "head", 0, "server-side request forgery"]
+      - ["PendingRequest", "get", 0, "server-side request forgery"]
+      - ["PendingRequest", "post", 0, "server-side request forgery"]
+      - ["PendingRequest", "send", 1, "server-side request forgery"]
+      # Storage / filesystem — path is arg 0.
+      - ["Storage", "get", 0, "path traversal"]
+      - ["Storage", "put", 0, "path traversal"]
+      - ["Storage", "download", 0, "path traversal"]
+      - ["Storage", "delete", 0, "path traversal"]
+      - ["Storage", "readStream", 0, "path traversal"]
 
   # ---- Sinks: Eloquent / DB raw SQL --------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }

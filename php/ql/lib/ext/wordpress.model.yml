@@ -57,3 +57,39 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:
       - ["wpdb", "prepare"]
+
+  # REST request object: `$request->get_param(...)` etc. — generic `get_*` names, so class-scoped.
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["WP_REST_Request", "get_param", "wordpress-request"]
+      - ["WP_REST_Request", "get_params", "wordpress-request"]
+      - ["WP_REST_Request", "get_query_params", "wordpress-request"]
+      - ["WP_REST_Request", "get_body_params", "wordpress-request"]
+      - ["WP_REST_Request", "get_json_params", "wordpress-request"]
+      - ["WP_REST_Request", "get_url_params", "wordpress-request"]
+      - ["WP_REST_Request", "get_body", "wordpress-request"]
+      - ["WP_REST_Request", "get_header", "wordpress-request"]
+
+  # More output/SSRF sinks (echo is a language construct; these are the WP echo/fetch wrappers).
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "_e", 0, "reflected XSS"]                  # translate + echo (unescaped)
+      - ["function", "_ex", 0, "reflected XSS"]
+      - ["function", "wp_die", 0, "reflected XSS"]             # $message rendered as HTML
+      - ["function", "fetch_feed", 0, "server-side request forgery"]
+
+  # Steps: WP helpers that carry taint through (essential first hops from the superglobals).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "wp_unslash", 0, -1]
+      - ["function", "stripslashes_deep", 0, -1]
+      - ["function", "map_deep", 0, -1]
+      - ["function", "wp_parse_args", 0, -1]
+      - ["function", "add_query_arg", -1, -1]                   # builds a URL from its args (XSS when echoed)
+      - ["function", "remove_query_arg", -1, -1]
+
+  # Shortcode callbacks: `add_shortcode('tag', fn($atts, $content) => …)` — the untyped $atts/$content
+  # closure params are user-controlled shortcode input (handled by the generic route-handler mechanism).
+  - addsTo: { pack: codeql/php-all, extensible: routeHandlerModel }
+    data:
+      - ["function", "add_shortcode", 1]

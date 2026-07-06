@@ -1,0 +1,81 @@
+# Magento 2 Models-as-Data.
+#
+# Adapting to Magento is data only. Request accessors are sources (generic `get*` names scoped to the
+# request classes via typedSourceModel); raw-SQL/redirect/filesystem/HTTP are sinks; the Escaper family
+# are sanitizers. Class short-names are unqualified (the engine matches the inferred receiver type by
+# short name). No engine change — same shape as the other CMS models.
+extensions:
+  # ---- Sources: request input (distinctive names) -----------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "getParam", "magento-request"]
+      - ["method", "getParams", "magento-request"]
+      - ["method", "getPostValue", "magento-request-body"]
+      - ["method", "getPostParam", "magento-request-body"]
+      - ["method", "getCookie", "magento-request-cookie"]
+      - ["method", "getBodyParams", "magento-request-body"]      # Webapi\Rest\Request
+      - ["method", "getRequestData", "magento-request-body"]
+
+  # Generic names (getQuery/getPost/getServer/getContent/getFiles) — scope to the request classes.
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["RequestInterface", "getParam", "magento-request"]
+      - ["RequestInterface", "getParams", "magento-request"]
+      - ["Http", "getQuery", "magento-request"]
+      - ["Http", "getPost", "magento-request-body"]
+      - ["Http", "getServer", "magento-request-server"]
+      - ["Http", "getContent", "magento-request-body"]
+      - ["Http", "getFiles", "magento-request-file"]
+      - ["Http", "getHeader", "magento-request-header"]
+      - ["Request", "getQuery", "magento-request"]
+      - ["Request", "getPost", "magento-request-body"]
+      - ["Request", "getContent", "magento-request-body"]
+
+  # ---- Sinks: raw SQL / redirect / filesystem / SSRF / deserialization --------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # Raw SQL — distinctive method names (arg 0 = SQL). Generic query/where handled by typedSink below.
+      - ["method", "rawQuery", 0, "SQL injection"]
+      - ["method", "rawFetchRow", 0, "SQL injection"]
+      - ["method", "multiQuery", 0, "SQL injection"]
+      # Redirect — distinctive (setPath/setUrl too generic; redirect target is arg 1).
+      - ["method", "_redirect", 0, "open redirect"]
+      - ["method", "setRedirect", 0, "open redirect"]
+      # Filesystem Driver\File — distinctive path sinks (arg 0).
+      - ["method", "fileGetContents", 0, "path traversal"]
+      - ["method", "filePutContents", 0, "path traversal"]
+      - ["method", "deleteFile", 0, "path traversal"]
+      - ["method", "createDirectory", 0, "path traversal"]
+      - ["method", "readDirectory", 0, "path traversal"]
+      # SSRF — distinctive HTTP-client names (makeRequest($method,$uri): arg 1; setUri: arg 0).
+      - ["method", "makeRequest", 1, "server-side request forgery"]
+      - ["method", "setUri", 0, "server-side request forgery"]
+      # Deserialization — SerializerInterface::unserialize (native/php backends).
+      - ["method", "unserialize", 0, "unsafe deserialization"]
+
+  # Typed sinks: precise class-scoped forms of the generic method names.
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["AdapterInterface", "query", 0, "SQL injection"]        # $connection->query($sql)
+      - ["Mysql", "query", 0, "SQL injection"]
+      - ["Curl", "get", 0, "server-side request forgery"]        # HTTP\Client\Curl::get($url)
+      - ["Curl", "post", 0, "server-side request forgery"]
+
+  # ---- Sanitizers: Escaper (XSS) + SQL quoting --------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "escapeHtml"]
+      - ["method", "escapeHtmlAttr"]
+      - ["method", "escapeUrl"]
+      - ["method", "escapeJs"]
+      - ["method", "escapeJsQuote"]
+      - ["method", "escapeCss"]
+      - ["method", "escapeQuote"]
+  # SQL quoting — scope to the DB adapter (quote/quoteInto are generic names).
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["Mysql", "quote"]
+      - ["Mysql", "quoteInto"]
+      - ["Mysql", "quoteIdentifier"]
+      - ["AdapterInterface", "quote"]
+      - ["AdapterInterface", "quoteInto"]
