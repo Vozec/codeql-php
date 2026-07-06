@@ -69,18 +69,27 @@ and fully covered — pointing the scan at the compiled views is the practical w
   ARE covered). PHP-level output (`echo`/`print`/`<?=`/`printf`) is fully modeled.
 - **Class-property sources** (WordPress `WP::$query_vars`, `WP_Query::$query_vars`): field access, not
   a call, so not expressible as a method row.
-- 37/40 patterns in the ComplexFlows test suite flow — constructor-promoted fields, private
+- Every PHP **syntax** parses and extracts (tree-sitter-php 0.24, `syntaxcoverage` test green) — the
+  limits below are advanced *semantic-flow* cases, not unsupported syntax.
+- ~57/61 patterns in the ComplexFlows test suite (6 batches) flow — constructor-promoted fields, private
   setter/getter, DI-typed request properties (on `vendor/` classes), fluent collection/string pipelines,
-  magic `__get`/`__set`, generators, `array_map`/`merge`/`column`, `parse_str` out-refs, interpolated
-  method calls (incl. heredoc), by-reference `foreach` write-back, nullsafe `?->` chains, named args &
-  named-key spread, multi-condition `match`, `??=`, `data_get`, string-transform builtins, and
-  controller/attribute/resource route params — with interprocedural tracking across several call layers.
-  The remaining gaps are engine/static-analysis-complexity limits, not data fixes:
+  magic `__get`/`__set`/`__toString`/`__invoke`, `ArrayAccess`, generators + `yield from`,
+  `array_map`/`merge`/`column`, `parse_str` out-refs, interpolated method calls (incl. heredoc &
+  `{$obj->prop}`), by-reference `foreach` write-back, `array_walk` by-ref callback, nullsafe `?->`
+  chains, named args & named-key spread, array spread in literals, multi-condition `match`, `??=`,
+  `data_get`, string-transform builtins, `extract`-free variable-variable, trait/interface dispatch,
+  closure `use` capture, first-class-callable to a builtin, static-local persistence, local
+  `throw`/`catch`, and controller/attribute/resource route params — with interprocedural tracking across
+  several call layers.
+  The remaining 4 gaps are engine/static-analysis-complexity limits, not data fixes:
   - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
     variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
   - **Interprocedural `throw`/`catch`** (a `throw` inside a *called* function, caught in the caller): the
     shared engine has no exceptional dataflow; a **local** `try { throw new Exception($x); } catch ($e) {
     $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not.
+  - **Return-by-reference aliasing** (`function &ref(){ return $this->v; }` then `$r = &$o->ref(); $r =
+    $tainted;`): a reference returned across a method boundary that the caller writes through — the
+    reference identity is not tracked across the call.
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
     to the enum's declared constants (an allow-list), so it is not attacker-controlled.
 
@@ -88,10 +97,6 @@ and fully covered — pointing the scan at the compiled views is the practical w
   write-back, local `throw`/`catch` message, first-class-callable to a builtin, and **static-local
   persistence across calls** (`static $s; $s = $tainted;` read on a later invocation — modelled as a
   function-scoped jump step, like `$GLOBALS`).
-  - **Exception message across throw/catch** (`throw new Exception($tainted)` … `catch ($e) {
-    $e->getMessage() }`): a *local* exception message flows (`new Exception($x); $e->getMessage()` is
-    modelled), but the engine does not track throw→catch exceptional control flow, so the message is lost
-    when it crosses a `throw`/`catch` boundary.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.
