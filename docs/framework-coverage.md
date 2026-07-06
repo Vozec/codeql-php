@@ -86,7 +86,13 @@ and fully covered — pointing the scan at the compiled views is the practical w
     variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
   - **Interprocedural `throw`/`catch`** (a `throw` inside a *called* function, caught in the caller): the
     shared engine has no exceptional dataflow; a **local** `try { throw new Exception($x); } catch ($e) {
-    $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not.
+    $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not. Root cause (from a
+    dedicated SSA diagnostic): a `catch (E $e)` variable gets **no SSA definition** — its reads are
+    orphans, tainted only by directly painting the read node (how the local case works). A cross-call fix
+    needs SSA-construction changes (give the catch variable a definition whose value is routed from the
+    `try`'s throws) plus the exceptional CFG edge — core-engine surgery shared by every query, with real
+    regression risk on the working local case, so deliberately not attempted. Modelling try/catch as an
+    if/else branch is the right shape but requires exactly those two construction-layer changes.
   - **Template-engine source syntax** (`.blade.php` / `.twig`) — see the Templating section (needs a
     template grammar in the extractor; compiled templates ARE covered).
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
