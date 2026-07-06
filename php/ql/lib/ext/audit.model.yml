@@ -102,6 +102,10 @@ extensions:
       - ["function", "hash", 0, "equals", "sha1", "weak-crypto"]
       - ["function", "hash_hmac", 0, "equals", "md5", "weak-crypto"]
       - ["function", "hash_hmac", 0, "equals", "sha1", "weak-crypto"]
+      # base_convert() on a hash digest loses precision (large hex hash -> smaller base drops entropy),
+      # weakening a token. Flag when arg 0 is a call to a hash/hex function; a literal / counter / substr
+      # (the `ok` cases) is not a hash call, so it is left clean.
+      - ["function", "base_convert", 0, "callto", "md5|sha1|sha256|sha512|hash|hash_hmac|crc32", "base-convert-loses-precision"]
       # LDAP anonymous bind: no password argument, or an empty/NULL password literal (a variable
       # password is NOT flagged — it may hold a real secret; catching it would FP the `ok` cases).
       - ["function", "ldap_bind", 2, "absent", "", "ldap-bind-without-password"]

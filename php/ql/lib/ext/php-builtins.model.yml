@@ -47,6 +47,9 @@ extensions:
       - ["function", "printf", -1, "reflected XSS"]
       - ["function", "print_r", -1, "reflected XSS"]
       - ["function", "vprintf", -1, "reflected XSS"]
+      # user error message is echoed to the page when display_errors is on
+      - ["function", "trigger_error", 0, "reflected XSS"]
+      - ["function", "user_error", 0, "reflected XSS"]
       # path traversal
       - ["function", "fopen", -1, "path traversal"]
       - ["function", "file_get_contents", -1, "path traversal"]

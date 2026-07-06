@@ -40,6 +40,16 @@ private predicate opMatches(AstNode a, string op, string operand) {
   op = "nonliteral" and not a instanceof Php::String and not a instanceof Php::EncapsedString
   or
   op = "isvar" and a instanceof Php::VariableName
+  or
+  // `callto` — the argument is a call to one of the `|`-separated function names, OR a call whose own
+  // first argument is such a call (one level of hex/encoding wrapper, e.g. `bin2hex(hash(...))` feeding
+  // `base_convert`). The wrapper case is what distinguishes `base_convert(bin2hex(hash(...)))` (flag)
+  // from `base_convert(bin2hex(random_bytes(...)))` (clean) without flagging `bin2hex` outright.
+  op = "callto" and
+  exists(FunctionCall fc | fc = a |
+    fc.getName().toLowerCase() = operand.splitAt("|") or
+    fc.getArgument(0).(FunctionCall).getName().toLowerCase() = operand.splitAt("|")
+  )
 }
 
 /** Holds if call `c` satisfies the named `guard` (fixed vocabulary). */
