@@ -15,9 +15,8 @@ $a2 = array_merge(['safe' => 1], $_GET); system($a2['x']);     // WANT array-mer
 // 3. array_column over tainted rows
 $rows3 = [['n' => $_GET['a']]]; $cols3 = array_column($rows3, 'n'); system($cols3[0]);  // WANT array-column
 
-// 4. reference in foreach mutating into a tainted value — KNOWN GAP (by-ref aliasing write-back is not
-//    modelled; niche pattern). Documented in docs/framework-coverage.md.
-$arr4 = ['a']; foreach ($arr4 as &$v4) { $v4 = $_GET['a']; } system($arr4[0]);  // known-gap foreach-ref
+// 4. reference in foreach mutating into a tainted value (by-ref write-back aliases the collection)
+$arr4 = ['a']; foreach ($arr4 as &$v4) { $v4 = $_GET['a']; } system($arr4[0]);  // WANT foreach-ref
 
 // 5. generator yielding tainted values
 function gen5() { yield $_GET['a']; }

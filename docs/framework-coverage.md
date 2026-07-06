@@ -69,11 +69,11 @@ and fully covered — pointing the scan at the compiled views is the practical w
   ARE covered). PHP-level output (`echo`/`print`/`<?=`/`printf`) is fully modeled.
 - **Class-property sources** (WordPress `WP::$query_vars`, `WP_Query::$query_vars`): field access, not
   a call, so not expressible as a method row.
-- **By-reference `foreach` write-back** (`foreach ($a as &$v) { $v = $tainted; }` taints `$a`): reference
-  aliasing is not modelled (niche pattern). Nearly all other complex flows work — see the ComplexFlows
-  test suite (constructor-promoted fields, private setter/getter, DI-typed request properties, fluent
-  collection/string pipelines, magic `__get`/`__set`, generators, `array_map`/`merge`/`column`,
-  `parse_str` out-refs, interpolated method calls, controller/attribute/resource route params).
+- All 30 patterns in the ComplexFlows test suite now flow — constructor-promoted fields, private
+  setter/getter, DI-typed request properties (on `vendor/` classes), fluent collection/string pipelines,
+  magic `__get`/`__set`, generators, `array_map`/`merge`/`column`, `parse_str` out-refs, interpolated
+  method calls, by-reference `foreach` write-back, `??=`, `data_get`, and controller/attribute/resource
+  route params — with interprocedural tracking across several call layers.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.

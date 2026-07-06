@@ -276,6 +276,21 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       i >= 1 and nodeFrom.asExpr() = f.getChild(0) and nodeTo.asExpr() = foreachBindingVar(f.getChild(i))
     )
     or
+    // By-REFERENCE foreach write-back: `foreach ($a as &$v) { $v = X; }` — assigning the aliased `$v`
+    // mutates the collection element, so `X` taints the collection variable's other reads (and hence its
+    // elements `$a[i]`). Over-approx (recall-first): any same-named read of the collection outside the loop.
+    exists(Php::ForeachStatement f, string vn, AssignExpr a, VariableAccess coll, VariableAccess later |
+      vn = f.getChild(_).(Php::ByRef).getChild().(Php::VariableName).getChild().getValue() and
+      coll = f.getChild(0) and
+      a.getLhs().(VariableAccess).getName() = vn and
+      a.(Php::AstNode).getParent+() = f.getBody() and
+      later.getName() = coll.getName() and
+      not later.(Php::AstNode).getParent+() = f.getBody() and
+      later != coll and
+      nodeFrom.asExpr() = a.getRhs() and
+      nodeTo.asExpr() = later
+    )
+    or
     // List/array destructuring `[$a, $b] = $rhs`: the whole RHS taints every target.
     exists(Php::AssignmentExpression a, Php::ListLiteral l |
       a.getLeft() = l and nodeFrom.asExpr() = a.getRight() and nodeTo.asExpr() = foreachBindingVar(l)
