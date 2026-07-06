@@ -18,7 +18,7 @@ cve/score.py                         # compares SARIF vs. the `// ruleid:` annot
 
 Run: `bash cve/run.sh` — reports DETECTED n/N annotated sinks + any un-annotated findings.
 
-## Status: 22 / 24 annotated sinks detected, 0 false positives
+## Status: 23 / 24 annotated sinks detected, 0 false positives
 
 ### Detected ✅
 
@@ -45,12 +45,12 @@ Run: `bash cve/run.sh` — reports DETECTED n/N annotated sinks + any un-annotat
 | CVE-2023-6360 | WordPress (My Calendar) | SQL injection | `WP_REST_Request::get_params()['from']` → `$wpdb` (weak-XSS sanitizer) |
 | CVE-2025-22207 | Joomla (com_scheduler) | SQL injection | `getUserStateFromRequest` → `$query->order(...)` → `setQuery` (fluent-builder taint) |
 | CVE-2024-13297 | Drupal (Eloqua) | object injection | `$form_state['values'][...]` (D7 array) → `unserialize` |
+| CVE-2024-42485 | Laravel (filament-excel) | path traversal | `request()->route('path')` → `Storage::disk('x')->path($p)` (facade-chain structural sink) |
 
-### Not yet detected ⚠️ (documented limitations)
+### Not yet detected ⚠️ (documented limitation)
 
 | CVE | Framework | Class | Why missed |
 |-----|-----------|-------|------------|
-| CVE-2024-42485 | Laravel (filament-excel) | path traversal | sink is `Storage::disk('x')->path($p)` — a generic `path()` on a **factory-returned** receiver (`disk()`), whose type the analyzer cannot resolve, so it is not a typed sink. Same factory-receiver gap across frameworks. |
 | CVE-2024-47186 | Laravel (Filament) | stored XSS | source is a **persisted** model property (`$record->color`) written from user input in a *different* request — genuine second-order/stored taint, out of scope for single-flow-from-request analysis. |
 
 ## Detection improvements driven by this corpus
@@ -67,3 +67,4 @@ unchanged at 40/176, full test suite green):
 - **Drupal-7 array form state** — a structural source for `$form_state['values'/'input'][...]`; **Joomla `getUserStateFromRequest`** request source.
 - **Fluent query-builder taint** — `$q->where($x)`/`->order($x)`/`->having($x)`/… taints the query object itself (receiver post-update), so a later whole-value read at `$db->setQuery($q)` / `$q->execute()` is a sink. Generalises to Doctrine/CakePHP/Joomla builders; inert unless the query reaches a SQL sink (benchmark FP unchanged).
 - **Laravel `request()->route('x')`** — receiver→return taint step for the route-parameter accessor of a tainted request.
+- **Laravel Storage facade chain** — a structural path-traversal sink for `Storage::disk('x')->{path,get,put,download,delete,readStream,…}($p)`; the `disk()` factory return type is unresolvable, so the sink is matched on the recognisable `Storage::disk(...)` receiver (scoped, no generic `->path()` false positives).

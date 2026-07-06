@@ -243,6 +243,21 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = "validation bypass"
   )
   or
+  // Laravel Storage facade accessed through a disk: `Storage::disk('x')->path($p)` / `->get` / `->put` /
+  // `->download` / `->delete` / `->readStream`. The `disk()` factory returns a `Filesystem` whose type
+  // does not resolve (framework code), so the plain `typedSinkModel` on `Storage` cannot fire; the path
+  // argument is matched structurally on the recognisable `Storage::disk(...)` receiver instead — scoped
+  // to that facade, so no generic `->path()` false positives (CVE-2024-42485).
+  exists(MethodCall c, StaticMethodCall disk |
+    disk = c.getReceiver() and
+    disk.getMethodName() = "disk" and
+    disk.getTargetName() = "Storage" and
+    c.getMethodName() =
+      ["path", "get", "put", "putFile", "putFileAs", "download", "delete", "readStream", "prepend", "append"] and
+    n.asExpr() = c.getArgument(0) and
+    kind = "path traversal"
+  )
+  or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
   // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
   exists(Php::ObjectCreationExpression oc |
