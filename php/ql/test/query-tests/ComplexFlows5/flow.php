@@ -2,10 +2,10 @@
 // COMPLEX flows batch 5 — very common real-world patterns. Source $_GET, sink system()/DB.
 
 // 1. extract() imports the superglobal into local variables (classic dangerous pattern)
-extract($_GET); system($id ?? '');                             // known-gap extract (dynamic var names)
+extract($_GET); system($id ?? '');                             // known-gap extract (SSA over-taint at shared scope — reverted)
 
 // 2. compact() then read back
-$name = $_GET['a']; $c2 = compact('name'); system($c2['name']);  // known-gap compact (dynamic var read)
+$name = $_GET['a']; $c2 = compact('name'); system($c2['name']);  // WANT compact (mirror of extract: string arg = variable name)
 
 // 3. variable-variable
 $k3 = 'v'; $$k3 = $_GET['a']; system($v);                       // WANT variable-variable

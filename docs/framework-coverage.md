@@ -82,8 +82,12 @@ and fully covered — pointing the scan at the compiled views is the practical w
   interprocedural `throw`/`catch`**, and controller/attribute/resource route params — with
   interprocedural tracking across several call layers.
   The remaining 2 gaps are static-analysis-complexity limits, not data fixes:
-  - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
-    variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
+  - **`extract($tainted)`** (creates `$id`, `$name`, … from the array's runtime keys): modelled as an SSA
+    may-write over the scope's variables, it works precisely for a variable *only read* after the extract
+    but over-taints at a broad shared scope (e.g. top-level scripts, where an unrelated later-assigned
+    variable picked up the taint) — so it was reverted pending a tighter scope model. `compact()` (the
+    inverse) IS modelled: `compact('a', …)` reads the variable named by each string argument, so a
+    tainted `$a` reaches the result.
   - **Template-engine source syntax** (`.blade.php` / `.twig`) — see the Templating section (needs a
     template grammar in the extractor; compiled templates ARE covered).
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded

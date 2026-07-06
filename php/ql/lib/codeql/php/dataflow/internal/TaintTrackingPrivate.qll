@@ -414,6 +414,19 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = read
     )
     or
+    // `compact('a', 'b', …)` builds `['a' => $a, 'b' => $b, …]` — it READS the variables named by its
+    // string arguments (each string IS a variable name), so taint on `$a` reaches the compact result. The
+    // variable is not read syntactically (the string names it), so we take the value assigned to it: any
+    // same-scope `$a = X` flows to the compact call. The mirror of `extract`.
+    exists(FunctionCall c, string vname, AssignExpr a |
+      c.getName() = "compact" and
+      vname = resolvedStringOf(c.getAnArgument()) and
+      a.getLhs().(VariableAccess).getName() = vname and
+      sameScope(c, a) and
+      nodeFrom.asExpr() = a.getRhs() and
+      nodeTo.asExpr() = c
+    )
+    or
     // Generator: `function g(){ yield $x; }` — the yielded value reaches `foreach (g() as $v)`.
     exists(Php::YieldExpression y, Php::FunctionDefinition gen, FunctionCall call, Php::ForeachStatement fe, int i |
       y.(Php::AstNode).getParent+() = gen.getBody() and
