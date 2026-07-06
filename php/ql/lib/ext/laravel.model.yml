@@ -58,6 +58,14 @@ extensions:
       - ["Request", "userAgent", "laravel-request"]         # header-derived, attacker-controlled
       - ["Request", "ip", "laravel-request"]                # X-Forwarded-For, attacker-controlled
       - ["Request", "server", "laravel-request"]
+      # validated data is still user-controlled (validation != sanitization)
+      - ["Request", "validate", "laravel-request"]
+      - ["Request", "validated", "laravel-request"]
+      - ["Request", "safe", "laravel-request"]
+      - ["FormRequest", "validated", "laravel-request"]
+      - ["FormRequest", "safe", "laravel-request"]
+      - ["Validator", "validated", "laravel-request"]
+      - ["Validator", "validate", "laravel-request"]
 
   # ---- Typed sinks: HTTP client (SSRF) & filesystem (path) — precise, receiver/scope class-scoped ---
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
@@ -180,8 +188,11 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["function", "e"]                                      # Blade escape
-      - ["method", "validate"]                                # $request->validate()
       - ["staticmethod", "slug"]                             # Str::slug
+      # NOTE: `$request->validate()`/`validated()`/`safe()` are NOT sanitizers — validation checks
+      # format/presence, it does not neutralise injection. The validated data is still user-controlled,
+      # so it is modelled as a SOURCE (below), fixing false negatives on the ubiquitous validate-then-
+      # query pattern.
 
   # ---- Route handlers: closure params are route parameters (user-controlled path segments) --------
   # `Route::get('/u/{id}', function ($id) { … })` — handler at arg 1; `Route::match([...], '/p', fn)` at 2.

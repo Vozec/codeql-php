@@ -14,6 +14,7 @@ private import codeql.php.ast.internal.TreeSitter
 private import codeql.php.DataFlow
 private import codeql.php.Concepts
 private import codeql.php.dataflow.internal.SsaImpl as SsaImpl
+private import codeql.php.dataflow.internal.TypeInference as TI
 
 /** A function/method whose result is a remote source of `sourceType`. */
 extensible predicate sourceModel(string subjectKind, string name, string sourceType);
@@ -152,7 +153,7 @@ private class TypedSanitizer extends Sanitizer {
   TypedSanitizer() {
     exists(MethodCall c, string cls |
       typedSanitizerModel(cls, c.getMethodName()) and
-      receiverClassName(c.getReceiver()) = cls and
+      (receiverClassName(c.getReceiver()) = cls or TI::exprTypeName(c.getReceiver()) = cls) and
       this.asExpr() = c
     )
   }

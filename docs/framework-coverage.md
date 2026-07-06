@@ -86,3 +86,9 @@ Generic method names (`get`/`query`/`request`/`read`/`quote`) are **class-scoped
 / `typedSinkModel` / `typedSanitizerModel` so they only fire on the right framework class. Kind-specific
 sanitizers that would mask other vuln classes (e.g. an XSS-only escaper clearing SQLi) are deliberately
 omitted.
+
+**Typed models resolve against the written type name, not just declared classes.** A receiver's class is
+matched by type *inference* (declared/instantiated classes) OR by the type *annotation* it carries
+(`function store(Request $request)`, `private Request $req`) — so the class-scoped models fire even when
+the framework class lives in an un-extracted `vendor/` (the normal case for real projects). Without this,
+every typed source/sink/sanitizer would silently miss on real framework code.

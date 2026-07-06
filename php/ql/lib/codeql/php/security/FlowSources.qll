@@ -265,7 +265,9 @@ private class TypedRemoteSource extends RemoteFlowSource {
     exists(MethodCall c, string cls, string m |
       typedSourceModel(cls, m, sourceType) and
       c.getMethodName() = m and
-      TI::exprClass(c.getReceiver()).getName() = cls and
+      // resolve the receiver class by inference (declared classes) OR by its written type name (so
+      // framework classes in an un-extracted vendor/ — `function (Request $r)` — still match).
+      (TI::exprClass(c.getReceiver()).getName() = cls or TI::exprTypeName(c.getReceiver()) = cls) and
       this.asExpr() = c
     )
   }
@@ -285,7 +287,7 @@ private class TypedSink extends Sink {
     exists(int i, string cls, string m | typedSinkModel(cls, m, i, kind) |
       exists(MethodCall c |
         c.getMethodName() = m and
-        TI::exprClass(c.getReceiver()).getName() = cls and
+        (TI::exprClass(c.getReceiver()).getName() = cls or TI::exprTypeName(c.getReceiver()) = cls) and
         (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
       )
       or

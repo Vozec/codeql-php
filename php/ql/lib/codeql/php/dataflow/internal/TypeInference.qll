@@ -63,6 +63,65 @@ private AstNode classBodyMember(ClassLike c) {
   result = c.(Php::TraitDeclaration).getBody().getChild(_)
 }
 
+/** Gets the short (last `\`-segment) name written in a type-declaration node `t` — WITHOUT requiring the
+ *  class to be declared/extracted. Lets typed models match framework classes that live in `vendor/`. */
+string typeNodeName(AstNode t) {
+  exists(AstNode nm | nm = t.(Php::NamedType).getChild() |
+    result = nm.(Php::Name).getValue()
+    or
+    result = nm.(Php::QualifiedName).getChild().(Php::Name).getValue()
+  )
+  or
+  result = typeNodeName(t.(Php::OptionalType).getChild())
+}
+
+/** Gets the declared/promoted type NAME (short, annotation-based) of `$this->name`. */
+private string thisPropertyTypeName(Php::MemberAccessExpression ma, string name) {
+  ma.getObject().(VariableAccess).getName() = "this" and
+  name = ma.getName().(Php::Name).getValue() and
+  exists(ClassLike c | c = enclosingClass(ma) |
+    exists(Php::PropertyDeclaration pd, Php::PropertyElement pe |
+      pd = classBodyMember(classOrAncestor(c)) and
+      pe = pd.getChild(_) and
+      pe.getName().getChild().getValue() = name and
+      result = typeNodeName(pd.getType())
+    )
+    or
+    exists(Method ctor, Php::PropertyPromotionParameter pp |
+      ctor = classOrAncestor(c).getADeclaredMethod() and
+      ctor.getName() = "__construct" and
+      pp.(Php::AstNode).getParent+() = ctor.(Php::MethodDeclaration) and
+      pp.getName().(Php::VariableName).getChild().getValue() = name and
+      result = typeNodeName(pp.getType())
+    )
+  )
+}
+
+/**
+ * Gets the short type NAME an expression is annotated with — a type-declared parameter (`function
+ * (Request $r)`), a `$this->prop` property type, `new C()`, or propagated through SSA assignment —
+ * WITHOUT requiring the class to be declared. Complements `exprClass` (which needs a declared class), so
+ * typed source/sink/sanitizer models fire on framework classes that live in an un-extracted `vendor/`.
+ */
+cached
+string exprTypeName(Expr e) {
+  exists(Php::ObjectCreationExpression oc | oc = e |
+    result = oc.getChild(_).(Php::Name).getValue()
+    or
+    result = oc.getChild(_).(Php::QualifiedName).getChild().(Php::Name).getValue()
+  )
+  or
+  exists(VariableAccess w, Php::SimpleParameter p |
+    w = ssaWriteReaching(e) and p.getName() = w and result = typeNodeName(p.getType())
+  )
+  or
+  result = thisPropertyTypeName(e, _)
+  or
+  exists(VariableAccess w, AssignExpr a |
+    w = ssaWriteReaching(e) and a.getLhs() = w and result = exprTypeName(a.getRhs())
+  )
+}
+
 /** Gets the declared class-type of property `name` on class `c` (declared or constructor-promoted). */
 private ClassLike propertyClass(ClassLike c, string name) {
   exists(ClassLike d, Php::PropertyDeclaration pd, Php::PropertyElement pe |
