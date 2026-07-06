@@ -658,6 +658,32 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = eread
     )
     or
+    // Return-by-reference aliasing: `function &m(){ return $this->P; } $r = &$o->m(); $r = X;` — writing
+    // the alias `$r` writes back through the reference to `$o->P`, so taint on `X` reaches reads of
+    // `$o->P`. Bounded to a by-reference method returning a single `$this->` property.
+    exists(
+      Php::ReferenceAssignmentExpression refA, string rn, Php::MemberCallExpression mc, string recvName,
+      Php::MethodDeclaration m, string p, Php::AssignmentExpression w,
+      Php::MemberAccessExpression propRead
+    |
+      rn = refA.getLeft().(Php::VariableName).getChild().(Php::Name).getValue() and
+      mc = refA.getRight() and
+      recvName = mc.getObject().(Php::VariableName).getChild().(Php::Name).getValue() and
+      m.getName().getValue() = mc.getName().(Php::Name).getValue() and
+      m.getChild(_) instanceof Php::ReferenceModifier and
+      exists(Php::ReturnStatement rs, Php::MemberAccessExpression ret |
+        rs.(Php::AstNode).getParent+() = m.getBody() and
+        ret = rs.getChild() and
+        ret.getObject().(Php::VariableName).getChild().(Php::Name).getValue() = "this" and
+        p = ret.getName().(Php::Name).getValue()
+      ) and
+      w.getLeft().(Php::VariableName).getChild().(Php::Name).getValue() = rn and
+      propRead.getObject().(Php::VariableName).getChild().(Php::Name).getValue() = recvName and
+      propRead.getName().(Php::Name).getValue() = p and
+      nodeFrom.asExpr() = w.getRight() and
+      nodeTo.asExpr() = propRead
+    )
+    or
     // `call_user_func[_array]` — the invoked callable's RETURN flows to the call result.
     exists(FunctionCall c, AstNode callee |
       callee = cufCallee(c) and

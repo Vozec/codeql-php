@@ -25,7 +25,7 @@ foreach (g4() as $x4) { system($x4); }                        // WANT yield-from
 
 // 5. reference return then assign
 class R5 { public $v = ''; public function &ref() { return $this->v; } }
-$r5 = new R5(); $ref = &$r5->ref(); $ref = $_GET['a']; system($r5->v);  // known-gap ref-return (return-by-reference aliasing across method boundary)
+$r5 = new R5(); $ref = &$r5->ref(); $ref = $_GET['a']; system($r5->v);  // WANT ref-return
 
 // 6. nested list destructuring
 [[$a6]] = [[$_GET['a']]]; system($a6);                        // WANT nested-list

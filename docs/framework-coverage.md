@@ -81,22 +81,23 @@ and fully covered — pointing the scan at the compiled views is the practical w
   closure `use` capture, first-class-callable to a builtin, static-local persistence, local
   `throw`/`catch`, and controller/attribute/resource route params — with interprocedural tracking across
   several call layers.
-  The remaining 4 gaps are engine/static-analysis-complexity limits, not data fixes:
+  The remaining 3 gaps are engine/static-analysis-complexity limits, not data fixes:
   - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
     variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
   - **Interprocedural `throw`/`catch`** (a `throw` inside a *called* function, caught in the caller): the
     shared engine has no exceptional dataflow; a **local** `try { throw new Exception($x); } catch ($e) {
     $e->getMessage() }` IS tracked, only the throw-across-a-call-boundary case is not.
-  - **Return-by-reference aliasing** (`function &ref(){ return $this->v; }` then `$r = &$o->ref(); $r =
-    $tainted;`): a reference returned across a method boundary that the caller writes through — the
-    reference identity is not tracked across the call.
+  - **Template-engine source syntax** (`.blade.php` / `.twig`) — see the Templating section (needs a
+    template grammar in the extractor; compiled templates ARE covered).
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
     to the enum's declared constants (an allow-list), so it is not attacker-controlled.
 
   Now covered (previously gaps): by-reference `foreach` write-back, `array_walk` by-reference callback
-  write-back, local `throw`/`catch` message, first-class-callable to a builtin, and **static-local
-  persistence across calls** (`static $s; $s = $tainted;` read on a later invocation — modelled as a
-  function-scoped jump step, like `$GLOBALS`).
+  write-back, local `throw`/`catch` message, first-class-callable to a builtin, **static-local
+  persistence across calls** (`static $s; $s = $tainted;` read on a later invocation — a function-scoped
+  jump step, like `$GLOBALS`), and **return-by-reference aliasing** (`function &m(){ return $this->P; }`
+  then `$r = &$o->m(); $r = $tainted;` taints `$o->P` — writing the returned reference writes the
+  property).
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.
