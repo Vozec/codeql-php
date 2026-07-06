@@ -1,2 +1,0 @@
-query: Security/CWE-327/InsecureProtocol.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

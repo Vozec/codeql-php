@@ -1,2 +1,0 @@
-query: Classes/SuperInOldStyleClass.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-312/AllowBackupAttributeEnabled.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

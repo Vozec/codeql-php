@@ -1,2 +1,0 @@
-query: Language Abuse/UselessUpcast.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

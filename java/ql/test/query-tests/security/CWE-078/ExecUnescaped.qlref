@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-078/ExecUnescaped.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

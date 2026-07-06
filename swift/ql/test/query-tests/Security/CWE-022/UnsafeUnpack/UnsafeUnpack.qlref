@@ -1,2 +1,0 @@
-query: experimental/Security/CWE-022/UnsafeUnpack.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

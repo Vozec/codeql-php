@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-200/SpringBootActuatorsConfig/SpringBootActuatorsConfig.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

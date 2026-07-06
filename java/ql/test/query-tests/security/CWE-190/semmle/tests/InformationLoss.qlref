@@ -1,2 +1,0 @@
-query: Likely Bugs/Arithmetic/InformationLoss.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

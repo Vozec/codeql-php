@@ -1,2 +1,0 @@
-query: Likely Bugs/Arithmetic/LShiftLargerThanTypeWidth.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

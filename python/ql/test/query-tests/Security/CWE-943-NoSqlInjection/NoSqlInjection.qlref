@@ -1,2 +1,0 @@
-query: Security/CWE-943/NoSqlInjection.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

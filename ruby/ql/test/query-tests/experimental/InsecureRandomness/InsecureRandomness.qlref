@@ -1,2 +1,0 @@
-query: experimental/insecure-randomness/InsecureRandomness.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

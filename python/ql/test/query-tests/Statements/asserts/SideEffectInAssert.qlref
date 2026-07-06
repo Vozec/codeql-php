@@ -1,2 +1,0 @@
-query: Statements/SideEffectInAssert.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

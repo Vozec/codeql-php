@@ -1,2 +1,0 @@
-query: Likely Bugs/Serialization/NonSerializableField.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

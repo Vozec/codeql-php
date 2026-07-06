@@ -1,2 +1,0 @@
-query: Classes/SlotsInOldStyleClass.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

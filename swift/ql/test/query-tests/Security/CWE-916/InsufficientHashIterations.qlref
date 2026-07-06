@@ -1,2 +1,0 @@
-query: queries/Security/CWE-916/InsufficientHashIterations.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

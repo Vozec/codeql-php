@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-190/ComparisonWithWiderType.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

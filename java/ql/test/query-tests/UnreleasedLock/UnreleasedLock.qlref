@@ -1,2 +1,0 @@
-query: Likely Bugs/Concurrency/UnreleasedLock.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

@@ -1,2 +1,0 @@
-query: Likely Bugs/Concurrency/ThreadSafe.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

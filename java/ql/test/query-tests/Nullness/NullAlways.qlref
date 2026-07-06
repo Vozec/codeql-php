@@ -1,2 +1,0 @@
-query: Likely Bugs/Nullness/NullAlways.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

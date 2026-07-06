@@ -1,4 +1,0 @@
-import python
-import utils.test.dataflow.DataflowQueryTest
-import experimental.semmle.python.security.RemoteCommandExecution
-import FromTaintTrackingConfig<RemoteCommandExecutionConfig>

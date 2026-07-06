@@ -1,2 +1,0 @@
-query: Likely Bugs/Comparison/StringComparison.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

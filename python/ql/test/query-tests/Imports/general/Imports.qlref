@@ -1,2 +1,0 @@
-query: Imports/Imports.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

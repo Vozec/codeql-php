@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-078/ExecRelative.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

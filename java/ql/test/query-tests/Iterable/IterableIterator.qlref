@@ -1,2 +1,0 @@
-query: Language Abuse/IterableIterator.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

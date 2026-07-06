@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-704/WcharCharConversion.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

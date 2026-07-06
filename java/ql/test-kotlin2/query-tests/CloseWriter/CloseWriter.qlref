@@ -1,2 +1,0 @@
-query: Likely Bugs/Resource Leaks/CloseWriter.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

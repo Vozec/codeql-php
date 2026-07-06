@@ -1,2 +1,0 @@
-query: viableCallable.ql
-postprocess: utils/test/ExternalLocationPostProcessing.ql

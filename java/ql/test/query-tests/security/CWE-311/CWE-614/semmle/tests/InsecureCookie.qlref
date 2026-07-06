@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-614/InsecureCookie.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-833/LockOrderInconsistency.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

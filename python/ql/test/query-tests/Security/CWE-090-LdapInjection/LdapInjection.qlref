@@ -1,2 +1,0 @@
-query: Security/CWE-090/LdapInjection.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

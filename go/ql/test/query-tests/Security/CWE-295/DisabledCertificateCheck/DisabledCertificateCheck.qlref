@@ -1,2 +1,0 @@
-query: Security/CWE-295/DisabledCertificateCheck.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

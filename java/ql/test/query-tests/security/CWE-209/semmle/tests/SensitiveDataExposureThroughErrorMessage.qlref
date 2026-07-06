@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-209/SensitiveDataExposureThroughErrorMessage.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

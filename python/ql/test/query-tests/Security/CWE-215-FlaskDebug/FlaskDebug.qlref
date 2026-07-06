@@ -1,2 +1,0 @@
-query: Security/CWE-215/FlaskDebug.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

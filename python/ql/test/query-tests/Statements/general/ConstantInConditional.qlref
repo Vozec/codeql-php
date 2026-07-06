@@ -1,2 +1,0 @@
-query: Statements/ConstantInConditional.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

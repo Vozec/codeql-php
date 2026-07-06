@@ -1,2 +1,0 @@
-query: experimental/Security/CWE-327/Azure/UnsafeUsageOfClientSideEncryptionVersion.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

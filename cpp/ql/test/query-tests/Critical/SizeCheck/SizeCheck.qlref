@@ -1,2 +1,0 @@
-query: Critical/SizeCheck.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

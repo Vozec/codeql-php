@@ -1,2 +1,0 @@
-query: Architecture/Dependencies/MutualDependency.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

@@ -1,2 +1,0 @@
-query: Exceptions/EmptyExcept.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

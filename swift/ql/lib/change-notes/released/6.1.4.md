@@ -1,3 +1,0 @@
-## 6.1.4
-
-No user-facing changes.

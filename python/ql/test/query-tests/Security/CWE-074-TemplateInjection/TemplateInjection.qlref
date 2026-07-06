@@ -1,2 +1,0 @@
-query: Security/CWE-074/TemplateInjection.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

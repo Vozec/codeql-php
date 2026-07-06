@@ -1,2 +1,0 @@
-query: Likely Bugs/Comparison/MissingInstanceofInEquals.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

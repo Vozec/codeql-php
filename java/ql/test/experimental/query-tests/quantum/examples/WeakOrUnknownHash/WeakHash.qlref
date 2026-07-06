@@ -1,4 +1,0 @@
-query: experimental/quantum/Examples/WeakHash.ql
-postprocess:
-  - utils/test/PrettyPrintModels.ql
-  - utils/test/InlineExpectationsTestQuery.ql

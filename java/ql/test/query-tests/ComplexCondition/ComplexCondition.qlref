@@ -1,2 +1,0 @@
-query: Complexity/ComplexCondition.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

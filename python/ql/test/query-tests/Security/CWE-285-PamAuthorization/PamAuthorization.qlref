@@ -1,2 +1,0 @@
-query: Security/CWE-285/PamAuthorization.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

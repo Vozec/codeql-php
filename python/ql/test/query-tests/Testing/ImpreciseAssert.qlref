@@ -1,2 +1,0 @@
-query: Testing/ImpreciseAssert.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

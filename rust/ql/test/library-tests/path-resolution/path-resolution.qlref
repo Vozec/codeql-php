@@ -1,2 +1,0 @@
-query: path-resolution.ql
-postprocess: utils/test/ExternalLocationPostProcessing.ql

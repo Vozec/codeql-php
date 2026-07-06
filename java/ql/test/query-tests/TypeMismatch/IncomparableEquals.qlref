@@ -1,2 +1,0 @@
-query: Likely Bugs/Comparison/IncomparableEquals.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

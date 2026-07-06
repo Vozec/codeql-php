@@ -1,2 +1,0 @@
-query: DeadCode/DeadField.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

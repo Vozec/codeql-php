@@ -1,2 +1,0 @@
-query: Classes/UselessClass.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

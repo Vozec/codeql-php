@@ -1,2 +1,0 @@
-query: experimental/ldap-improper-auth/ImproperLdapAuth.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

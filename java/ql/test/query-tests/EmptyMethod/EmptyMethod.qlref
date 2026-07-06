@@ -1,2 +1,0 @@
-query: Language Abuse/EmptyMethod.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

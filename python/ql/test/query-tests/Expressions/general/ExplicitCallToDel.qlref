@@ -1,2 +1,0 @@
-query: Expressions/ExplicitCallToDel.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

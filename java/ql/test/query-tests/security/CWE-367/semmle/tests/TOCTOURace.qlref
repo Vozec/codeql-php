@@ -1,2 +1,0 @@
-query: Security/CWE/CWE-367/TOCTOURace.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

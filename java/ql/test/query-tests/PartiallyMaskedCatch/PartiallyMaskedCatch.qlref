@@ -1,2 +1,0 @@
-query: Likely Bugs/Statements/PartiallyMaskedCatch.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

@@ -1,3 +1,0 @@
-multiplePathResolutions
-| test.rs:10:28:10:65 | Result::<...> |
-| test.rs:97:40:97:49 | Result::<...> |

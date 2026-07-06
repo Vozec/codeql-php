@@ -1,2 +1,0 @@
-query: Functions/DeprecatedSliceMethod.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

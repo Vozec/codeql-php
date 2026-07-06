@@ -1,2 +1,0 @@
-query: Statements/UnusedExceptionObject.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

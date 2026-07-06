@@ -1,4 +1,0 @@
-variableIsCaptured
-| app.rb:126:9:130:11 | self | CapturedVariable is not captured |
-consistencyOverview
-| CapturedVariable is not captured | 1 |

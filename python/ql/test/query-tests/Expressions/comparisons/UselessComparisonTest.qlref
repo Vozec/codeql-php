@@ -1,2 +1,0 @@
-query: Expressions/Comparisons/UselessComparisonTest.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

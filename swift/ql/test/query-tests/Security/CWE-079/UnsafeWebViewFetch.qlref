@@ -1,2 +1,0 @@
-query: queries/Security/CWE-079/UnsafeWebViewFetch.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

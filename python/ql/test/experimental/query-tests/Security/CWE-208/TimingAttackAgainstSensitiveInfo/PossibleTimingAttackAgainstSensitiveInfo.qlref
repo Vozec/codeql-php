@@ -1,2 +1,0 @@
-query: experimental/Security/CWE-208/TimingAttackAgainstSensitiveInfo/PossibleTimingAttackAgainstSensitiveInfo.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

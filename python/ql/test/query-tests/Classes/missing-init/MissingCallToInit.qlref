@@ -1,2 +1,0 @@
-query: Classes/CallsToInitDel/MissingCallToInit.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

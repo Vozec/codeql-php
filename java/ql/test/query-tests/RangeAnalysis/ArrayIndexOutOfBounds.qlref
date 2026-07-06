@@ -1,2 +1,0 @@
-query: Likely Bugs/Collections/ArrayIndexOutOfBounds.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

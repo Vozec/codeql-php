@@ -1,2 +1,0 @@
-query: queries/Security/CWE-760/ConstantSalt.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

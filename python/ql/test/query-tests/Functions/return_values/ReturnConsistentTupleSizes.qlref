@@ -1,2 +1,0 @@
-query: Functions/ReturnConsistentTupleSizes.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

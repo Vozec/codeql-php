@@ -1,2 +1,0 @@
-query: experimental/CWE-840/ConditionalBypass.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

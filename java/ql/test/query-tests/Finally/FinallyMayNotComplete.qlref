@@ -1,2 +1,0 @@
-query: Violations of Best Practice/legacy/FinallyMayNotComplete.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql

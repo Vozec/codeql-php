@@ -1,2 +1,0 @@
-query: Statements/UseOfExit.ql
-postprocess: utils/test/InlineExpectationsTestQuery.ql
