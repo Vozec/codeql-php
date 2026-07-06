@@ -52,6 +52,22 @@ private predicate opMatches(AstNode a, string op, string operand) {
   )
 }
 
+/** Holds if a sibling value node `v` satisfies `op val` — adds a `falsy` op over `opMatches`. */
+bindingset[op, val]
+private predicate siblingValueMatches(AstNode v, string op, string val) {
+  opMatches(v, op, val)
+  or
+  // `falsy` — a `false`/`null` literal, or `env(_, false|null)` (config default is insecure).
+  op = "falsy" and
+  (
+    norm(v) = ["false", "null"]
+    or
+    exists(FunctionCall e |
+      e = v and e.getName() = "env" and norm(e.getArgument(1)) = ["false", "null"]
+    )
+  )
+}
+
 /** Holds if call `c` satisfies the named `guard` (fixed vocabulary). */
 private predicate guardHolds(Expr c, string guard) {
   guard = ""
@@ -110,6 +126,22 @@ predicate auditFinding(AstNode n, string ruleId) {
     opMatches(el.getChild(1), vOp, vPat) and
     contextHolds(el, ctx) and
     n = el
+  )
+  or
+  // F5 — flag the `flagKey => *` element when a SIBLING `sibKey => *` in the same array satisfies the
+  // value op. For config audits keyed on a neighbouring flag (e.g. flag `'cookie'` when `'http_only'`
+  // is false). Only fires when the sibling is present and matching (no absent branch — that would flag
+  // every array with the key).
+  exists(
+    Php::ArrayElementInitializer flagEl, Php::ArrayElementInitializer sibEl, string fKey, string sKey,
+    string sOp, string sVal
+  |
+    auditArraySibling(fKey, sKey, sOp, sVal, ruleId) and
+    opMatches(flagEl.getChild(0), "equals", fKey) and
+    sibEl.getParent() = flagEl.getParent() and
+    opMatches(sibEl.getChild(0), "equals", sKey) and
+    siblingValueMatches(sibEl.getChild(1), sOp, sVal) and
+    n = flagEl
   )
   or
   // ---- Structural exceptions: shapes with a receiver+multi-arg conjunction that the flat F1/F2/F3

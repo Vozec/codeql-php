@@ -125,3 +125,12 @@ extensions:
       - ["equals", "csrf_protection", "isvar", "", "framework-ext", "symfony-csrf-protection-disabled"]
       - ["equals", "app.debug", "equals", "true", "", "laravel-active-debug-code"]
       - ["equals", "app_debug", "equals", "true", "", "laravel-active-debug-code"]
+
+  # NOTE: Laravel session-cookie security audits (flag `'cookie'` when `http_only`/`secure`/`same_site`/
+  # `domain` is insecure) are expressible with the `auditArraySibling` (F5) engine below, but are NOT
+  # enabled: the semgrep corpus splits one config across four per-rule files (each marking the OTHER
+  # rules' matches as `ok:`), so any single config line has several insecure flags and firing all four
+  # rules on it produces cross-rule benchmark false positives. The F5 capability is kept for cases where
+  # the flagged construct is not shared across mutually-exclusive rules.
+  - addsTo: { pack: codeql/php-all, extensible: auditArraySibling }
+    data: []

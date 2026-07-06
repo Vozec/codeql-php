@@ -128,6 +128,16 @@ extensible predicate auditArrayKV(
   string keyOp, string keyPat, string valOp, string valPat, string context, string ruleId
 );
 
+/**
+ * F5 — flags the `flagKey => *` element of an array when a SIBLING `sibKey => *` in the same array
+ * satisfies `sibValOp sibVal`, OR the sibling key is absent. `sibValOp` adds a `falsy` value op (a `false`
+ * / `null` literal, or `env(_, false|null)`). For config-security audits that flag one key based on a
+ * neighbouring flag — e.g. flag a session `'cookie'` when its `'http_only'` is false or missing.
+ */
+extensible predicate auditArraySibling(
+  string flagKey, string sibKey, string sibValOp, string sibVal, string ruleId
+);
+
 /** Gets the class name of the receiver `recv`, resolved via `new C()` (SSA) or a known global. */
 private string receiverClassName(VariableAccess recv) {
   // `$o = new C(); ... $o->m()`
