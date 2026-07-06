@@ -19,6 +19,13 @@ private ClassLike typeNodeClass(AstNode t) {
   result = typeNodeClass(t.(Php::OptionalType).getChild())
 }
 
+/**
+ * Holds if parameter `p` is declared with a CLASS type (so it is a dependency-injected service or a
+ * model-bound object, NOT a scalar route parameter). Untyped params and scalar-typed params
+ * (`int`/`string`/…, which don't resolve to a class) do not hold — those are the route-parameter shape.
+ */
+predicate hasClassParameterType(Php::SimpleParameter p) { exists(typeNodeClass(p.getType())) }
+
 /** Gets the class whose method body (transitively) encloses `n` — the type of `$this` inside it. */
 private ClassLike enclosingClass(AstNode n) {
   exists(Method m |

@@ -288,8 +288,9 @@ private class TypedSink extends Sink {
   override string getKind() { result = kind }
 }
 
-/** Gets the handler callable at the modelled argument of a router call (`routeHandlerModel`). */
-private AstNode routeHandler() {
+/** Gets the handler-argument expression of a router call (`routeHandlerModel`): a closure, an array
+ *  callable `[Controller::class, 'm']` / `[$obj, 'm']`, or a string `'Controller@m'`. */
+private AstNode routeHandlerArg() {
   exists(Call route, string sk, string nm, int hi | routeHandlerModel(sk, nm, hi) |
     sk = "staticmethod" and route.(StaticMethodCall).getMethodName() = nm and result = route.getArgument(hi)
     or
@@ -299,34 +300,80 @@ private AstNode routeHandler() {
   )
 }
 
-/** Gets an untyped scalar parameter of a route-handler closure/arrow (typed params are DI services). */
-private Php::SimpleParameter routeHandlerParam(AstNode handler) {
-  (
-    result = handler.(Php::AnonymousFunction).getParameters().getChild(_) or
-    result = handler.(Php::ArrowFunction).getParameters().getChild(_)
-  ) and
-  not exists(result.getType())
+/**
+ * Gets the callable a router dispatches to: the closure/arrow itself, OR — for a CONTROLLER handler —
+ * the resolved method of an array callable `[Controller::class, 'show']` / `[$obj, 'show']` or a string
+ * `'Controller@show'`. Modelling the controller method is what makes real-world routes work: the bug is
+ * usually several calls deep inside the action, not in a closure attached to the router.
+ */
+private AstNode routeCallable() {
+  exists(AstNode h | h = routeHandlerArg() |
+    (h instanceof Php::AnonymousFunction or h instanceof Php::ArrowFunction) and result = h
+    or
+    // `[$obj, 'm']` / `['C', 'm']` — resolved by the shared array-callable resolver.
+    result = TI::arrayCallableMethod(h)
+    or
+    // `[Controller::class, 'm']` — the `::class` form: resolve the method by class + name.
+    exists(Php::ArrayCreationExpression arr, ClassLike c, string m |
+      arr = h and
+      c.getName() =
+        arr.getChild(0)
+            .(Php::ArrayElementInitializer)
+            .getChild(0)
+            .(Php::ClassConstantAccessExpression)
+            .getChild(0)
+            .(Php::Name)
+            .getValue() and
+      m = arr.getChild(1).(Php::ArrayElementInitializer).getChild(0).(StringLiteral).getValue() and
+      result = c.getAMethod() and
+      result.(Method).getName() = m
+    )
+    or
+    // `'Controller@method'` string handler.
+    exists(ClassLike c, string s, string m |
+      s = h.(StringLiteral).getValue() and
+      s.matches("%@%") and
+      c.getName() = s.splitAt("@", 0) and
+      m = s.splitAt("@", 1) and
+      result = c.getAMethod() and
+      result.(Method).getName() = m
+    )
+  )
 }
 
-/** Gets the body of a route-handler closure/arrow. */
-private AstNode routeHandlerBody(AstNode handler) {
-  result = handler.(Php::AnonymousFunction).getBody() or
-  result = handler.(Php::ArrowFunction).getBody()
+/** Gets a route-parameter parameter (untyped or scalar-typed, i.e. NOT a DI/model class) of a route
+ *  callable — a closure/arrow or a resolved controller method. */
+private Php::SimpleParameter routeCallableParam(AstNode callable) {
+  (
+    result = callable.(Php::AnonymousFunction).getParameters().getChild(_) or
+    result = callable.(Php::ArrowFunction).getParameters().getChild(_) or
+    result = callable.(Php::MethodDeclaration).getParameters().getChild(_)
+  ) and
+  not TI::hasClassParameterType(result)
+}
+
+/** Gets the body of a route callable (closure/arrow/controller method). */
+private AstNode routeCallableBody(AstNode callable) {
+  result = callable.(Php::AnonymousFunction).getBody() or
+  result = callable.(Php::ArrowFunction).getBody() or
+  result = callable.(Php::MethodDeclaration).getBody()
 }
 
 /**
- * A route parameter: an untyped scalar parameter of a framework route handler is bound to a path
- * segment (`/user/{id}` → `function ($id) {…}`), i.e. attacker-controlled. A read of it inside the
- * handler body is a source. Data-driven: the routers themselves are `routeHandlerModel` rows, so a new
- * framework's routing needs no change here — only data.
+ * A route parameter: a scalar parameter of a framework route handler is bound to a path segment
+ * (`/user/{id}` → `show($id)`), i.e. attacker-controlled. A read of it inside the handler/action body is
+ * a source, and the interprocedural engine carries it through however many calls the action makes.
+ * Handles both closure handlers AND controller-method handlers (`[Controller::class, 'm']` /
+ * `'Controller@m'`). Data-driven: the routers are `routeHandlerModel` rows — a new framework needs only
+ * data.
  */
 private class RouteParamSource extends RemoteFlowSource {
   RouteParamSource() {
-    exists(AstNode handler, Php::SimpleParameter p, VariableAccess read |
-      handler = routeHandler() and
-      p = routeHandlerParam(handler) and
+    exists(AstNode callable, Php::SimpleParameter p, VariableAccess read |
+      callable = routeCallable() and
+      p = routeCallableParam(callable) and
       read.getName() = p.getName().getChild().getValue() and
-      read.(Php::AstNode).getParent+() = routeHandlerBody(handler) and
+      read.(Php::AstNode).getParent+() = routeCallableBody(callable) and
       this.asExpr() = read
     )
   }

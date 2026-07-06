@@ -24,14 +24,21 @@ adapting a new framework is a data file, never an engine change. See
 ## Route → source support
 
 An HTTP handler's user-controlled parameters become taint sources via the generic
-`routeHandlerModel(subjectKind, name, handlerArgIndex)` mechanism: the untyped scalar parameters of a
-closure passed to a registered router are marked as `route parameter` sources.
+`routeHandlerModel(subjectKind, name, handlerArgIndex)` mechanism, then the **interprocedural** engine
+carries the taint through however many function/method calls the handler makes before reaching a sink
+(the real-world case — the bug is usually several calls deep, not in the handler itself). A parameter is
+a route source when it is untyped or **scalar-typed** (`int $id`, `string $slug`); parameters typed as a
+class (a DI service or model-bound object) are excluded.
 
-- ✅ **Closure-based routers** (Laravel `Route::get('/u/{id}', fn($id) => …)`, WordPress
-  `add_shortcode('t', fn($atts) => …)`): fully supported by data rows.
-- ❌ **Attribute/annotation routing** (Symfony `#[Route]` on a controller action): the route
-  placeholders bind to *method parameters* with no call site, so they cannot be a data row — this
-  needs a dedicated structural QL source (not yet implemented). **Known gap.**
+- ✅ **Closure handlers** — `Route::get('/u/{id}', fn($id) => …)`, `add_shortcode('t', fn($atts) => …)`.
+- ✅ **Controller handlers** — `Route::get('/u/{id}', [UserController::class, 'show'])`,
+  `Route::delete('/u/{id}', 'UserController@destroy')`: the resolved action method's scalar parameters
+  become sources, tracked interprocedurally into the action's call graph.
+- ⚠️ **`Route::resource(...)` / `apiResource(...)`** — maps to conventional controller methods
+  (`index`/`show`/`update`/…) by naming convention; those method params are not yet resolved (partial).
+- ❌ **Attribute/annotation routing** (Symfony `#[Route]` on a controller action): the placeholders bind
+  to method parameters with no call site (no `routeHandlerModel` shape), so this needs a dedicated
+  attribute-driven QL source. **Known gap.**
 - **n/a — declarative routing** (Magento `routes.xml`, Joomla `task=`, TYPO3): there is no per-route
   callable; user input enters through the request object (`getParam`/`Input::get`) which *is* modeled
   as a source, so no route mechanism is needed.
