@@ -30,12 +30,17 @@ extensions:
       - ["function", "mcrypt_generic", "", "mcrypt-use"]
       - ["function", "mdecrypt_generic", "", "mcrypt-use"]
       - ["function", "mcrypt_module_open", "", "mcrypt-use"]
+      - ["function", "mcrypt_ecb", "", "mcrypt-use"]
+      - ["function", "mcrypt_cbc", "", "mcrypt-use"]
+      - ["function", "mcrypt_cfb", "", "mcrypt-use"]
+      - ["function", "mcrypt_ofb", "", "mcrypt-use"]
       # weak hashing (NOT as a comparison operand — that is the type-juggling query's domain)
       - ["function", "md5", "not-comparison", "weak-crypto"]
       - ["function", "sha1", "not-comparison", "weak-crypto"]
       - ["function", "md5_file", "not-comparison", "weak-crypto"]
       - ["function", "sha1_file", "not-comparison", "weak-crypto"]
       - ["function", "crypt", "not-comparison", "weak-crypto"]
+      - ["function", "str_rot13", "", "weak-crypto"]
       # WordPress audit families
       - ["function", "assert", "", "wp-code-execution-audit"]
       - ["function", "eval", "", "wp-code-execution-audit"]
@@ -92,8 +97,16 @@ extensions:
       # weak 224-bit SHA family (algo string contains "224")
       - ["function", "hash", 0, "contains", "224", "sha224-hash"]
       - ["function", "hash_hmac", 0, "contains", "224", "sha224-hash"]
-      # LDAP anonymous bind (no password argument)
+      # weak hash algorithm named in hash()/hash_hmac() (exact — sha256/sha384 stay clean)
+      - ["function", "hash", 0, "equals", "md5", "weak-crypto"]
+      - ["function", "hash", 0, "equals", "sha1", "weak-crypto"]
+      - ["function", "hash_hmac", 0, "equals", "md5", "weak-crypto"]
+      - ["function", "hash_hmac", 0, "equals", "sha1", "weak-crypto"]
+      # LDAP anonymous bind: no password argument, or an empty/NULL password literal (a variable
+      # password is NOT flagged — it may hold a real secret; catching it would FP the `ok` cases).
       - ["function", "ldap_bind", 2, "absent", "", "ldap-bind-without-password"]
+      - ["function", "ldap_bind", 2, "equals", "", "ldap-bind-without-password"]
+      - ["function", "ldap_bind", 2, "equals", "null", "ldap-bind-without-password"]
       # non-literal redirect target
       - ["method", "redirect", 0, "nonliteral", "", "symfony-non-literal-redirect"]
       # permissive CORS via raw header, and Laravel debug via putenv

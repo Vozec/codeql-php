@@ -23,6 +23,9 @@ private string norm(AstNode e) {
       e.(Php::EncapsedString).getChild(_).(Php::StringContent).getValue(),
       e.(Php::Boolean).getValue()
     ].regexpReplaceAll("\\s+", "").toLowerCase()
+  or
+  // the `null` literal normalises to "null" (so `equals null` can match, e.g. an empty LDAP password)
+  e instanceof Php::Null and result = "null"
 }
 
 /** Holds if argument/operand node `a` satisfies `op operand` — the fixed matcher vocabulary. */
@@ -120,6 +123,10 @@ predicate auditFinding(AstNode n, string ruleId) {
     n instanceof Php::RequireOnceExpression
   ) and
   ruleId = "wp-file-inclusion-audit"
+  or
+  // Backtick shell execution `` `cmd` `` is the ShellCommandExpression operator, not a call.
+  n instanceof Php::ShellCommandExpression and
+  ruleId = "backticks-use"
 }
 
 from AstNode n, string ruleId
