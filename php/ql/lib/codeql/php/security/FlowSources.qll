@@ -185,6 +185,18 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // (Phase C), applied by `DataSink`.
   exists(EchoStmt e | n.asExpr() = e.getAnOperand() and kind = "reflected XSS")
   or
+  // `<?= $x ?>` short-echo tag — the workhorse of PHP templates (.phtml, WordPress/Magento themes).
+  // tree-sitter models it NOT as an `echo` but as a `<?=` PhpTag token immediately followed by an
+  // ExpressionStatement, so the echoed expression is a `reflected XSS` sink.
+  exists(Php::ExpressionStatement es, Php::PhpTag t |
+    t.getValue() = "<?=" and
+    t.getLocation().getEndLine() = es.getLocation().getStartLine() and
+    t.getLocation().getEndColumn() <= es.getLocation().getStartColumn() and
+    es.getLocation().getStartColumn() - t.getLocation().getEndColumn() <= 3 and
+    n.asExpr() = es.getChild() and
+    kind = "reflected XSS"
+  )
+  or
   // `print $x` / `print($x)` is a language construct (PrintIntrinsic), not a function call.
   exists(Php::PrintIntrinsic p | n.asExpr() = p.getChild() and kind = "reflected XSS")
   or

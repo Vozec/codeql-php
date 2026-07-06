@@ -137,6 +137,10 @@ extensions:
       - ["staticmethod", "get", 0, -1]
       - ["staticmethod", "first", 0, -1]
       - ["staticmethod", "pluck", 0, -1]
+      # Raw-HTML helpers: return unescaped HTML that is then echoed (the `{!! !!}` Blade analog) — taint
+      # must reach the echo sink, so carry it through.
+      - ["staticmethod", "markdown", 0, -1]                    # Str::markdown
+      - ["staticmethod", "inlineMarkdown", 0, -1]              # Str::inlineMarkdown
       # Collection / Eloquent fluent (instance)
       - ["method", "toArray", -1, -1]
       - ["method", "first", -1, -1]
