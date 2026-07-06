@@ -646,18 +646,9 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = later
     )
     or
-    // Local `throw`/`catch`: `try { throw X; } catch (E $e) { … $e … }` — the thrown value flows to the
-    // catch variable (the shared engine models no exceptional dataflow). Local throws only (a throw in a
-    // called function is not linked).
-    exists(Php::TryStatement try, Php::ThrowExpression thr, Php::CatchClause cat, VariableAccess eread |
-      thr.(Php::AstNode).getParent+() = try.getBody() and
-      cat = try.getChild(_) and
-      eread.getName() = cat.getName().(Php::VariableName).getChild().getValue() and
-      eread.(Php::AstNode).getParent+() = cat.getBody() and
-      nodeFrom.asExpr() = thr.getChild() and
-      nodeTo.asExpr() = eread
-    )
-    or
+    // (Local `throw`/`catch` is now handled generically by the CFG/SSA consolidation — the catch variable
+    // has a real SSA definition and the thrown value is routed to it in DataFlowPrivate — so the former
+    // read-painting step here is redundant and has been removed.)
     // Return-by-reference aliasing: `function &m(){ return $this->P; } $r = &$o->m(); $r = X;` — writing
     // the alias `$r` writes back through the reference to `$o->P`, so taint on `X` reaches reads of
     // `$o->P`. Bounded to a by-reference method returning a single `$this->` property.
