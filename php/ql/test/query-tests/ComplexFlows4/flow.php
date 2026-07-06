@@ -8,7 +8,7 @@ EOT;
 system($h1);                                                   // WANT heredoc-interp
 
 // 2. first-class callable syntax then invoke
-$fn2 = strtoupper(...); system($fn2($_GET['a']));             // known-gap first-class-callable->builtin
+$fn2 = strtoupper(...); system($fn2($_GET['a']));             // WANT first-class-callable->builtin
 
 // 3. static variable persisting a tainted value across calls
 function acc3($x) { static $s; if ($x) { $s = $x; } return $s; }

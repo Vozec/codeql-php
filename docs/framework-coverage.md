@@ -75,11 +75,11 @@ and fully covered — pointing the scan at the compiled views is the practical w
   method calls (incl. heredoc), by-reference `foreach` write-back, nullsafe `?->` chains, named args &
   named-key spread, multi-condition `match`, `??=`, `data_get`, string-transform builtins, and
   controller/attribute/resource route params — with interprocedural tracking across several call layers.
-  The 3 remaining niche gaps are engine-complexity limits, not data fixes:
-  - **First-class-callable to a builtin** (`$f = strtoupper(...); $f($x)`): the library step is not
-    applied through the lambda dispatch (same shape as the `call_user_func('builtin', …)` case).
+  The 2 remaining niche gaps are engine-complexity limits (mutable cross-call state / exceptional flow),
+  not data fixes:
   - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): static-variable
-    state across invocations is not tracked.
+    state carried between invocations is mutable cross-call state, not a value flow — it would need a
+    jump-step/global model (like `$GLOBALS`), not a taint step.
   - **Exception message across throw/catch** (`throw new Exception($tainted)` … `catch ($e) {
     $e->getMessage() }`): a *local* exception message flows (`new Exception($x); $e->getMessage()` is
     modelled), but the engine does not track throw→catch exceptional control flow, so the message is lost

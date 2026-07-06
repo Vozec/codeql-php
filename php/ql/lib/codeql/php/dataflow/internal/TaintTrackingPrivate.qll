@@ -304,6 +304,31 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = oc
     )
     or
+    // First-class-callable to a library builtin: `$fn = strtoupper(...); $fn($x)` — the FCC references a
+    // step-model builtin with no PHP body, so forward the call args to the call result (mirroring the
+    // step a direct `strtoupper($x)` gets). Analogous to the `call_user_func('builtin', …)` case.
+    exists(
+      FunctionCall dyn, VariableAccess fnvar, VariableAccess w, AssignExpr a, FunctionCall fcc,
+      string fname, Ssa::LocalVariable v, Ssa::Definition def, Ssa::Cfg::BasicBlock bbw, int iw,
+      Ssa::Cfg::BasicBlock bbr, int ir
+    |
+      dyn.isDynamic() and
+      fnvar = dyn.(Php::FunctionCallExpression).getFunction() and
+      Ssa::variableAccessAt(bbr, ir, fnvar) and
+      Ssa::Impl::ssaDefReachesRead(v, def, bbr, ir) and
+      def.definesAt(v, bbw, iw) and
+      Ssa::variableAccessAt(bbw, iw, w) and
+      a.getLhs() = w and
+      fcc = a.getRhs() and
+      exists(Php::VariadicPlaceholder p |
+        p.(Php::AstNode).getParent+() = fcc.(Php::FunctionCallExpression).getArguments()
+      ) and
+      fname = fcc.getName() and
+      stepModel("function", fname, _, _) and
+      nodeFrom.asExpr() = dyn.getAnArgument() and
+      nodeTo.asExpr() = dyn
+    )
+    or
     // List/array destructuring `[$a, $b] = $rhs`: the whole RHS taints every target.
     exists(Php::AssignmentExpression a, Php::ListLiteral l |
       a.getLeft() = l and nodeFrom.asExpr() = a.getRight() and nodeTo.asExpr() = foreachBindingVar(l)
