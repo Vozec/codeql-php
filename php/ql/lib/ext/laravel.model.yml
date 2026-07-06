@@ -69,6 +69,11 @@ extensions:
       - ["method", "having", 0, "SQL injection"]
       - ["method", "where", 0, "SQL injection"]
       - ["method", "select", 0, "SQL injection"]
+      # aggregate helpers take a COLUMN name (tainted column = injection), same rationale as pluck/where
+      - ["method", "max", 0, "SQL injection"]
+      - ["method", "min", 0, "SQL injection"]
+      - ["method", "avg", 0, "SQL injection"]
+      - ["method", "sum", 0, "SQL injection"]
       # redirects (open redirect)
       - ["function", "redirect", 0, "open redirect"]
       - ["method", "away", 0, "open redirect"]

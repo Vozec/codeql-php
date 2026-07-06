@@ -61,6 +61,8 @@ extensions:
       - ["function", "rmdir", -1, "path traversal"]
       - ["function", "scandir", -1, "path traversal"]
       - ["function", "opendir", -1, "path traversal"]
+      # hash_file(algo, FILENAME): only arg 1 is the path (arg 0 is the algorithm string).
+      - ["function", "hash_file", 1, "path traversal"]
       # open redirect
       # NOTE: `header()` is an open-redirect sink ONLY for a `Location:` header — modelled
       # structurally in FlowSources (a blanket arg row also flagged `header('X-Foo: '.$x)`).
