@@ -69,11 +69,19 @@ and fully covered — pointing the scan at the compiled views is the practical w
   ARE covered). PHP-level output (`echo`/`print`/`<?=`/`printf`) is fully modeled.
 - **Class-property sources** (WordPress `WP::$query_vars`, `WP_Query::$query_vars`): field access, not
   a call, so not expressible as a method row.
-- All 30 patterns in the ComplexFlows test suite now flow — constructor-promoted fields, private
+- 37/40 patterns in the ComplexFlows test suite flow — constructor-promoted fields, private
   setter/getter, DI-typed request properties (on `vendor/` classes), fluent collection/string pipelines,
   magic `__get`/`__set`, generators, `array_map`/`merge`/`column`, `parse_str` out-refs, interpolated
-  method calls, by-reference `foreach` write-back, `??=`, `data_get`, and controller/attribute/resource
-  route params — with interprocedural tracking across several call layers.
+  method calls (incl. heredoc), by-reference `foreach` write-back, nullsafe `?->` chains, named args &
+  named-key spread, multi-condition `match`, `??=`, `data_get`, string-transform builtins, and
+  controller/attribute/resource route params — with interprocedural tracking across several call layers.
+  The 3 remaining niche gaps are engine-complexity limits, not data fixes:
+  - **First-class-callable to a builtin** (`$f = strtoupper(...); $f($x)`): the library step is not
+    applied through the lambda dispatch (same shape as the `call_user_func('builtin', …)` case).
+  - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): static-variable
+    state across invocations is not tracked.
+  - **Exception message across throw/catch** (`throw new Exception($tainted)` → `$e->getMessage()`):
+    exceptional control flow + the internal message field are not modelled.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.
