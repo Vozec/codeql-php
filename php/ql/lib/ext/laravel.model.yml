@@ -141,14 +141,40 @@ extensions:
       # must reach the echo sink, so carry it through.
       - ["staticmethod", "markdown", 0, -1]                    # Str::markdown
       - ["staticmethod", "inlineMarkdown", 0, -1]              # Str::inlineMarkdown
-      # Collection / Eloquent fluent (instance)
-      - ["method", "toArray", -1, -1]
-      - ["method", "first", -1, -1]
-      - ["method", "map", -1, -1]
-      - ["method", "filter", -1, -1]
-      - ["method", "pluck", -1, -1]
-      - ["method", "value", -1, -1]
-      - ["method", "implode", -1, -1]
+      # Collection / Eloquent fluent (instance): the taint is in the RECEIVER (the collection `$this`),
+      # so fromArg = -2 (receiver) → return. This carries taint through fluent pipelines like
+      # `collect($x)->map(...)->filter(...)->implode(',')`.
+      - ["method", "toArray", -2, -1]
+      - ["method", "toJson", -2, -1]
+      - ["method", "all", -2, -1]
+      - ["method", "first", -2, -1]
+      - ["method", "last", -2, -1]
+      - ["method", "map", -2, -1]
+      - ["method", "mapWithKeys", -2, -1]
+      - ["method", "flatMap", -2, -1]
+      - ["method", "filter", -2, -1]
+      - ["method", "reject", -2, -1]
+      - ["method", "where", -2, -1]
+      - ["method", "pluck", -2, -1]
+      - ["method", "values", -2, -1]
+      - ["method", "keys", -2, -1]
+      - ["method", "flatten", -2, -1]
+      - ["method", "unique", -2, -1]
+      - ["method", "reverse", -2, -1]
+      - ["method", "sort", -2, -1]
+      - ["method", "sortBy", -2, -1]
+      - ["method", "take", -2, -1]
+      - ["method", "slice", -2, -1]
+      - ["method", "chunk", -2, -1]
+      - ["method", "value", -2, -1]
+      - ["method", "implode", -2, -1]
+      - ["method", "join", -2, -1]
+      - ["method", "reduce", -2, -1]
+      - ["method", "pipe", -2, -1]
+      - ["method", "tap", -2, -1]
+      # `merge`/`concat`/`push` also take a tainted DATA arg → keep the arg-based propagation too.
+      - ["method", "merge", -1, -1]
+      - ["method", "concat", -1, -1]
 
   # ---- Sanitizers -------------------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }

@@ -78,3 +78,25 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: routeAttributeModel }
     data:
       - ["Route"]
+  # Symfony String component fluent chain `u($x)->lower()->replace(...)->toString()` — the value is the
+  # RECEIVER (fromArg -2), so it flows through the chain.
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "u", 0, -1]                                # u($str) -> UnicodeString
+      - ["function", "b", 0, -1]                                # b($str) -> ByteString
+      - ["method", "toString", -2, -1]
+      - ["method", "toByteString", -2, -1]
+      - ["method", "slice", -2, -1]
+      - ["method", "trim", -2, -1]
+      - ["method", "lower", -2, -1]
+      - ["method", "upper", -2, -1]
+      - ["method", "title", -2, -1]
+      - ["method", "replace", -2, -1]
+      - ["method", "replaceMatches", -2, -1]
+      - ["method", "prepend", -2, -1]
+      - ["method", "append", -2, -1]
+      - ["method", "ensureStart", -2, -1]
+      - ["method", "ensureEnd", -2, -1]
+      - ["method", "camel", -2, -1]
+      - ["method", "snake", -2, -1]
+      - ["method", "truncate", -2, -1]

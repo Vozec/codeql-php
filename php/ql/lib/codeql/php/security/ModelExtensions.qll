@@ -158,11 +158,14 @@ private class TypedSanitizer extends Sanitizer {
   }
 }
 
-/** Gets the `i`th argument of call `c`, or any argument when `i = -1`. */
+/** Gets the `i`th argument of call `c`, any argument when `i = -1`, or the RECEIVER when `i = -2`
+ *  (`$coll->map(...)` — the taint of a fluent method is in the receiver `$this`, not an argument). */
 private Expr argOf(Call c, int i) {
   i >= 0 and result = c.getArgument(i)
   or
   i = -1 and result = c.getAnArgument()
+  or
+  i = -2 and result = c.(MethodCall).getReceiver()
 }
 
 /** Holds if call `c` names `name` and has the given `subjectKind`. */
