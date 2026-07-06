@@ -613,6 +613,17 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = pRead
     )
     or
+    // Higher-order callback RESULT: an inline callback's return value flows to the HO function's result
+    // — `array_map(fn($x) => …, $a)` and `preg_replace_callback(fn($m) => …, $s)` build their result
+    // from the callback's returns (so a callback that returns a tainted value taints the result).
+    exists(FunctionCall c, int cbArg, AstNode cl |
+      callbackModel(c.getName(), cbArg, _) and
+      cl = c.getArgument(cbArg) and
+      (cl instanceof Php::AnonymousFunction or cl instanceof Php::ArrowFunction) and
+      nodeFrom.asExpr() = anyCalleeReturnValue(cl) and
+      nodeTo.asExpr() = c
+    )
+    or
     // `call_user_func[_array]` — the invoked callable's RETURN flows to the call result.
     exists(FunctionCall c, AstNode callee |
       callee = cufCallee(c) and

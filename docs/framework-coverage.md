@@ -75,11 +75,15 @@ and fully covered — pointing the scan at the compiled views is the practical w
   method calls (incl. heredoc), by-reference `foreach` write-back, nullsafe `?->` chains, named args &
   named-key spread, multi-condition `match`, `??=`, `data_get`, string-transform builtins, and
   controller/attribute/resource route params — with interprocedural tracking across several call layers.
-  The 2 remaining niche gaps are engine-complexity limits (mutable cross-call state / exceptional flow),
-  not data fixes:
-  - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): static-variable
-    state carried between invocations is mutable cross-call state, not a value flow — it would need a
-    jump-step/global model (like `$GLOBALS`), not a taint step.
+  The remaining gaps are engine/static-analysis-complexity limits, not data fixes:
+  - **`extract()` / `compact()`** (`extract($_GET)` creates `$id`, `$name`, … from array keys): dynamic
+    variable creation/reading — the variable names are data-dependent, a universal static-analysis limit.
+  - **`array_walk` by-reference callback write-back** (`array_walk($a, fn(&$v) => $v = $tainted)`):
+    aliased mutation through a callback (same family as by-ref `foreach`, but via a callback).
+  - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): mutable cross-call
+    state, not a value flow — would need a jump-step/global model (like `$GLOBALS`).
+  - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
+    to the enum's declared constants (an allow-list), so it is not attacker-controlled.
   - **Exception message across throw/catch** (`throw new Exception($tainted)` … `catch ($e) {
     $e->getMessage() }`): a *local* exception message flows (`new Exception($x); $e->getMessage()` is
     modelled), but the engine does not track throw→catch exceptional control flow, so the message is lost
