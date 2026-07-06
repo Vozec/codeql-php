@@ -66,6 +66,32 @@ extensions:
       - ["function", "opendir", -1, "path traversal"]
       # hash_file(algo, FILENAME): only arg 1 is the path (arg 0 is the algorithm string).
       - ["function", "hash_file", 1, "path traversal"]
+      # ---- Blind file read via PHP filter chains (error-based oracle, per Synacktiv). These primitives
+      # take a user-controlled path that PHP resolves through stream wrappers (`php://filter/...`), so an
+      # arbitrary local file can be read even though the function returns only a hash / metadata / no
+      # displayed content — hence NOT classic path traversal. See `file read` sinks below.
+      - ["function", "md5_file", 0, "file read"]
+      - ["function", "sha1_file", 0, "file read"]
+      - ["function", "crc32_file", 0, "file read"]
+      - ["function", "hash_file", 1, "file read"]
+      - ["function", "getimagesize", 0, "file read"]
+      - ["function", "mime_content_type", 0, "file read"]
+      - ["function", "exif_read_data", 0, "file read"]
+      - ["function", "exif_imagetype", 0, "file read"]
+      - ["function", "exif_thumbnail", 0, "file read"]
+      - ["function", "finfo_file", 1, "file read"]        # finfo_file($finfo, FILENAME)
+      - ["function", "parse_ini_file", 0, "file read"]
+      - ["function", "gzfile", 0, "file read"]
+      - ["function", "readgzfile", 0, "file read"]
+      - ["function", "highlight_file", 0, "file read"]
+      - ["function", "show_source", 0, "file read"]
+      # the content-displaying readers below are ALSO filter-chain sinks; they already appear as path
+      # traversal above, but list them here too so the dedicated file-read query reports them.
+      - ["function", "file_get_contents", 0, "file read"]
+      - ["function", "readfile", 0, "file read"]
+      - ["function", "file", 0, "file read"]
+      - ["function", "fopen", 0, "file read"]
+      - ["function", "copy", 0, "file read"]
       # open redirect
       # NOTE: `header()` is an open-redirect sink ONLY for a `Location:` header — modelled
       # structurally in FlowSources (a blanket arg row also flagged `header('X-Foo: '.$x)`).
@@ -263,3 +289,13 @@ extensions:
       - ["preg_match", 1, 2]        # preg_match($pat, $subj, $matches) — $matches from $subj
       - ["preg_match_all", 1, 2]
       - ["sscanf", 0, 2]            # sscanf($str, $fmt, &$out)
+
+  # ---- Typed method sinks: file-reading methods on built-in classes (filter-chain file read) --------
+  - addsTo:
+      pack: codeql/php-all
+      extensible: typedSinkModel
+    data:
+      - ["finfo", "file", 0, "file read"]               # (new finfo())->file($path)
+      - ["SplFileObject", "__construct", 0, "file read"]
+      - ["SplFileInfo", "__construct", 0, "file read"]
+      - ["SplFileInfo", "openFile", 0, "file read"]
