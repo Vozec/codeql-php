@@ -48,3 +48,25 @@ class ProductController
     }
 }
 
+// Laravel RESTful resource controller: Route::resource maps to conventional actions by name; show/update
+// receive the {photo} id (update's id is the SECOND param, after the injected Request).
+class PhotoController
+{
+    public function show($id)
+    {
+        DB::statement("SELECT * FROM photos WHERE id = $id");           // WANT SQLi (resource show)
+    }
+
+    public function update(Request $request, $id)
+    {
+        DB::statement("UPDATE photos SET n = 1 WHERE id = $id");        // WANT SQLi (resource update)
+    }
+
+    public function index()
+    {
+        DB::statement("SELECT * FROM photos");                         // ok: no route parameter
+    }
+}
+
+Route::resource('photos', PhotoController::class);
+

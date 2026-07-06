@@ -172,3 +172,12 @@ extensions:
       - ["method", "delete", 1]
       - ["method", "any", 1]
       - ["method", "match", 2]
+
+  # RESTful resource controllers: `Route::resource('photos', PhotoController::class)` — the controller
+  # arg is at index 1; its show/edit/update/destroy actions receive the {resource} id.
+  - addsTo: { pack: codeql/php-all, extensible: routeResourceModel }
+    data:
+      - ["staticmethod", "resource", 1]
+      - ["staticmethod", "apiResource", 1]
+      - ["method", "resource", 1]
+      - ["method", "apiResource", 1]

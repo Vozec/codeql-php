@@ -37,8 +37,9 @@ class (a DI service or model-bound object) are excluded.
 - ✅ **Attribute/annotation routing** (Symfony `#[Route('/u/{id}')] public function show(int $id)`): the
   scalar action parameters become sources via the generic `routeAttributeModel` (data row: the attribute
   short-name, e.g. `Route`), tracked interprocedurally into the action.
-- ⚠️ **`Route::resource(...)` / `apiResource(...)`** — maps to conventional controller methods
-  (`index`/`show`/`update`/…) by naming convention; those method params are not yet resolved (partial).
+- ✅ **`Route::resource('photos', PhotoController::class)` / `apiResource`** — the conventional RESTful
+  actions that receive the `{resource}` id (`show`/`edit`/`update`/`destroy`) have their scalar id
+  parameter resolved as a source (via `routeResourceModel`).
 - **n/a — declarative routing** (Magento `routes.xml`, Joomla `task=`, TYPO3): there is no per-route
   callable; user input enters through the request object (`getParam`/`Input::get`) which *is* modeled
   as a source, so no route mechanism is needed.
@@ -47,8 +48,6 @@ class (a DI service or model-bound object) are excluded.
 
 - **Template-engine output** (Blade `{!! !!}`, Twig `|raw`, `.phtml` unescaped echo of `getData()`):
   raw-output is template syntax, not a PHP call — needs template extraction / a template analyzer.
-- **`Route::resource`/`apiResource` conventional actions** (Laravel): the RESTful methods
-  (`index`/`show`/`update`/…) are mapped by naming convention, not resolved yet.
 - **Class-property sources** (WordPress `WP::$query_vars`, `WP_Query::$query_vars`): field access, not
   a call, so not expressible as a method row.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),

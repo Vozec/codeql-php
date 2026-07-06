@@ -339,6 +339,26 @@ private AstNode routeCallable() {
       result.(Method).getName() = m
     )
   )
+  or
+  // `Route::resource('photos', PhotoController::class)` — the conventional RESTful actions that receive
+  // the `{resource}` id (show/edit/update/destroy) on the named controller class.
+  exists(Call route, string sk, string nm, int ci, ClassLike c |
+    routeResourceModel(sk, nm, ci) and
+    (
+      sk = "staticmethod" and route.(StaticMethodCall).getMethodName() = nm
+      or
+      sk = "method" and route.(MethodCall).getMethodName() = nm
+      or
+      sk = "function" and route.(FunctionCall).getName() = nm
+    ) and
+    c.getName() =
+      [
+        route.getArgument(ci).(Php::ClassConstantAccessExpression).getChild(0).(Php::Name).getValue(),
+        route.getArgument(ci).(StringLiteral).getValue()
+      ] and
+    result = c.getAMethod() and
+    result.(Method).getName() = ["show", "edit", "update", "destroy"]
+  )
 }
 
 /** Gets a route-parameter parameter (untyped or scalar-typed, i.e. NOT a DI/model class) of a route

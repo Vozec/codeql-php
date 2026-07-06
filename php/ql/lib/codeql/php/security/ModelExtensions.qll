@@ -90,6 +90,15 @@ extensible predicate routeHandlerModel(string subjectKind, string name, int hand
  */
 extensible predicate routeAttributeModel(string attributeName);
 
+/**
+ * A RESTful resource router (`resource`/`apiResource`) whose argument at `controllerArgIndex` is a
+ * controller class (`Route::resource('photos', PhotoController::class)`). The controller's conventional
+ * resource actions that receive the `{resource}` id — `show`/`edit`/`update`/`destroy` — have that id as
+ * a scalar parameter = attacker-controlled, so those params become sources. Generic: the resource
+ * routers are data rows.
+ */
+extensible predicate routeResourceModel(string subjectKind, string name, int controllerArgIndex);
+
 // ---- Audit MAD: declarative STRUCTURAL rules (a shape exists), separate from the taint MAD above.
 //      A generic engine (SemgrepAudit.ql) reads these; adding an audit rule is a data row, never QL.
 
