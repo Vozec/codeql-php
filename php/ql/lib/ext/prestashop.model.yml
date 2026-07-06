@@ -9,6 +9,7 @@ extensions:
     data:
       - ["staticmethod", "getValue", "prestashop-input"]        # Tools::getValue('x')
       - ["staticmethod", "getAllValues", "prestashop-input"]    # Tools::getAllValues()
+      - ["staticmethod", "getValueRaw", "prestashop-input"]
 
   # ---- Sinks: raw SQL + redirects ---------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
@@ -27,3 +28,6 @@ extensions:
     data:
       - ["function", "pSQL"]                                    # SQL-escape (PrestaShop)
       - ["function", "bqSQL"]                                   # backquote-escape (identifiers)
+      - ["staticmethod", "safeOutput"]                         # Tools::safeOutput — HTML-escape
+      - ["staticmethod", "htmlentitiesUTF8"]                   # Tools::htmlentitiesUTF8
+      - ["staticmethod", "purifyHTML"]                         # Tools::purifyHTML (HTMLPurifier)

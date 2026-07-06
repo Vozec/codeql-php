@@ -24,6 +24,7 @@ adapting a new framework is a data file, never an engine change. See
 | **Yii 2** 🧪 | ✅ `getQueryParam`/`getBodyParam` + `Request::get/post` (typed) | ✅ `createCommand` + `Command::setSql` (typed) | ❌ | ❌ | ❌ | ✅ `Response::redirect` (typed) | ❌ | ✅ `Html::encode` | ❌ | n/a |
 | **CakePHP 3/4** 🧪 | ✅ `ServerRequest::getData/getQuery/…` (typed) | ✅ `Connection::query/execute` (typed) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `h()` | ❌ | n/a |
 | **CodeIgniter 3/4** 🧪 | ✅ `get_post`/`input_stream` + `CI_Input`/`IncomingRequest` accessors (typed) | ✅ `simple_query` + `query` (typed) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `html_escape`/`xss_clean`/`escape_str` | ❌ | n/a |
+| **PSR-7 apps** (Slim, Laminas/Mezzio, …) | ✅ `getParsedBody`/`getQueryParams`/`getParsedBodyParam`/`getServerParams`/… (any PSR-7 `ServerRequest`) | ✅ generic `query`/`executeQuery`/`exec` | ❌ | ✅ PSR-18 `sendRequest`/`createRequest` | ❌ | ❌ | ❌ | (framework-specific) | ✅ Guzzle/Symfony/PSR-18 HTTP clients | n/a |
 
 ## Route → source support
 

@@ -6,10 +6,14 @@ extensions:
       - ["staticmethod", "_GET", "typo3-request"]
       - ["staticmethod", "_POST", "typo3-request"]
       - ["staticmethod", "getIndpEnv", "typo3-request"]
+      - ["staticmethod", "_GPmerged", "typo3-request"]
+      - ["staticmethod", "_GETset", "typo3-request"]
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       - ["method", "sql_query", -1, "SQL injection"]
       - ["method", "exec_SELECTquery", -1, "SQL injection"]
+      - ["method", "exec_SELECTgetRows", -1, "SQL injection"]
+      - ["method", "admin_query", -1, "SQL injection"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["method", "quoteStr"]

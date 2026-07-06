@@ -47,6 +47,8 @@ extensions:
       - ["method", "getCookieParams", "remote"]
       - ["method", "getUploadedFiles", "remote"]
       - ["method", "getHeaderLine", "remote"]
+      - ["method", "getParsedBodyParam", "remote"]           # Slim helper
+      - ["method", "getQueryParam", "remote"]                # Slim / Yii helper
       # Symfony ParameterBag / InputBag (`$request->query->get(...)`, `$request->request->all()`)
       - ["method", "getBoolean", "remote"]
       - ["method", "getInt", "remote"]
