@@ -232,6 +232,17 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     n.asExpr() = c.getName() and kind = "code injection"
   )
   or
+  // Laravel unsafe validator: `Rule::unique(...)->ignore($userInput)` / `Rule::exists(...)->ignore(...)`
+  // — a user-controlled `ignore()` argument lets an attacker exclude an arbitrary row, bypassing the
+  // uniqueness/existence check (mass-assignment-style validation bypass).
+  exists(Php::MemberCallExpression c, Php::ScopedCallExpression rule |
+    c.getName().(Php::Name).getValue() = "ignore" and
+    rule = c.getObject() and
+    rule.getName().(Php::Name).getValue() = ["unique", "exists"] and
+    n.asExpr() = c.getArguments().getChild(_).(Php::Argument).getChild() and
+    kind = "validation bypass"
+  )
+  or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
   // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
   exists(Php::ObjectCreationExpression oc |
@@ -273,6 +284,23 @@ private class TypedRemoteSource extends RemoteFlowSource {
   }
 
   override string getSourceType() { result = sourceType }
+}
+
+/**
+ * A property access on a Laravel `Request` (`$request->field`) — the framework's `__get` returns the
+ * corresponding input value, so any non-method property read of a Request-typed receiver is user input.
+ * A few framework-internal names (the authenticated user, the route/session objects) are excluded.
+ */
+private class RequestPropertySource extends RemoteFlowSource {
+  RequestPropertySource() {
+    exists(Php::MemberAccessExpression ma |
+      (TI::exprClass(ma.getObject()).getName() = "Request" or TI::exprTypeName(ma.getObject()) = "Request") and
+      not ma.getName().(Php::Name).getValue() = ["user", "route", "session", "auth", "server", "headers"] and
+      this.asExpr() = ma
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
 }
 
 /**
