@@ -80,8 +80,10 @@ and fully covered — pointing the scan at the compiled views is the practical w
     applied through the lambda dispatch (same shape as the `call_user_func('builtin', …)` case).
   - **Static local persistence** (`static $s; $s = $tainted;` read on a later call): static-variable
     state across invocations is not tracked.
-  - **Exception message across throw/catch** (`throw new Exception($tainted)` → `$e->getMessage()`):
-    exceptional control flow + the internal message field are not modelled.
+  - **Exception message across throw/catch** (`throw new Exception($tainted)` … `catch ($e) {
+    $e->getMessage() }`): a *local* exception message flows (`new Exception($x); $e->getMessage()` is
+    modelled), but the engine does not track throw→catch exceptional control flow, so the message is lost
+    when it crosses a `throw`/`catch` boundary.
 - **Context/flow-dependent audit rules**: `openssl-decrypt-validate` (needs HMAC-validation context),
   `base-convert-loses-precision`, `md5-used-as-password` (needs value flow) — the same call is safe or
   unsafe depending on surrounding code, so no precise syntactic rule exists.

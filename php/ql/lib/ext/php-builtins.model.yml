@@ -152,6 +152,9 @@ extensions:
       pack: codeql/php-all
       extensible: stepModel
     data:
+      # Exception message accessor: `$e->getMessage()` returns the message the exception carries
+      # (receiver -> return). Paired with the `new *Exception($msg)` message step in TaintTrackingPrivate.
+      - ["method", "getMessage", -2, -1]
       - ["function", "strtoupper", -1, -1]
       - ["function", "strtolower", -1, -1]
       - ["function", "ucfirst", -1, -1]

@@ -291,6 +291,19 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = later
     )
     or
+    // `new SomeException($msg, …)` — the message argument is carried by the exception object, so a
+    // `$e->getMessage()` on it yields the message (paired with the `getMessage` receiver step). Matches
+    // classes whose name ends in `Exception`/`Error` (or `Throwable`).
+    exists(Php::ObjectCreationExpression oc, string cn |
+      (
+        cn = oc.getChild(_).(Php::Name).getValue() or
+        cn = oc.getChild(_).(Php::QualifiedName).getChild().(Php::Name).getValue()
+      ) and
+      (cn.matches("%Exception") or cn.matches("%Error") or cn = "Throwable") and
+      nodeFrom.asExpr() = oc.getChild(_).(Php::Arguments).getChild(_).(Php::Argument).getChild() and
+      nodeTo.asExpr() = oc
+    )
+    or
     // List/array destructuring `[$a, $b] = $rhs`: the whole RHS taints every target.
     exists(Php::AssignmentExpression a, Php::ListLiteral l |
       a.getLeft() = l and nodeFrom.asExpr() = a.getRight() and nodeTo.asExpr() = foreachBindingVar(l)

@@ -41,3 +41,6 @@ class Repo10 { public $conn; }
 class Conn10 { public function q($s) { return $s; } }
 $r10 = new Repo10(); $r10->conn = new Conn10();
 \DB::statement($r10->conn?->q($_GET['a']));                  // WANT nullsafe-prop-method
+
+// 11. exception DIRECT (no throw/catch) — isolate the new-Exception + getMessage steps
+$ed11 = new \Exception($_GET['a']); system($ed11->getMessage());  // WANT exception-direct (new Exception + getMessage steps)
