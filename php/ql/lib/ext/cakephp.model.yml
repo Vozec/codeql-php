@@ -1,0 +1,24 @@
+# CakePHP 3/4 Models-as-Data. Generic request/DB method names are class-scoped (`typed*Model`); the
+# distinctive `h()` escaper is a plain sanitizer. Engine is language-general QL.
+extensions:
+  # ---- Sources: request input (Cake\Http\ServerRequest) -----------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["ServerRequest", "getData", "remote"]                 # $this->request->getData('field')
+      - ["ServerRequest", "getQuery", "remote"]                # $this->request->getQuery('x')
+      - ["ServerRequest", "getQueryParams", "remote"]
+      - ["ServerRequest", "getParam", "remote"]
+      - ["ServerRequest", "getCookie", "remote"]
+      - ["Request", "getData", "remote"]
+      - ["Request", "getQuery", "remote"]
+
+  # ---- Sinks: raw SQL ---------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Connection", "query", 0, "SQL injection"]            # $connection->query($sql)
+      - ["Connection", "execute", 0, "SQL injection"]
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "h"]                                      # Cake's global HTML-escape helper

@@ -1,0 +1,50 @@
+# Drupal Models-as-Data (Drupal 7 procedural + Drupal 8/9/10 OO, which is Symfony-HttpFoundation based).
+#
+# Adapting the analyser to Drupal is purely data — request accessors are sources, `db_query` / the DBTNG
+# `Connection::query` are SQL sinks, `drupal_goto` / RedirectResponse are redirect sinks, and the
+# `check_plain` / `filter_xss` / `Html::escape` / `Xss::filter` helpers are sanitizers. The engine
+# (dispatch, flow) is language-general QL; only these names are Drupal-specific.
+extensions:
+  # ---- Sources: request input -------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "arg", "drupal-request"]                  # Drupal 7 `arg(0)` — a URL path component
+  # Typed form sources (Drupal 8+): generic method names, so class-scoped for precision.
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      # $form_state->getValue('x') / getValues() / getUserInput() — user-submitted form data.
+      - ["FormStateInterface", "getValue", "remote"]
+      - ["FormStateInterface", "getValues", "remote"]
+      - ["FormStateInterface", "getUserInput", "remote"]
+      - ["FormState", "getValue", "remote"]
+      - ["FormState", "getValues", "remote"]
+      - ["FormState", "getUserInput", "remote"]
+
+  # ---- Sinks: raw SQL, redirects ----------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # Drupal 7 database API — the query string (arg 0) is raw SQL.
+      - ["function", "db_query", 0, "SQL injection"]
+      - ["function", "db_query_range", 0, "SQL injection"]
+      - ["function", "db_queryd", 0, "SQL injection"]
+      # Drupal 7 redirect: drupal_goto($path).
+      - ["function", "drupal_goto", 0, "open redirect"]
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      # Drupal 8+ DBTNG: `\Drupal::database()->query($sql)` / a Connection::query — raw SQL at arg 0.
+      - ["Connection", "query", 0, "SQL injection"]
+      - ["Connection", "queryRange", 0, "SQL injection"]
+      - ["Connection", "queryTemporary", 0, "SQL injection"]
+      # RedirectResponse (Symfony, used by Drupal) — the destination URL.
+      - ["RedirectResponse", "__construct", 0, "open redirect"]
+      - ["TrustedRedirectResponse", "__construct", 0, "open redirect"]
+
+  # ---- Sanitizers: Drupal escaping / filtering helpers ------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "check_plain"]                            # Drupal 7 HTML-escape
+      - ["function", "check_url"]                              # Drupal 7 URL sanitiser
+      - ["function", "filter_xss"]                             # Drupal 7 XSS filter
+      - ["function", "filter_xss_admin"]
+      - ["staticmethod", "checkPlain"]                         # SafeMarkup::checkPlain (deprecated)
+      - ["method", "escapeLike"]                               # Connection::escapeLike — LIKE-wildcard escape

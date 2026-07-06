@@ -20,6 +20,10 @@ adapting a new framework is a data file, never an engine change. See
 | **Joomla 3/4/5** 🧪 | ✅ `getRaw`/`getHtml` + `Input::get` (typed, J3+J4) | ✅ `setQuery` | ✅ echo/`<?=` | ✅ `Http::get/post/request` (typed) | ✅ `File::read/delete` | ✅ `$app->redirect` | ✅ (`unserialize`) | ✅ `getInt/getUint/…` filters + `quote`/`escape` (typed) | ❌ | n/a (MVC `task` dispatch → source is `Input::get`) |
 | **PrestaShop** | ✅ `Tools::getValue` | ✅ `Db::executeS` | ❌ | ❌ | ❌ | ✅ `Tools::redirect*` | ❌ | ✅ `pSQL`/`bqSQL` | ❌ | n/a |
 | **TYPO3** | ✅ `GeneralUtility::_GP/_GET/_POST` | ✅ `sql_query`/`exec_SELECTquery` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `quoteStr`/`fullQuoteStr` | ❌ | n/a |
+| **Drupal 7/8+** 🧪 | ✅ `arg`, `FormState::getValue*` (typed) | ✅ `db_query*` + `Connection::query*` (typed) | ❌ (render arrays) | ❌ | ❌ | ✅ `drupal_goto`/`RedirectResponse` | ❌ | ✅ `check_plain`/`filter_xss`/`escapeLike` | ❌ | n/a |
+| **Yii 2** 🧪 | ✅ `getQueryParam`/`getBodyParam` + `Request::get/post` (typed) | ✅ `createCommand` + `Command::setSql` (typed) | ❌ | ❌ | ❌ | ✅ `Response::redirect` (typed) | ❌ | ✅ `Html::encode` | ❌ | n/a |
+| **CakePHP 3/4** 🧪 | ✅ `ServerRequest::getData/getQuery/…` (typed) | ✅ `Connection::query/execute` (typed) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `h()` | ❌ | n/a |
+| **CodeIgniter 3/4** 🧪 | ✅ `get_post`/`input_stream` + `CI_Input`/`IncomingRequest` accessors (typed) | ✅ `simple_query` + `query` (typed) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ `html_escape`/`xss_clean`/`escape_str` | ❌ | n/a |
 
 ## Route → source support
 

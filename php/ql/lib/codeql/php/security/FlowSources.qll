@@ -295,6 +295,9 @@ private class RequestPropertySource extends RemoteFlowSource {
   RequestPropertySource() {
     exists(Php::MemberAccessExpression ma |
       (TI::exprClass(ma.getObject()).getName() = "Request" or TI::exprTypeName(ma.getObject()) = "Request") and
+      // Only EXTERNAL reads (`$request->field`) — not `$this->prop` inside the Request class itself, which
+      // is internal storage, and not the framework-internal property names.
+      not ma.getObject().(Php::VariableName).getChild().getValue() = "this" and
       not ma.getName().(Php::Name).getValue() = ["user", "route", "session", "auth", "server", "headers"] and
       this.asExpr() = ma
     )

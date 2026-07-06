@@ -1,0 +1,35 @@
+# CodeIgniter 3/4 Models-as-Data. Distinctive names (`get_post`, `simple_query`, `xss_clean`, …) are
+# plain rows; generic method names (`post`/`get`/`query`) are class-scoped. Engine is language-general QL.
+extensions:
+  # ---- Sources: request input -------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "get_post", "codeigniter-request"]          # $this->input->get_post('x')
+      - ["method", "input_stream", "codeigniter-request"]      # $this->input->input_stream('x')
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      # CI3 `$this->input` is a CI_Input; CI4 IncomingRequest. Generic names, class-scoped for precision.
+      - ["CI_Input", "post", "remote"]
+      - ["CI_Input", "get", "remote"]
+      - ["CI_Input", "cookie", "remote"]
+      - ["CI_Input", "server", "remote"]
+      - ["IncomingRequest", "getVar", "remote"]                # CI4 $request->getVar('x')
+      - ["IncomingRequest", "getGet", "remote"]
+      - ["IncomingRequest", "getPost", "remote"]
+
+  # ---- Sinks: raw SQL ---------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "simple_query", 0, "SQL injection"]         # $this->db->simple_query($sql)
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["CI_DB_query_builder", "query", 0, "SQL injection"]   # $this->db->query($sql)
+      - ["BaseConnection", "query", 0, "SQL injection"]        # CI4 $db->query($sql)
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "html_escape"]                            # CI global HTML-escape helper
+      - ["method", "xss_clean"]                                # $this->security->xss_clean($x)
+      - ["method", "escape_str"]                               # $this->db->escape_str($x)
+      - ["method", "escapeString"]                             # CI4 $db->escapeString($x)

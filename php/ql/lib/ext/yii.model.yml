@@ -1,0 +1,29 @@
+# Yii 2 Models-as-Data. Distinctive names are plain rows; generic method names (`get`/`post`/`query`) are
+# class-scoped (`typed*Model`) so they only fire on the right Yii class. Engine is language-general QL.
+extensions:
+  # ---- Sources: request input (yii\web\Request) -------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "getQueryParam", "yii-request"]             # $request->getQueryParam('x')
+      - ["method", "getBodyParam", "yii-request"]              # $request->getBodyParam('x')
+      - ["method", "getBodyParams", "yii-request"]
+      - ["method", "getQueryParams", "yii-request"]
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Request", "get", "remote"]                           # Yii::$app->request->get('x')
+      - ["Request", "post", "remote"]
+      - ["Request", "getRawBody", "remote"]
+
+  # ---- Sinks: raw SQL + redirect ----------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "createCommand", 0, "SQL injection"]        # $connection->createCommand($sql)
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Command", "setSql", 0, "SQL injection"]              # $command->setSql($sql)
+      - ["Response", "redirect", 0, "open redirect"]           # Yii::$app->response->redirect($url)
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["staticmethod", "encode"]                             # yii\helpers\Html::encode($x) — HTML escape
