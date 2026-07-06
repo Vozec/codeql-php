@@ -427,6 +427,24 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       nodeTo.asExpr() = c
     )
     or
+    // `extract($arr)` imports the array's entries as local variables (`$arr['id']` becomes `$id` — the
+    // key IS the variable name). Taint the reads of a variable that is NEVER written in the scope by any
+    // other means: such a variable can only originate from the `extract` (`$id` used only after it). A
+    // variable with its own assignment / `foreach` / `catch` / `list` binding is handled by that write
+    // (`isWriteAccess`) and left out, so an explicitly-set value is not clobbered. A precise, direct taint
+    // step: the array's taint reaches exactly the imported variables actually used.
+    exists(FunctionCall ex, VariableAccess read, string vname |
+      ex.getName() = "extract" and
+      vname = read.getName() and
+      not vname.matches("\\_%") and
+      not vname = "GLOBALS" and
+      read != ex.getAnArgument() and
+      sameScope(ex, read) and
+      not exists(VariableAccess w | Ssa::isWriteAccess(w) and w.getName() = vname and sameScope(w, ex)) and
+      nodeFrom.asExpr() = ex.getAnArgument() and
+      nodeTo.asExpr() = read
+    )
+    or
     // Generator: `function g(){ yield $x; }` — the yielded value reaches `foreach (g() as $v)`.
     exists(Php::YieldExpression y, Php::FunctionDefinition gen, FunctionCall call, Php::ForeachStatement fe, int i |
       y.(Php::AstNode).getParent+() = gen.getBody() and

@@ -2,7 +2,7 @@
 // COMPLEX flows batch 5 — very common real-world patterns. Source $_GET, sink system()/DB.
 
 // 1. extract() imports the superglobal into local variables (classic dangerous pattern)
-extract($_GET); system($id ?? '');                             // known-gap extract (SSA over-taint at shared scope — reverted)
+extract($_GET); system($id ?? '');                             // WANT extract (never-assigned var comes from the imported array)
 
 // 2. compact() then read back
 $name = $_GET['a']; $c2 = compact('name'); system($c2['name']);  // WANT compact (mirror of extract: string arg = variable name)
@@ -28,8 +28,8 @@ $a6 = ['x']; array_walk($a6, function (&$v) { $v = $_GET['a']; }); system($a6[0]
 $r7 = preg_replace_callback('/x/', function ($m) { return $_GET['a']; }, 'xx'); system($r7);  // WANT preg-replace-callback
 
 // 8. enum backed value from input
-enum E8: string { case A = 'a'; }
-$e8 = E8::tryFrom($_GET['a']); system($e8->value);             // ok: enum value is bounded to enum constants (allowlist)
+enum Color8: string { case A = 'a'; }
+$col8 = Color8::tryFrom($_GET['a']); system($col8->value);             // ok: enum value is bounded to enum constants (allowlist)
 
 // 9. list destructuring with a skipped element
 [, $b9] = ['skip', $_GET['a']]; system($b9);                   // WANT list-skip

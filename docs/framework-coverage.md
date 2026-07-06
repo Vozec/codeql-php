@@ -81,15 +81,16 @@ and fully covered — pointing the scan at the compiled views is the practical w
   closure `use` capture, first-class-callable to a builtin, static-local persistence, **local AND
   interprocedural `throw`/`catch`**, and controller/attribute/resource route params — with
   interprocedural tracking across several call layers.
-  The remaining 2 gaps are static-analysis-complexity limits, not data fixes:
-  - **`extract($tainted)`** (creates `$id`, `$name`, … from the array's runtime keys): modelled as an SSA
-    may-write over the scope's variables, it works precisely for a variable *only read* after the extract
-    but over-taints at a broad shared scope (e.g. top-level scripts, where an unrelated later-assigned
-    variable picked up the taint) — so it was reverted pending a tighter scope model. `compact()` (the
-    inverse) IS modelled: `compact('a', …)` reads the variable named by each string argument, so a
-    tainted `$a` reaches the result.
+  The remaining gap is not a data fix:
   - **Template-engine source syntax** (`.blade.php` / `.twig`) — see the Templating section (needs a
     template grammar in the extractor; compiled templates ARE covered).
+
+  `extract()` / `compact()` ARE now modelled. `compact('a', …)` reads the variable named by each string
+  argument, so a tainted `$a` reaches the result. `extract($tainted)` taints the reads of any variable
+  the scope NEVER writes by any means (`isWriteAccess` — assignment / `foreach` / `catch` / `list` /
+  `global` / `static`): such a variable can only originate from the extract (`$id` used only after it),
+  while a variable with its own write is left to that write and not clobbered — precise, and no benchmark
+  false positives.
   - Note `MyEnum::tryFrom($input)->value` is intentionally NOT flagged — a backed-enum value is bounded
     to the enum's declared constants (an allow-list), so it is not attacker-controlled.
 
