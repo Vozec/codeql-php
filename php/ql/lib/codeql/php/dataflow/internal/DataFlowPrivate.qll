@@ -497,10 +497,18 @@ private Expr definitionReachingValue(Ssa::Definition def) {
       thr.(Php::AstNode).getParent+() = try.getBody() and result = thr.getChild()
     )
     or
-    // a call in the try that can throw — the thrown value is on its result node (ReturnNode)
+    // a function call in the try that can throw — the thrown value is on its result node (ReturnNode)
     exists(Php::FunctionCallExpression call, Php::FunctionDefinition callee |
       call.(Php::AstNode).getParent+() = try.getBody() and
       callee.getName().getValue() = call.getFunction().(Php::Name).getValue() and
+      exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody()) and
+      result = call
+    )
+    or
+    // a method call in the try that can throw (`$service->risky()`) — same, callee resolved by method name
+    exists(Php::MemberCallExpression call, Php::MethodDeclaration callee |
+      call.(Php::AstNode).getParent+() = try.getBody() and
+      callee.getName().getValue() = call.getName().(Php::Name).getValue() and
       exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody()) and
       result = call
     )

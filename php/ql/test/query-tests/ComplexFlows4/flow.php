@@ -44,3 +44,8 @@ $r10 = new Repo10(); $r10->conn = new Conn10();
 
 // 11. exception DIRECT (no throw/catch) — isolate the new-Exception + getMessage steps
 $ed11 = new \Exception($_GET['a']); system($ed11->getMessage());  // WANT exception-direct (new Exception + getMessage steps)
+
+// 12. interprocedural throw via a METHOD call, caught in the caller
+class Svc12 { public function risky() { throw new \Exception($_GET['a']); } }
+$s12 = new Svc12();
+try { $s12->risky(); } catch (\Exception $e12) { system($e12->getMessage()); }  // WANT method-throw-interproc

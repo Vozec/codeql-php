@@ -613,6 +613,26 @@ private class SwitchTree extends PostOrderTree instanceof Php::SwitchStatement {
 /** Gets a `catch` clause of a `try`. */
 private Php::CatchClause tryCatch(Php::TryStatement t) { result = t.getChild(_) }
 
+/**
+ * Holds if `call` is in the body of `try` `t` and calls a function or method whose body contains a
+ * `throw` — so the call may raise into the `try`'s catch. Callees are resolved by name (an
+ * over-approximation, matching how the exceptional call edge itself over-approximates).
+ */
+private predicate throwingCallInTry(Php::TryStatement t, AstNode call) {
+  call.(Php::AstNode).getParent+() = t.getBody() and
+  (
+    exists(Php::FunctionDefinition callee |
+      callee.getName().getValue() = call.(Php::FunctionCallExpression).getFunction().(Php::Name).getValue() and
+      exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody())
+    )
+    or
+    exists(Php::MethodDeclaration callee |
+      callee.getName().getValue() = call.(Php::MemberCallExpression).getName().(Php::Name).getValue() and
+      exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody())
+    )
+  )
+}
+
 /** Gets the `finally` clause of a `try`, if any. */
 private Php::FinallyClause tryFinally(Php::TryStatement t) { result = t.getChild(_) }
 
@@ -641,18 +661,14 @@ private class TryTree extends PostOrderTree instanceof Php::TryStatement {
       // try body throws -> a catch clause (any)
       last(t.getBody(), pred, c) and c instanceof RaiseCompletion and first(tryCatch(t), succ)
       or
-      // try body calls a function that can throw -> a catch clause (any). Calls do not produce a
+      // try body calls a function/method that can throw -> a catch clause (any). Calls do not produce a
       // `RaiseCompletion` (the CFG does not track which callee raises), so a body containing a call to a
-      // throwing function is over-approximated as able to reach the catch on its normal exit — enough to
-      // linearise the catch binding (giving `$e` an SSA definition) and route the thrown value to it (see
-      // `DataFlowPrivate`). This mirrors the exceptional call edges other language packs build.
+      // throwing function/method is over-approximated as able to reach the catch on its normal exit —
+      // enough to linearise the catch binding (giving `$e` an SSA definition) and route the thrown value
+      // to it (see `DataFlowPrivate`). This mirrors the exceptional call edges other language packs build.
       last(t.getBody(), pred, c) and
       c instanceof NormalCompletion and
-      exists(Php::FunctionCallExpression call, Php::FunctionDefinition callee |
-        call.getParent+() = t.getBody() and
-        callee.getName().getValue() = call.getFunction().(Php::Name).getValue() and
-        exists(Php::ThrowExpression thr | thr.getParent+() = callee.getBody())
-      ) and
+      throwingCallInTry(t, _) and
       first(tryCatch(t), succ)
       or
       // try body completes normally -> finally / exit
