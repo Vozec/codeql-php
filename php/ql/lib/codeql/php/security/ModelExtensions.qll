@@ -29,6 +29,14 @@ extensible predicate typedSourceModel(string className, string methodName, strin
 /** An argument (`argIndex`) of a function/method that is a `vulnKind` sink. */
 extensible predicate sinkModel(string subjectKind, string name, int argIndex, string vulnKind);
 
+/**
+ * An argument (`argIndex`, -1 = any) of a method/static call `className::methodName` that is a
+ * `vulnKind` sink ONLY when the receiver's inferred class (or the static scope) is `className`. The
+ * precise form of `sinkModel` — lets generic method names (`get`/`query`/`execute`/`request`) be sinks
+ * on the right framework class without flooding false positives on unrelated objects.
+ */
+extensible predicate typedSinkModel(string className, string methodName, int argIndex, string vulnKind);
+
 /** Taint flows from argument `fromArg` to `toArg` (-1 = return) of a function/method. */
 extensible predicate stepModel(string subjectKind, string name, int fromArg, int toArg);
 
@@ -64,6 +72,15 @@ extensible predicate outRefModel(string name, int fromArg, int toRefArg);
  * common framework globals, by convention (`global $wpdb`).
  */
 extensible predicate typedSanitizerModel(string className, string methodName);
+
+/**
+ * A framework router that dispatches a user request to a handler CALLABLE: a call to `name`
+ * (subjectKind `function`/`method`/`staticmethod`) whose argument at `handlerArgIndex` is the request
+ * handler (e.g. `Route::get('/u/{id}', function ($id) { … })` → `["staticmethod","get",1]`). The
+ * handler closure's untyped scalar parameters are route parameters = attacker-controlled, so they
+ * become sources. GENERIC mechanism: every framework's routers are just data rows, no engine change.
+ */
+extensible predicate routeHandlerModel(string subjectKind, string name, int handlerArgIndex);
 
 // ---- Audit MAD: declarative STRUCTURAL rules (a shape exists), separate from the taint MAD above.
 //      A generic engine (SemgrepAudit.ql) reads these; adding an audit rule is a data row, never QL.

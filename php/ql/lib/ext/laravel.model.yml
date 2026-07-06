@@ -116,3 +116,23 @@ extensions:
       - ["function", "e"]                                      # Blade escape
       - ["method", "validate"]                                # $request->validate()
       - ["staticmethod", "slug"]                             # Str::slug
+
+  # ---- Route handlers: closure params are route parameters (user-controlled path segments) --------
+  # `Route::get('/u/{id}', function ($id) { … })` — handler at arg 1; `Route::match([...], '/p', fn)` at 2.
+  - addsTo: { pack: codeql/php-all, extensible: routeHandlerModel }
+    data:
+      - ["staticmethod", "get", 1]
+      - ["staticmethod", "post", 1]
+      - ["staticmethod", "put", 1]
+      - ["staticmethod", "patch", 1]
+      - ["staticmethod", "delete", 1]
+      - ["staticmethod", "options", 1]
+      - ["staticmethod", "any", 1]
+      - ["staticmethod", "match", 2]
+      - ["method", "get", 1]                                   # $router->get(...)
+      - ["method", "post", 1]
+      - ["method", "put", 1]
+      - ["method", "patch", 1]
+      - ["method", "delete", 1]
+      - ["method", "any", 1]
+      - ["method", "match", 2]

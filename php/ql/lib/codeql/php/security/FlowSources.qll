@@ -261,6 +261,79 @@ private class TypedRemoteSource extends RemoteFlowSource {
   override string getSourceType() { result = sourceType }
 }
 
+/**
+ * A class-scoped sink (`typedSinkModel`): an argument is a sink only when the call's receiver type (for
+ * `$obj->m()`) or static scope (for `C::m()`) is the named class — so generic method names like
+ * `get`/`query`/`request`/`read` are sinks on the right framework class without mass false positives.
+ */
+private class TypedSink extends Sink {
+  string kind;
+
+  TypedSink() {
+    exists(int i, string cls, string m | typedSinkModel(cls, m, i, kind) |
+      exists(MethodCall c |
+        c.getMethodName() = m and
+        TI::exprClass(c.getReceiver()).getName() = cls and
+        (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
+      )
+      or
+      exists(StaticMethodCall c |
+        c.getMethodName() = m and
+        c.getTargetName() = cls and
+        (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
+      )
+    )
+  }
+
+  override string getKind() { result = kind }
+}
+
+/** Gets the handler callable at the modelled argument of a router call (`routeHandlerModel`). */
+private AstNode routeHandler() {
+  exists(Call route, string sk, string nm, int hi | routeHandlerModel(sk, nm, hi) |
+    sk = "staticmethod" and route.(StaticMethodCall).getMethodName() = nm and result = route.getArgument(hi)
+    or
+    sk = "method" and route.(MethodCall).getMethodName() = nm and result = route.getArgument(hi)
+    or
+    sk = "function" and route.(FunctionCall).getName() = nm and result = route.getArgument(hi)
+  )
+}
+
+/** Gets an untyped scalar parameter of a route-handler closure/arrow (typed params are DI services). */
+private Php::SimpleParameter routeHandlerParam(AstNode handler) {
+  (
+    result = handler.(Php::AnonymousFunction).getParameters().getChild(_) or
+    result = handler.(Php::ArrowFunction).getParameters().getChild(_)
+  ) and
+  not exists(result.getType())
+}
+
+/** Gets the body of a route-handler closure/arrow. */
+private AstNode routeHandlerBody(AstNode handler) {
+  result = handler.(Php::AnonymousFunction).getBody() or
+  result = handler.(Php::ArrowFunction).getBody()
+}
+
+/**
+ * A route parameter: an untyped scalar parameter of a framework route handler is bound to a path
+ * segment (`/user/{id}` → `function ($id) {…}`), i.e. attacker-controlled. A read of it inside the
+ * handler body is a source. Data-driven: the routers themselves are `routeHandlerModel` rows, so a new
+ * framework's routing needs no change here — only data.
+ */
+private class RouteParamSource extends RemoteFlowSource {
+  RouteParamSource() {
+    exists(AstNode handler, Php::SimpleParameter p, VariableAccess read |
+      handler = routeHandler() and
+      p = routeHandlerParam(handler) and
+      read.getName() = p.getName().getChild().getValue() and
+      read.(Php::AstNode).getParent+() = routeHandlerBody(handler) and
+      this.asExpr() = read
+    )
+  }
+
+  override string getSourceType() { result = "route parameter" }
+}
+
 /** The built-in remote sources become `RemoteFlowSource` instances (extensible via QL/data). */
 private class BuiltinRemoteSource extends RemoteFlowSource {
   BuiltinRemoteSource() { isRemoteSource(this) }
