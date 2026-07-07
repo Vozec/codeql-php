@@ -445,6 +445,24 @@ private class GetenvSource extends RemoteFlowSource {
 }
 
 /**
+ * Dolibarr `GETPOST(name, type, …)` request accessor. The 2nd arg selects a sanitiser: `'int'`, `'alpha'`,
+ * `'aZ09'`, … neutralise the value, so those calls are NOT sources; only the clearly-raw forms are — no
+ * type arg, or the explicit `'none'` type. (`GETPOSTINT` is always-int and never matches.) This mirrors
+ * the getenv split: model the accessor as a source only where it actually returns unsanitised input.
+ */
+private class GetpostSource extends RemoteFlowSource {
+  GetpostSource() {
+    exists(FunctionCall c | c.getName() = "GETPOST" and this.asExpr() = c |
+      not exists(c.getArgument(1))
+      or
+      constantStringValue(c.getArgument(1)) = "none"
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * A class-scoped sink (`typedSinkModel`): an argument is a sink only when the call's receiver type (for
  * `$obj->m()`) or static scope (for `C::m()`) is the named class — so generic method names like
  * `get`/`query`/`request`/`read` are sinks on the right framework class without mass false positives.
