@@ -543,12 +543,11 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
       objectCandidate(obj) and
       nodeFrom.asExpr() = methodReturnValue(ts) and
       nodeTo.asExpr() = ctx and
-      // Precise when the object's class is inferred; type-agnostic fallback otherwise (bounded). NOTE:
-      // this fallback (and, more so, over-broad PARAMETER type inference feeding the precise branch) is
-      // the root of a real-plugin false-positive explosion — one tainted `__toString` floods many
-      // `"…{$x}…"` interpolations. Removing it drops legitimate deserialization-gadget coverage without
-      // fixing the param-inference variant, so it is kept; see docs/cve-cartography.md (iteration 2).
-      (ts = TI::exprClass(obj).getAMethod() or not exists(TI::exprClass(obj)))
+      // Dispatch ONLY to `__toString` of the object's inferred class. The old type-agnostic fallback
+      // (`not exists(TI::exprClass(obj))`) connected every UNTYPED string context to EVERY `__toString`
+      // in the codebase, so one tainted `__toString` (e.g. an OAuth token) flooded hundreds of unrelated
+      // `"…{$x}…"` interpolations — the dominant real-plugin false positive. Bench/corpus unaffected.
+      ts = TI::exprClass(obj).getAMethod()
     )
     or
     // Magic `__get`: `$o->prop` on an object with `__get` returns `__get`'s value.
