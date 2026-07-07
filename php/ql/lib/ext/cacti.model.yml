@@ -1,0 +1,19 @@
+# Cacti Models-as-Data. Distinctive function names (no collision risk): request accessors are sources,
+# the RAW (non-prepared) db_fetch_* / db_execute are SQL sinks. The *_prepared API is the safe
+# parameterised path and is deliberately NOT a sink. Engine is language-general QL.
+extensions:
+  # ---- Sources: request accessors ---------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "get_request_var", "cacti-request"]
+      - ["function", "get_nfilter_request_var", "cacti-request"]   # NO filter — always raw
+      - ["function", "get_filter_request_var", "cacti-request"]
+
+  # ---- Sinks: RAW (non-prepared) query helpers — the whole SQL string (arg 0) is the sink ------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "db_fetch_assoc", 0, "SQL injection"]
+      - ["function", "db_fetch_row", 0, "SQL injection"]
+      - ["function", "db_fetch_cell", 0, "SQL injection"]
+      - ["function", "db_execute", 0, "SQL injection"]
+      # NB: db_fetch_*_prepared / db_execute_prepared are the SAFE parameterised API — NOT sinks.
