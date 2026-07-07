@@ -292,6 +292,23 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = "SQL injection"
   )
   or
+  // Laravel filesystem via the `app('files')` service locator: `app('files')->delete($path)` / `->get` /
+  // `->put` / … . Same rationale as the Storage/Db facades — the helper returns a `Filesystem` whose type
+  // does not resolve, so the path argument is matched structurally on the recognisable `app('files')`
+  // receiver, scoped to that service string (no generic `->delete()` false positives) (CVE-2024-55415).
+  exists(MethodCall c, FunctionCall app |
+    app = c.getReceiver() and
+    app.getName() = "app" and
+    constantStringValue(app.getArgument(0)) = "files" and
+    c.getMethodName() =
+      [
+        "delete", "get", "put", "append", "prepend", "move", "copy", "makeDirectory", "deleteDirectory",
+        "cleanDirectory", "replace"
+      ] and
+    n.asExpr() = c.getArgument(0) and
+    kind = "path traversal"
+  )
+  or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
   // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
   exists(Php::ObjectCreationExpression oc |

@@ -18,7 +18,7 @@ cve/score.py                         # compares SARIF vs. the `// ruleid:` annot
 
 Run: `bash cve/run.sh` — reports DETECTED n/N annotated sinks + any un-annotated findings.
 
-## Status: 32 / 32 annotated sinks detected, 0 false positives
+## Status: 33 / 33 annotated sinks detected, 0 false positives
 
 ### Detected ✅
 
