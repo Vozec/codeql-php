@@ -154,6 +154,12 @@ private string stringLiteralCallee(FunctionCall c) {
   )
 }
 
+/** Gets the method name of a 2-element array callable `[$recv, 'm']` / `['C', 'm']`. */
+private string arrayCallableMethodName(Php::ArrayCreationExpression arr) {
+  result =
+    arr.getChild(1).(Php::ArrayElementInitializer).getChild(0).(StringLiteral).getValue()
+}
+
 /** Holds if `n` is a sink of vulnerability class `kind`. */
 predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // NOTE: the direct built-in function sink (`system($x)`, …) is DATA — `sinkModel` rows applied by
@@ -177,6 +183,20 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = sinkFunctionKind(constantStringValue(c.getArgument(cb))) and
     k >= da and
     k != cb and
+    n.asExpr() = c.getArgument(k)
+  )
+  or
+  // Array-callable METHOD dispatch: `call_user_func([$obj, 'query'], $sql)` / `array_map([$o,'m'], …)`
+  // where the callback names a MODELED sink method — the mirror of the string-callback sink above. Scoped
+  // to sink-method names (the same genericity as the direct `$obj->query()` sink, no extra FP), so a sink
+  // reached through this callable form is not silently lost.
+  exists(FunctionCall c, int cb, int da, int k, string m, int i |
+    callbackModel(c.getName(), cb, da) and
+    m = arrayCallableMethodName(c.getArgument(cb)) and
+    sinkModel("method", m, i, kind) and
+    k >= da and
+    k != cb and
+    (i = -1 or k = da + i) and
     n.asExpr() = c.getArgument(k)
   )
   or
