@@ -113,6 +113,18 @@ private string constantStringValue(Expr e) {
   e.(Php::EncapsedString).getChild(_).(Php::StringContent).getValue() = result
 }
 
+/**
+ * Holds when `e` is (or a `A | B` bit-or combination containing) an unsafe libxml flag — the entity /
+ * DTD-loading flags that re-enable XXE in an otherwise safe-by-default modern libxml.
+ */
+private predicate unsafeLibxmlFlag(Php::AstNode e) {
+  e.(Php::Name).getValue() = ["LIBXML_NOENT", "LIBXML_DTDLOAD", "LIBXML_DTDATTR", "LIBXML_DTDVALID"]
+  or
+  unsafeLibxmlFlag(e.(Php::BinaryExpression).getLeft())
+  or
+  unsafeLibxmlFlag(e.(Php::BinaryExpression).getRight())
+}
+
 /** Gets the referenced name if `e` is a first-class callable `name(...)` (PHP 8.1). */
 private string firstClassCallableName(Expr e) {
   exists(Php::FunctionCallExpression fc |
@@ -307,6 +319,25 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
       ] and
     n.asExpr() = c.getArgument(0) and
     kind = "path traversal"
+  )
+  or
+  // XXE — modern libxml disables external-entity / DTD loading BY DEFAULT, so an XML parse is only
+  // dangerous when an unsafe libxml flag (LIBXML_NOENT / a DTD-loading flag) is explicitly passed. We
+  // therefore flag the parsed-string argument ONLY when such a flag appears in the call, which keeps the
+  // safe-default majority free of false positives. Covers CVE-2023-38490 (Kirby) and the SAML2
+  // DOMDocument::loadXML class.
+  exists(FunctionCall c |
+    c.getName() = ["simplexml_load_string", "simplexml_load_file"] and
+    unsafeLibxmlFlag(c.getAnArgument()) and
+    n.asExpr() = c.getArgument(0) and
+    kind = "xxe"
+  )
+  or
+  exists(MethodCall c |
+    c.getMethodName() = ["loadXML", "loadHTML", "load"] and
+    unsafeLibxmlFlag(c.getAnArgument()) and
+    n.asExpr() = c.getArgument(0) and
+    kind = "xxe"
   )
   or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
