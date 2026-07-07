@@ -15,7 +15,9 @@ extensions:
       pack: codeql/php-all
       extensible: sourceModel
     data:
-      - ["function", "getenv", "remote"]
+      # NOTE: `getenv` is NOT a blanket source — `getenv('TEMP'/'PATH'/'HOME'/…)` are server-controlled.
+      # A structural `GetenvSource` (FlowSources.qll) fires only for user-controllable names (`HTTP_*`,
+      # request-derived) or a dynamic/absent key (conservative).
       - ["function", "apache_request_headers", "remote"]
       - ["function", "getallheaders", "remote"]
       - ["function", "filter_input", "remote"]

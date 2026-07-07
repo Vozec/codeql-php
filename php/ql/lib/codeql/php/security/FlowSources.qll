@@ -387,6 +387,33 @@ private class SymfonyBagSource extends RemoteFlowSource {
 }
 
 /**
+ * `getenv('HTTP_…')` and the request-derived CGI variables are user input, but `getenv('TEMP'/'PATH'/
+ * 'HOME'/…)` are SERVER-controlled and must not be sources — treating every `getenv()` as remote floods
+ * file/path sinks (e.g. a backup plugin building temp paths from `getenv('TEMP')`). A dynamic or absent
+ * key is treated conservatively as a source (it could resolve to an `HTTP_*` variable).
+ */
+private class GetenvSource extends RemoteFlowSource {
+  GetenvSource() {
+    exists(FunctionCall c | c.getName() = "getenv" and this.asExpr() = c |
+      // dynamic / absent / non-constant key → conservative (it could resolve to an `HTTP_*` variable)
+      not exists(constantStringValue(c.getArgument(0)))
+      or
+      exists(string k | k = constantStringValue(c.getArgument(0)).toUpperCase() |
+        k.matches("HTTP\\_%")
+        or
+        k =
+          [
+            "QUERY_STRING", "REQUEST_URI", "REQUEST_METHOD", "PATH_INFO", "PATH_TRANSLATED",
+            "CONTENT_TYPE", "CONTENT_LENGTH", "PHP_AUTH_USER", "PHP_AUTH_PW", "PHP_AUTH_DIGEST", "AUTH_TYPE"
+          ]
+      )
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * A class-scoped sink (`typedSinkModel`): an argument is a sink only when the call's receiver type (for
  * `$obj->m()`) or static scope (for `C::m()`) is the named class — so generic method names like
  * `get`/`query`/`request`/`read` are sinks on the right framework class without mass false positives.
