@@ -278,6 +278,20 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = "path traversal"
   )
   or
+  // PrestaShop DB facade: `Db::getInstance()->getValue($sql)` / `->getRow` / `->executeS` / `->execute`.
+  // `getValue`/`getRow` are far too common to model as bare method sinks, and `Db::getInstance()` is a
+  // static factory whose return type does not resolve — so, exactly like the Storage facade above, the
+  // query argument is matched structurally on the recognisable `Db::getInstance()` receiver, scoped to
+  // that facade (no generic `->getValue()` false positives) (CVE-2024-28391).
+  exists(MethodCall c, StaticMethodCall inst |
+    inst = c.getReceiver() and
+    inst.getMethodName() = "getInstance" and
+    inst.getTargetName() = "Db" and
+    c.getMethodName() = ["getValue", "getRow", "executeS", "ExecuteS", "execute", "query"] and
+    n.asExpr() = c.getArgument(0) and
+    kind = "SQL injection"
+  )
+  or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
   // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
   exists(Php::ObjectCreationExpression oc |
