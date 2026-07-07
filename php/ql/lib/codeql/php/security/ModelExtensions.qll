@@ -159,11 +159,45 @@ private string receiverClassName(VariableAccess recv) {
   recv.getName() = "wpdb" and result = "wpdb"
 }
 
+/** Gets the class whose method body (transitively) encloses `n` — the type of `$this` inside it. */
+private ClassLike enclosingClassOf(AstNode n) {
+  exists(Method m |
+    n.(Php::AstNode).getParent+() = m.(Php::MethodDeclaration).getBody() and
+    result = m.getDeclaringType()
+  )
+}
+
+/**
+ * Resolves the class of a `$this->prop` receiver from a `$this->prop = <typed value>` assignment in the
+ * SAME class. Covers the extremely common idiom of caching a framework object in a property —
+ * `$this->db = $wpdb; … $this->db->prepare(…)` — so a class-scoped sanitizer/sink still applies. Without
+ * this, a whole DB-manager class of parameterised `$this->db->prepare()` queries reads as unsanitised.
+ */
+private string propertyReceiverClassName(Php::MemberAccessExpression prop) {
+  exists(string f, ClassLike cls, AssignExpr a, Php::MemberAccessExpression w |
+    prop.getObject().(Php::VariableName).getChild().getValue() = "this" and
+    prop.getName().(Php::Name).getValue() = f and
+    enclosingClassOf(prop) = cls and
+    a.getLhs() = w and
+    w.getObject().(Php::VariableName).getChild().getValue() = "this" and
+    w.getName().(Php::Name).getValue() = f and
+    enclosingClassOf(w) = cls
+  |
+    a.getRhs().(VariableAccess).getName() = "wpdb" and result = "wpdb"
+    or
+    result = a.getRhs().(NewExpr).getClassName()
+  )
+}
+
 private class TypedSanitizer extends Sanitizer {
   TypedSanitizer() {
     exists(MethodCall c, string cls |
       typedSanitizerModel(cls, c.getMethodName()) and
-      (receiverClassName(c.getReceiver()) = cls or TI::exprTypeName(c.getReceiver()) = cls) and
+      (
+        receiverClassName(c.getReceiver()) = cls or
+        TI::exprTypeName(c.getReceiver()) = cls or
+        propertyReceiverClassName(c.getReceiver()) = cls
+      ) and
       this.asExpr() = c
     )
   }
