@@ -31,6 +31,7 @@ extensions:
       - ["method", "replacePrefix", 0, "SQL injection"]
       # Redirect — $app->redirect($url) (distinctive on the application).
       - ["method", "redirect", 0, "open redirect"]
+      - ["method", "setRedirect", 0, "open redirect"]    # JApplication::setRedirect($url)
 
   # Typed sinks: Http transport + File I/O — generic names (get/read/delete) scoped to their class.
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
