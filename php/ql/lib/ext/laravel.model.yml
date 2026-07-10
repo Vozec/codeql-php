@@ -82,6 +82,11 @@ extensions:
       - ["PendingRequest", "send", 1, "server-side request forgery"]
       # Storage / filesystem — path is arg 0.
       - ["Storage", "get", 0, "path traversal"]
+      # spatie/browsershot headless-Chrome — url() fetches (SSRF), html() can read local files
+      - ["Browsershot", "url", 0, "server-side request forgery"]
+      - ["Browsershot", "setUrl", 0, "server-side request forgery"]
+      - ["Browsershot", "html", 0, "path traversal"]
+      - ["Browsershot", "setHtml", 0, "path traversal"]
       - ["Storage", "put", 0, "path traversal"]
       - ["Storage", "download", 0, "path traversal"]
       - ["Storage", "delete", 0, "path traversal"]
