@@ -494,6 +494,27 @@ private class GetpostSource extends RemoteFlowSource {
 }
 
 /**
+ * OpenCart request: `$this->request->get['x']` / `->post` / `->cookie` / `->request`. The Request object's
+ * public arrays are populated from the superglobals. Scoped to the `(...->request)->{get,post,cookie,
+ * request}[...]` chain so the generic property names never fire outside that idiom.
+ */
+private class OpenCartRequestSource extends RemoteFlowSource {
+  OpenCartRequestSource() {
+    exists(
+      Php::SubscriptExpression sub, Php::MemberAccessExpression prop, Php::MemberAccessExpression req
+    |
+      prop = sub.getChild(0) and
+      prop.getName().(Php::Name).getValue() = ["get", "post", "cookie", "request"] and
+      req = prop.getObject() and
+      req.getName().(Php::Name).getValue() = "request" and
+      this.asExpr() = sub
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * A class-scoped sink (`typedSinkModel`): an argument is a sink only when the call's receiver type (for
  * `$obj->m()`) or static scope (for `C::m()`) is the named class — so generic method names like
  * `get`/`query`/`request`/`read` are sinks on the right framework class without mass false positives.
