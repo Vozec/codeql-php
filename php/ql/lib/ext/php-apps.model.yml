@@ -1,0 +1,21 @@
+# Raw-SQL execution wrappers for standalone PHP apps. Distinctive names (no collision); the SQL-string
+# arg is targeted so parameterised calls are not flagged. Same discipline as the Cacti/Moodle models.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "db_query", 0, "SQL injection"]          # osTicket
+      - ["function", "dbFetchRows", 0, "SQL injection"]       # LibreNMS (dbFacile)
+      - ["function", "dbFetchRow", 0, "SQL injection"]
+      - ["function", "dbFetchCell", 0, "SQL injection"]
+      - ["function", "dbFetchColumn", 0, "SQL injection"]
+      - ["function", "dbFetchKeyValue", 0, "SQL injection"]
+      - ["function", "pwg_query", 0, "SQL injection"]         # Piwigo
+      - ["method", "runQuery", 0, "SQL injection"]            # phpIPAM PDO wrapper
+      - ["method", "get_full_list", 1, "SQL injection"]       # SuiteCRM SugarBean (arg1 = raw WHERE)
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Database", "query", 0, "SQL injection"]             # Chamilo Database::query
+      - ["Database", "select", 0, "SQL injection"]            # Chamilo Database::select
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "get_vars", "librenms-request"]          # LibreNMS merged GET/POST accessor
