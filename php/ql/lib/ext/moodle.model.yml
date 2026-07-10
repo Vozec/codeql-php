@@ -1,0 +1,22 @@
+# Moodle Models-as-Data. optional_param/required_param are Moodle's universal request accessors; the
+# get_*_sql / *_select $DB methods run raw SQL (distinctive names, no collision). The SQL-string arg is
+# targeted (not the params arg) so parameterised queries are not flagged.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "optional_param", "moodle-request"]
+      - ["function", "required_param", "moodle-request"]
+      - ["function", "optional_param_array", "moodle-request"]
+      - ["function", "required_param_array", "moodle-request"]
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "get_records_sql", 0, "SQL injection"]
+      - ["method", "get_record_sql", 0, "SQL injection"]
+      - ["method", "get_recordset_sql", 0, "SQL injection"]
+      - ["method", "get_field_sql", 0, "SQL injection"]
+      - ["method", "get_fieldset_sql", 0, "SQL injection"]
+      - ["method", "count_records_sql", 0, "SQL injection"]
+      - ["method", "get_records_select", 1, "SQL injection"]
+      - ["method", "get_record_select", 1, "SQL injection"]
+      - ["method", "count_records_select", 1, "SQL injection"]
+      - ["method", "delete_records_select", 1, "SQL injection"]

@@ -1,0 +1,9 @@
+# SilverStripe Models-as-Data. HTTPRequest getVar/postVar/requestVar are the request accessors; scoped to
+# the HTTPRequest class (typedSourceModel) so the generic method names never fire elsewhere.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["HTTPRequest", "getVar", "silverstripe-request"]
+      - ["HTTPRequest", "getVars", "silverstripe-request"]
+      - ["HTTPRequest", "postVar", "silverstripe-request"]
+      - ["HTTPRequest", "requestVar", "silverstripe-request"]
