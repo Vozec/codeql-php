@@ -1,0 +1,8 @@
+edges
+nodes
+| test.php:7:24:7:44 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:15:26:15:58 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+subpaths
+#select
+| test.php:7:24:7:44 | FunctionCallExpression | test.php:7:24:7:44 | FunctionCallExpression | test.php:7:24:7:44 | FunctionCallExpression | This sink executes a value read from a store that is $@. | test.php:7:24:7:44 | FunctionCallExpression | written from user input in another request |
+| test.php:15:26:15:58 | FunctionCallExpression | test.php:15:26:15:58 | FunctionCallExpression | test.php:15:26:15:58 | FunctionCallExpression | This sink executes a value read from a store that is $@. | test.php:15:26:15:58 | FunctionCallExpression | written from user input in another request |
