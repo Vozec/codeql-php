@@ -45,6 +45,21 @@ extensible predicate stepModel(string subjectKind, string name, int fromArg, int
 extensible predicate sanitizerModel(string subjectKind, string name);
 
 /**
+ * A key-value store WRITE `name(...)` (`subjectKind` = "function" | "method"): the constant KEY is at
+ * `keyArg` (and, for composite scope|name stores, also `keyArg2`, else -1), the stored VALUE at
+ * `valueArg`. Drives the second-order `php/stored-injection` query — the store API is DATA, not QL.
+ */
+extensible predicate storeWriteModel(
+  string subjectKind, string name, int keyArg, int keyArg2, int valueArg
+);
+
+/**
+ * A key-value store READ `name(...)` returning the value stored at the constant key at `keyArg` (and
+ * `keyArg2` for composite keys, else -1). Correlated to `storeWriteModel` by key.
+ */
+extensible predicate storeReadModel(string subjectKind, string name, int keyArg, int keyArg2);
+
+/**
  * A validator function used as a branch GUARD: `if (g($x)) { … }` establishes that `$x` is safe on the
  * controlled branch (its result is a boolean, not a sanitized value). The NAMES are data here; the
  * barrier STRUCTURE (`isGuardedRead`) stays in QL.

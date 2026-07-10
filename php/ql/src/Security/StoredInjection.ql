@@ -19,38 +19,45 @@ import codeql.php.DataFlow
 import codeql.php.TaintTracking
 import codeql.php.Concepts
 import codeql.php.security.FlowSources
+import codeql.php.security.ModelExtensions
 
 /** The constant string value of `e` if it is a string literal (single- or double-quoted). */
 private string keyString(Expr e) { result = e.(StringLiteral).getValue() }
 
+/** Holds when `c` is a call to the function/method `name` (`subjectKind` = "function" | "method"). */
+private predicate callMatches(Call c, string subjectKind, string name) {
+  subjectKind = "function" and c.(FunctionCall).getName() = name
+  or
+  subjectKind = "method" and c.(MethodCall).getMethodName() = name
+}
+
+/** The (possibly composite `scope|name`) constant key of call `c` at `keyArg` / `keyArg2` (-1 = none). */
+private string keyOf(Call c, int keyArg, int keyArg2) {
+  keyArg2 = -1 and result = keyString(c.getArgument(keyArg))
+  or
+  keyArg2 >= 0 and
+  result = keyString(c.getArgument(keyArg)) + "|" + keyString(c.getArgument(keyArg2))
+}
+
 /**
- * A key-value store WRITE `fn(...)` whose stored VALUE is `value` and whose constant KEY is `key`.
- * Only the WordPress option / metadata / transient setters — all take a constant string key.
+ * A key-value store WRITE whose stored VALUE is `value` and whose constant KEY is `key`. The store APIs
+ * are Models-as-Data (`storeWriteModel`), so covering a new store is a data addition, not QL.
  */
-private predicate storeWrite(FunctionCall w, string key, Expr value) {
-  exists(string fn | fn = w.getName() |
-    fn = ["update_option", "add_option", "update_site_option"] and
-    key = keyString(w.getArgument(0)) and
-    value = w.getArgument(1)
-    or
-    fn = ["update_post_meta", "update_user_meta", "update_term_meta"] and
-    key = keyString(w.getArgument(1)) and
-    value = w.getArgument(2)
-    or
-    fn = ["set_transient", "set_site_transient"] and
-    key = keyString(w.getArgument(0)) and
-    value = w.getArgument(1)
+private predicate storeWrite(Call w, string key, Expr value) {
+  exists(string subj, string name, int keyArg, int keyArg2, int valueArg |
+    storeWriteModel(subj, name, keyArg, keyArg2, valueArg) and
+    callMatches(w, subj, name) and
+    key = keyOf(w, keyArg, keyArg2) and
+    value = w.getArgument(valueArg)
   )
 }
 
-/** A key-value store READ `fn(...)` returning the value stored at constant `key`. */
-private predicate storeRead(FunctionCall r, string key) {
-  exists(string fn | fn = r.getName() |
-    fn = ["get_option", "get_site_option"] and key = keyString(r.getArgument(0))
-    or
-    fn = ["get_post_meta", "get_user_meta", "get_term_meta"] and key = keyString(r.getArgument(1))
-    or
-    fn = ["get_transient", "get_site_transient"] and key = keyString(r.getArgument(0))
+/** A key-value store READ returning the value stored at constant `key` (`storeReadModel` data). */
+private predicate storeRead(Call r, string key) {
+  exists(string subj, string name, int keyArg, int keyArg2 |
+    storeReadModel(subj, name, keyArg, keyArg2) and
+    callMatches(r, subj, name) and
+    key = keyOf(r, keyArg, keyArg2)
   )
 }
 
@@ -77,9 +84,7 @@ private predicate userWritableKey(string key) {
  */
 class StoredSource extends DataFlow::Node {
   StoredSource() {
-    exists(FunctionCall r, string key |
-      storeRead(r, key) and userWritableKey(key) and this.asExpr() = r
-    )
+    exists(Call r, string key | storeRead(r, key) and userWritableKey(key) and this.asExpr() = r)
   }
 }
 

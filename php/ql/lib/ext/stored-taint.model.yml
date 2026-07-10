@@ -1,0 +1,37 @@
+# Key-value store read/write APIs for the second-order `php/stored-injection` query. The QL is generic
+# (correlate a store READ with a same-key store WRITE proven to carry user input); WHICH functions/methods
+# are stores is DATA here, so covering a new plugin's store is a data addition, not an engine change.
+#
+# storeWriteModel: [subjectKind, name, keyArg, keyArg2, valueArg]   (keyArg2 = -1 unless composite key)
+# storeReadModel:  [subjectKind, name, keyArg, keyArg2]
+extensions:
+  - addsTo:
+      pack: codeql/php-all
+      extensible: storeWriteModel
+    data:
+      # --- WordPress core option / metadata / transient setters (universal APIs) ---
+      - ["function", "update_option", 0, -1, 1]
+      - ["function", "add_option", 0, -1, 1]
+      - ["function", "update_site_option", 0, -1, 1]
+      - ["function", "update_post_meta", 1, -1, 2]
+      - ["function", "update_user_meta", 1, -1, 2]
+      - ["function", "update_term_meta", 1, -1, 2]
+      - ["function", "set_transient", 0, -1, 1]
+      - ["function", "set_site_transient", 0, -1, 1]
+      # --- Common WP-plugin meta-wrapper convention: `$obj->update_meta(key, value)` ---
+      - ["method", "update_meta", 0, -1, 1]
+      # --- Per-app settings stores (opt-in data; composite scope|name key) ---
+      - ["method", "updateSettingByScope", 0, 1, 2]        # Gibbon
+  - addsTo:
+      pack: codeql/php-all
+      extensible: storeReadModel
+    data:
+      - ["function", "get_option", 0, -1]
+      - ["function", "get_site_option", 0, -1]
+      - ["function", "get_post_meta", 1, -1]
+      - ["function", "get_user_meta", 1, -1]
+      - ["function", "get_term_meta", 1, -1]
+      - ["function", "get_transient", 0, -1]
+      - ["function", "get_site_transient", 0, -1]
+      - ["method", "get_meta", 1, -1]
+      - ["method", "getSettingByScope", 0, 1]              # Gibbon
