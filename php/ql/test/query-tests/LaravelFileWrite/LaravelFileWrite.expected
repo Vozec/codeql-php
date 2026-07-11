@@ -1,0 +1,8 @@
+edges
+| test.php:7:13:7:35 | MemberCallExpression | test.php:8:54:8:58 | VariableName | provenance |  |
+nodes
+| test.php:7:13:7:35 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:8:54:8:58 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:8:54:8:58 | VariableName | test.php:7:13:7:35 | MemberCallExpression | test.php:8:54:8:58 | VariableName | This file path depends on a $@. | test.php:7:13:7:35 | MemberCallExpression | user-provided value |
