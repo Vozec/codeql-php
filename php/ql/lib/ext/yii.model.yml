@@ -18,6 +18,10 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       - ["method", "createCommand", 0, "SQL injection"]        # $connection->createCommand($sql)
+      # Yii::createObject($type) instantiates a class named by $type (string or `['class'=>…]` config);
+      # a user-controlled type is arbitrary object instantiation => RCE (Craft CVE-2023-41892). The name
+      # is distinctive to Yii, and a constant class argument (the normal case) carries no taint => no FP.
+      - ["staticmethod", "createObject", 0, "code injection"]
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
     data:
       - ["Command", "setSql", 0, "SQL injection"]              # $command->setSql($sql)
