@@ -73,6 +73,11 @@ extensions:
       - ["method", "fetchNumeric", 0, "SQL injection"]
       - ["method", "fetchFirstColumn", 0, "SQL injection"]
       - ["method", "iterateAssociative", 0, "SQL injection"]
+      # Pimcore ORM Listing raw WHERE: `$list->setCondition($sql, $params)` uses $sql as the WHERE clause of
+      # the listing query, executed on load(). Safe when parameterised (`setCondition('x = ?', [$v])` — arg 0
+      # is a constant); a tainted CONCATENATED condition is SQLi. Taint-gated, so parameterised calls stay
+      # clean. Used pervasively across Pimcore admin grid filters (CVE-2026-44741, CVE-2026-55208).
+      - ["method", "setCondition", 0, "SQL injection"]
       # Symfony Filesystem — distinctive path sinks (dumpFile/appendToFile/mirror).
       - ["method", "dumpFile", 0, "path traversal"]
       - ["method", "appendToFile", 0, "path traversal"]
