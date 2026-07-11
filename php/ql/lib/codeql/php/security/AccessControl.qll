@@ -132,6 +132,20 @@ private AstNode callableBody(Callable c) {
 /** A call inside callable `c`'s body (transitively). */
 private Call callIn(Callable c) { result.(Php::AstNode).getParent+() = callableBody(c) }
 
+/** A global function directly called from `c`'s body, resolved by name (function names are global in PHP,
+ *  so this is precise). Method-call resolution is intentionally omitted here (needs receiver types). */
+private Function directCallee(Callable c) {
+  exists(FunctionCall fc | fc = callIn(c) and fc.getName() = result.getName())
+}
+
+/** The set of callables reachable from `c` by following global function calls (bounded by the finite set
+ *  of functions). Lets an entrypoint that DELEGATES the sensitive work to a helper still be analysed. */
+private Callable reaches(Callable c) {
+  result = c
+  or
+  result = directCallee(reaches(c))
+}
+
 /** Holds if `call` matches `authorizationGuardModel`. */
 predicate isAuthorizationGuard(Call call) {
   exists(string sk, string nm | authorizationGuardModel(sk, nm) |
@@ -154,17 +168,49 @@ predicate isSensitiveAction(Call call, string category) {
   )
 }
 
-/** Holds if the entrypoint `e` contains any authorization guard in its body. */
-predicate hasGuard(Entrypoint e) { isAuthorizationGuard(callIn(e)) }
+/** Holds if the entrypoint `e`, or any helper it reaches, contains an authorization guard. Inter-procedural
+ *  so a capability check factored into a shared helper still suppresses the finding (fewer false positives). */
+predicate hasGuard(Entrypoint e) { isAuthorizationGuard(callIn(reaches(e))) }
 
 /**
- * A MISSING-AUTHORIZATION finding: an attacker-reachable entrypoint that performs a sensitive action but
- * has NO authorization guard anywhere in its handler body. `action` is the offending call; `category` its
- * kind; `priv` the entrypoint's privilege level (unauthenticated is the most severe).
+ * A MISSING-AUTHORIZATION finding: an attacker-reachable entrypoint that performs a sensitive action —
+ * directly OR via a helper it reaches — with NO authorization guard anywhere on that reachable code. `action`
+ * is the offending call; `category` its kind; `priv` the entrypoint's privilege level (unauthenticated is
+ * the most severe).
  */
 predicate missingAuthorization(Entrypoint e, Call action, string category, string priv) {
-  action = callIn(e) and
+  action = callIn(reaches(e)) and
   isSensitiveAction(action, category) and
   priv = e.getPrivilegeLevel() and
   not hasGuard(e)
+}
+
+// ---- IDOR support (used by Idor.ql, a taint query) ------------------------------------------------
+
+/** The RESOURCE-SELECTOR argument index of a sensitive action call — the `argIndex` of a
+ *  `sensitiveActionModel` row with a concrete index (>= 0). A request value flowing here selects which
+ *  object is acted on; if the context is unguarded that is IDOR / broken access control. */
+predicate sensitiveResourceArg(Call call, int argIndex, string category) {
+  exists(string sk, string nm |
+    sensitiveActionModel(sk, nm, argIndex, category) and argIndex >= 0
+  |
+    sk = "function" and call.(FunctionCall).getName() = nm
+    or
+    sk = "method" and call.(MethodCall).getMethodName() = nm
+    or
+    sk = "staticmethod" and call.(StaticMethodCall).getMethodName() = nm
+  )
+}
+
+/**
+ * Holds if `call` is NOT authorization-gated: no authorization guard appears in the sink's own enclosing
+ * callable(s) (the function/method lexically containing it). A real capability gate is almost always in the
+ * same function as the sensitive call (`if (!current_user_can(..)) return; ...; wp_delete_post(..)`).
+ * TRANSITIVE callee/caller reachability was tried and rejected: over global function names it connects an
+ * interconnected plugin's handler to unrelated guarded functions and silently suppresses real bugs.
+ * Guard-in-a-directly-called-wrapper is a documented residual limitation.
+ */
+predicate isUnguardedContext(Call call) {
+  exists(Callable c | call = callIn(c)) and
+  not exists(Callable c | call = callIn(c) and isAuthorizationGuard(callIn(c)))
 }

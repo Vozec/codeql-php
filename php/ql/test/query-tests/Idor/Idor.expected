@@ -1,0 +1,8 @@
+edges
+| test.php:5:11:5:16 | VariableName | test.php:6:20:6:22 | VariableName | provenance |  |
+nodes
+| test.php:5:11:5:16 | VariableName | semmle.label | VariableName |
+| test.php:6:20:6:22 | VariableName | semmle.label | VariableName |
+subpaths
+#select
+| test.php:6:20:6:22 | VariableName | test.php:5:11:5:16 | VariableName | test.php:6:20:6:22 | VariableName | This resource selector of a sensitive action is a $@ and the action has no authorization check (IDOR). | test.php:5:11:5:16 | VariableName | user-provided value |
