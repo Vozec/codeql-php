@@ -60,6 +60,10 @@ extensions:
       - ["function", "file", -1, "path traversal"]
       - ["function", "unlink", -1, "path traversal"]
       - ["function", "fwrite", -1, "path traversal"]
+      # move_uploaded_file($tmp, $dest) — the canonical upload sink. The DESTINATION (arg 1) decides
+      # where (and under what name/extension) the upload lands; an attacker-controlled destination is
+      # arbitrary file write => webshell/RCE. arg 0 is the server-set temp path, so scope to arg 1.
+      - ["function", "move_uploaded_file", 1, "path traversal"]
       - ["function", "copy", -1, "path traversal"]
       - ["function", "rename", -1, "path traversal"]
       - ["function", "mkdir", -1, "path traversal"]
