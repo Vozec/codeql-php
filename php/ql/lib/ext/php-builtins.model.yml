@@ -119,6 +119,9 @@ extensions:
       - ["function", "ldap_list", -1, "LDAP injection"]
       - ["function", "ldap_read", -1, "LDAP injection"]
       - ["function", "ldap_bind", -1, "LDAP injection"]
+      # XPath injection: SimpleXMLElement::xpath($expr) — `xpath` is a distinctive method name, so
+      # matching by name is precise. (DOMXPath::query/evaluate use generic names -> typed sinks below.)
+      - ["method", "xpath", -1, "xpath injection"]
       # unsafe deserialization
       - ["function", "unserialize", -1, "unsafe deserialization"]
 
@@ -310,3 +313,7 @@ extensions:
       - ["SplFileObject", "__construct", 0, "file read"]
       - ["SplFileInfo", "__construct", 0, "file read"]
       - ["SplFileInfo", "openFile", 0, "file read"]
+      # XPath injection: DOMXPath::query/evaluate take the XPath expression at arg 0. `query`/`evaluate`
+      # are generic names, so scope to the DOMXPath class (SimpleXMLElement::xpath is by-name above).
+      - ["DOMXPath", "query", 0, "xpath injection"]
+      - ["DOMXPath", "evaluate", 0, "xpath injection"]

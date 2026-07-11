@@ -1,0 +1,12 @@
+edges
+| test.php:5:13:5:17 | VariableName | test.php:6:24:6:53 | BinaryExpression | provenance |  |
+| test.php:10:13:10:17 | VariableName | test.php:11:26:11:55 | BinaryExpression | provenance |  |
+nodes
+| test.php:5:13:5:17 | VariableName | semmle.label | VariableName |
+| test.php:6:24:6:53 | BinaryExpression | semmle.label | BinaryExpression |
+| test.php:10:13:10:17 | VariableName | semmle.label | VariableName |
+| test.php:11:26:11:55 | BinaryExpression | semmle.label | BinaryExpression |
+subpaths
+#select
+| test.php:6:24:6:53 | BinaryExpression | test.php:5:13:5:17 | VariableName | test.php:6:24:6:53 | BinaryExpression | This XPath expression depends on a $@. | test.php:5:13:5:17 | VariableName | user-provided value |
+| test.php:11:26:11:55 | BinaryExpression | test.php:10:13:10:17 | VariableName | test.php:11:26:11:55 | BinaryExpression | This XPath expression depends on a $@. | test.php:10:13:10:17 | VariableName | user-provided value |
