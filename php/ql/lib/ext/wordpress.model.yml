@@ -64,6 +64,9 @@ extensions:
       - ["function", "sanitize_textarea_field", 0, -1]
 
   # Type-scoped: `$wpdb->prepare()` sanitizes ONLY on a real wpdb (a custom ->prepare() does not).
+  # NB: this sanitizes the RETURN (so correctly-bound queries are clean downstream), but a tainted
+  # FORMAT string still hits the bare `prepare` arg0 SQLi sink at the prepare call itself — so
+  # prepare-misuse (tainted value concatenated into arg0, e.g. Tutor CVE-2024-1751) is still caught.
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:
       - ["wpdb", "prepare"]
