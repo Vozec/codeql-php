@@ -1,0 +1,11 @@
+# Contao Models-as-Data. `Contao\Input` is the framework's canonical request accessor; its get/post/
+# cookie methods are called statically (`Input::post('x')`). Scoped to the Input class via
+# typedSourceModel (matched as a class-qualified static call) so the generic names never fire elsewhere.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Input", "get", "contao-input"]
+      - ["Input", "post", "contao-input"]
+      - ["Input", "postRaw", "contao-input"]
+      - ["Input", "postHtml", "contao-input"]
+      - ["Input", "cookie", "contao-input"]

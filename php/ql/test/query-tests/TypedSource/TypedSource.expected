@@ -2,7 +2,9 @@ edges
 nodes
 | test.php:13:12:13:27 | MemberCallExpression | semmle.label | MemberCallExpression |
 | test.php:14:12:14:32 | MemberCallExpression | semmle.label | MemberCallExpression |
+| test.php:28:12:28:29 | ScopedCallExpression | semmle.label | ScopedCallExpression |
 subpaths
 #select
 | test.php:13:12:13:27 | MemberCallExpression | test.php:13:12:13:27 | MemberCallExpression | test.php:13:12:13:27 | MemberCallExpression | This shell command depends on a $@. | test.php:13:12:13:27 | MemberCallExpression | user-provided value |
 | test.php:14:12:14:32 | MemberCallExpression | test.php:14:12:14:32 | MemberCallExpression | test.php:14:12:14:32 | MemberCallExpression | This shell command depends on a $@. | test.php:14:12:14:32 | MemberCallExpression | user-provided value |
+| test.php:28:12:28:29 | ScopedCallExpression | test.php:28:12:28:29 | ScopedCallExpression | test.php:28:12:28:29 | ScopedCallExpression | This shell command depends on a $@. | test.php:28:12:28:29 | ScopedCallExpression | user-provided value |

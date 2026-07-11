@@ -384,6 +384,28 @@ private class TypedRemoteSource extends RemoteFlowSource {
 }
 
 /**
+ * A class-qualified STATIC method source (`typedSourceModel` reused for static calls): `Input::post()`
+ * (Contao) is a source only when the scope qualifier is exactly the named class, so a bare `post`/`get`
+ * cannot FP across unrelated classes. The qualifier is known syntactically (`getTargetName()`), so this
+ * needs no type inference and works even when the class lives in an un-extracted `vendor/`. Because both
+ * the class name AND the method must match, `Model::all()` never matches a `["Request","all",…]` entry.
+ */
+private class TypedStaticRemoteSource extends RemoteFlowSource {
+  string sourceType;
+
+  TypedStaticRemoteSource() {
+    exists(StaticMethodCall c, string cls, string m |
+      typedSourceModel(cls, m, sourceType) and
+      c.getTargetName() = cls and
+      c.getMethodName() = m and
+      this.asExpr() = c
+    )
+  }
+
+  override string getSourceType() { result = sourceType }
+}
+
+/**
  * A property access on a Laravel `Request` (`$request->field`) — the framework's `__get` returns the
  * corresponding input value, so any non-method property read of a Request-typed receiver is user input.
  * A few framework-internal names (the authenticated user, the route/session objects) are excluded.

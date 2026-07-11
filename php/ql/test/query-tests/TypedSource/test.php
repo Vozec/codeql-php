@@ -17,3 +17,17 @@ function handle(Request $req) {
 function load(Repository $repo) {
     system($repo->get('id'));       // safe: Repository::get is not a request source
 }
+
+// Class-qualified STATIC sources: `Input::post()` (Contao) is tainted; the qualifier must match the
+// modeled class, so a same-named static method on an unrelated class is NOT a source.
+class NotInput {
+    public static function post($k) {}
+}
+
+function handleStatic() {
+    system(Input::post('cmd'));     // BUG: Input::post is a Contao request source
+}
+
+function safeStatic() {
+    system(NotInput::post('id'));   // safe: NotInput::post is not modeled
+}
