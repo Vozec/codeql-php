@@ -3,8 +3,9 @@
  * @description A request-controlled value selects the resource operated on by a sensitive/state-changing
  *              action (delete/update/role-change), and the action is not protected by any authorization
  *              check. An attacker can act on objects they do not own — broken access control. Numeric
- *              sanitizers (`intval`/`absint`) stop injection but NOT IDOR: the value is still
- *              attacker-controlled for resource selection, so it stays tainted here.
+ *              sanitizers (`intval`/`absint`/`is_numeric`) stop injection but NOT IDOR: the value is still
+ *              attacker-controlled for resource selection, so it stays tainted here (access-control taint
+ *              engine).
  * @kind path-problem
  * @problem.severity error
  * @security-severity 8.1
@@ -17,9 +18,9 @@
 
 import codeql.php.AST
 import codeql.php.DataFlow
-import codeql.php.TaintTracking
 import codeql.php.security.FlowSources
 import codeql.php.security.AccessControl
+import codeql.php.security.AccessControlTaint
 
 module IdorCfg implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node n) { n instanceof RemoteFlowSource }
@@ -31,10 +32,12 @@ module IdorCfg implements DataFlow::ConfigSig {
       n.asExpr() = call.getArgument(i)
     )
   }
-
 }
 
-module IdorFlow = TaintTracking::Global<IdorCfg>;
+// Access-control taint: identical to the standard engine but numeric coercion/validation does NOT sanitize
+// (a numeric id is still attacker-chosen), so `delete(intval($_GET['id']))` and `if(is_numeric($id))
+// delete($id)` are caught.
+module IdorFlow = AcTaintTracking::Global<IdorCfg>;
 
 import IdorFlow::PathGraph
 

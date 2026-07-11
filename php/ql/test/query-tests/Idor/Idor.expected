@@ -1,8 +1,16 @@
 edges
 | test.php:5:11:5:16 | VariableName | test.php:6:20:6:22 | VariableName | provenance |  |
+| test.php:12:27:12:31 | VariableName | test.php:12:20:12:39 | FunctionCallExpression | provenance | ac-numeric-coercion |
+| test.php:18:24:18:28 | VariableName | test.php:18:24:18:35 | SubscriptExpression | provenance |  |
 nodes
 | test.php:5:11:5:16 | VariableName | semmle.label | VariableName |
 | test.php:6:20:6:22 | VariableName | semmle.label | VariableName |
+| test.php:12:20:12:39 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+| test.php:12:27:12:31 | VariableName | semmle.label | VariableName |
+| test.php:18:24:18:28 | VariableName | semmle.label | VariableName |
+| test.php:18:24:18:35 | SubscriptExpression | semmle.label | SubscriptExpression |
 subpaths
 #select
 | test.php:6:20:6:22 | VariableName | test.php:5:11:5:16 | VariableName | test.php:6:20:6:22 | VariableName | This resource selector of a sensitive action is a $@ and the action has no authorization check (IDOR). | test.php:5:11:5:16 | VariableName | user-provided value |
+| test.php:12:20:12:39 | FunctionCallExpression | test.php:12:27:12:31 | VariableName | test.php:12:20:12:39 | FunctionCallExpression | This resource selector of a sensitive action is a $@ and the action has no authorization check (IDOR). | test.php:12:27:12:31 | VariableName | user-provided value |
+| test.php:18:24:18:35 | SubscriptExpression | test.php:18:24:18:28 | VariableName | test.php:18:24:18:35 | SubscriptExpression | This resource selector of a sensitive action is a $@ and the action has no authorization check (IDOR). | test.php:18:24:18:28 | VariableName | user-provided value |
