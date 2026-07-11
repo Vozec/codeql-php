@@ -108,3 +108,11 @@ extensions:
       - ["method", "camel", -2, -1]
       - ["method", "snake", -2, -1]
       - ["method", "truncate", -2, -1]
+  # Symfony ExpressionLanguage — evaluate()/compile() run the expression as code. Type-scoped to the
+  # ExpressionLanguage class because the bare method names are far too generic (Sulu CVE-2021-43836:
+  # an attacker-controlled route-scheme expression reaches evaluate() and pulls the Translator into
+  # scope to include() an arbitrary PHP file => RCE).
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["ExpressionLanguage", "evaluate", 0, "code injection"]
+      - ["ExpressionLanguage", "compile", 0, "code injection"]
