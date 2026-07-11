@@ -44,6 +44,14 @@ extensions:
       - ["method", "orWhere", -1, "SQL injection"]
       - ["method", "andHaving", -1, "SQL injection"]
       - ["method", "orHaving", -1, "SQL injection"]
+      # Doctrine QueryBuilder select/order fragments. addSelect/addOrderBy are distinctive Doctrine
+      # names (Laravel uses select/orderBy); the aggregation alias and ORDER column are interpolated
+      # raw (Shopware CVE-2024-42357 addSelect, Bolt CVE-2026-39229 addOrderBy).
+      - ["method", "addSelect", 0, "SQL injection"]
+      - ["method", "addOrderBy", 0, "SQL injection"]
+      # orderBy's *direction* (arg 1) is concatenated unbound in several apps (Sylius CVE-2026-31825,
+      # Mautic CVE-2026-3105). arg 0 is already covered by the Laravel model; here we add only arg 1.
+      - ["method", "orderBy", 1, "SQL injection"]
       # Symfony controller redirect
       - ["method", "redirect", 0, "open redirect"]
       # Symfony Process — `$process->mustRun()` runs the (possibly tainted) command line.
