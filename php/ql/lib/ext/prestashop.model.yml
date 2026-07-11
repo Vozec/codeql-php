@@ -18,6 +18,9 @@ extensions:
       # so matching by method name is precise). The whole SQL string (any arg) is the sink.
       - ["method", "executeS", -1, "SQL injection"]
       - ["method", "ExecuteS", -1, "SQL injection"]
+      # Db::getInstance()->getRow($sql) — the raw-SQL single-row fetch. `getRow` is PrestaShop-specific
+      # ($wpdb uses get_row, Doctrine/PDO do not have it), so matching by name stays precise (no FP).
+      - ["method", "getRow", -1, "SQL injection"]
       # Open redirect: Tools::redirect / redirectLink / redirectAdmin take the destination URL at arg 0.
       - ["staticmethod", "redirect", 0, "open redirect"]
       - ["staticmethod", "redirectLink", 0, "open redirect"]
