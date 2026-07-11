@@ -39,6 +39,12 @@ extensions:
       - ["function", "eval", -1, "code injection"]
       - ["function", "assert", -1, "code injection"]
       - ["function", "create_function", -1, "code injection"]
+      # call_user_func($callable, …) / call_user_func_array — a user-controlled CALLABLE (arg 0) is an
+      # arbitrary function call => RCE (e.g. call_user_func($_POST['callback'], …)). Scoped to arg 0
+      # (the callable); a tainted argument in a constant-callable call is not this sink. Only fires when
+      # the callable itself is tainted, so ordinary hook/dispatch usage (constant callables) is clean.
+      - ["function", "call_user_func", 0, "code injection"]
+      - ["function", "call_user_func_array", 0, "code injection"]
       # SQL injection
       - ["function", "mysqli_query", -1, "SQL injection"]
       - ["function", "mysql_query", -1, "SQL injection"]
