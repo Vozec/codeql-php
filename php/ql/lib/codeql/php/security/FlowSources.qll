@@ -516,6 +516,23 @@ private class GetpostSource extends RemoteFlowSource {
 }
 
 /**
+ * `file_get_contents('php://input')` — the raw HTTP request body. REST/webhook/JSON-API handlers read
+ * user input this way, so the call result is a remote source. Keyed on the literal `php://input` argument
+ * (NOT `file_get_contents` in general, which is an ordinary file read), so it never fires elsewhere.
+ */
+private class PhpInputSource extends RemoteFlowSource {
+  PhpInputSource() {
+    exists(FunctionCall c |
+      c.getName() = "file_get_contents" and
+      constantStringValue(c.getArgument(0)) = "php://input" and
+      this.asExpr() = c
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
  * OpenCart request: `$this->request->get['x']` / `->post` / `->cookie` / `->request`. The Request object's
  * public arrays are populated from the superglobals. Scoped to the `(...->request)->{get,post,cookie,
  * request}[...]` chain so the generic property names never fire outside that idiom.

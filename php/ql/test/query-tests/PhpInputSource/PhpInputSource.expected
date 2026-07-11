@@ -1,0 +1,6 @@
+edges
+nodes
+| test.php:5:12:5:43 | FunctionCallExpression | semmle.label | FunctionCallExpression |
+subpaths
+#select
+| test.php:5:12:5:43 | FunctionCallExpression | test.php:5:12:5:43 | FunctionCallExpression | test.php:5:12:5:43 | FunctionCallExpression | This shell command depends on a $@. | test.php:5:12:5:43 | FunctionCallExpression | user-provided value |
