@@ -62,6 +62,11 @@ extensions:
     data:
       - ["function", "sanitize_text_field", 0, -1]
       - ["function", "sanitize_textarea_field", 0, -1]
+      # $wpdb->esc_like() escapes ONLY the LIKE wildcards % _ \ — it does NOT escape quotes, so a value
+      # concatenated into a LIKE clause (instead of bound via prepare) is still SQLi (WooCommerce
+      # CVE-2021-32790). It must CARRY taint (arg -> return), not drop it. (In a prepared query the
+      # prepare() sanitizer handles safety; here the value is concatenated.)
+      - ["method", "esc_like", 0, -1]
 
   # Type-scoped: `$wpdb->prepare()` sanitizes ONLY on a real wpdb (a custom ->prepare() does not).
   # NB: this sanitizes the RETURN (so correctly-bound queries are clean downstream), but a tainted
