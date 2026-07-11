@@ -1,0 +1,12 @@
+# Chamilo LMS Models-as-Data. Security::remove_XSS() is an HTML/XSS filter only — it does NOT neutralize
+# shell / SQL / path metacharacters — so it is a WEAK (XSS-only) sanitizer that must still CARRY taint
+# onward to command/SQL/path sinks. Modeling it as a full sanitizer (or leaving it unmodeled, which drops
+# taint at the call) would hide the sanitize-for-the-wrong-context class (Chamilo CVE-2026-32892:
+# remove_XSS'd `move_to` reaches exec()). Same discipline as WordPress esc_* / sanitize_text_field.
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "remove_XSS"]
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "remove_XSS", 0, -1]
