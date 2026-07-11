@@ -52,6 +52,12 @@ extensions:
       # orderBy's *direction* (arg 1) is concatenated unbound in several apps (Sylius CVE-2026-31825,
       # Mautic CVE-2026-3105). arg 0 is already covered by the Laravel model; here we add only arg 1.
       - ["method", "orderBy", 1, "SQL injection"]
+      # LIMIT/OFFSET injection: Doctrine's modifyLimitQuery() interpolates setMaxResults/setFirstResult
+      # into the SQL WITHOUT casting to int and WITHOUT binding (LIMIT can't be a bound param), so a
+      # request value passed uncast is SQLi (CVE-2021-43608). Taint-gated + (int)/intval sanitize, so
+      # setMaxResults(10) and setMaxResults((int)$_GET['n']) stay clean; only uncast request input flags.
+      - ["method", "setMaxResults", 0, "SQL injection"]
+      - ["method", "setFirstResult", 0, "SQL injection"]
       # Symfony controller redirect
       - ["method", "redirect", 0, "open redirect"]
       # Symfony Process — `$process->mustRun()` runs the (possibly tainted) command line.
