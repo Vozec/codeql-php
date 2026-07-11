@@ -35,6 +35,11 @@ extensions:
       - ["function", "passthru", -1, "command injection"]
       - ["function", "proc_open", -1, "command injection"]
       - ["function", "popen", -1, "command injection"]
+      # mail($to,$subj,$msg,$headers,$params) — the 5th arg (additional_parameters, index 4) is appended
+      # to the sendmail command line, so a tainted value is OS command injection => RCE (the PHPMailer /
+      # sendmail `-X`/`-f` class, e.g. CVE-2016-10033). Scoped to arg 4 (to/subject/headers are CRLF
+      # header-injection, a different class).
+      - ["function", "mail", 4, "command injection"]
       # code injection
       - ["function", "eval", -1, "code injection"]
       - ["function", "assert", -1, "code injection"]

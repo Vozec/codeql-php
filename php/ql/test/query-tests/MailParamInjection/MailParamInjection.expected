@@ -1,0 +1,8 @@
+edges
+| test.php:5:13:5:17 | VariableName | test.php:6:56:6:67 | BinaryExpression | provenance |  |
+nodes
+| test.php:5:13:5:17 | VariableName | semmle.label | VariableName |
+| test.php:6:56:6:67 | BinaryExpression | semmle.label | BinaryExpression |
+subpaths
+#select
+| test.php:6:56:6:67 | BinaryExpression | test.php:5:13:5:17 | VariableName | test.php:6:56:6:67 | BinaryExpression | This shell command depends on a $@. | test.php:5:13:5:17 | VariableName | user-provided value |
