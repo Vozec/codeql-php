@@ -318,8 +318,14 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     disk = c.getReceiver() and
     disk.getMethodName() = "disk" and
     disk.getTargetName() = "Storage" and
+    // Same Laravel Filesystem contract as the app('files') service below — keep the dangerous-method set
+    // aligned. A traversal in ->deleteDirectory / ->move / ->copy is exactly as bad as in ->delete
+    // (Voyager media-manager CVE-2024-55415 deletes folders via Storage::disk()->deleteDirectory($p)).
     c.getMethodName() =
-      ["path", "get", "put", "putFile", "putFileAs", "download", "delete", "readStream", "prepend", "append"] and
+      [
+        "path", "get", "put", "putFile", "putFileAs", "download", "delete", "deleteDirectory", "readStream",
+        "prepend", "append", "move", "copy", "makeDirectory", "cleanDirectory", "replace"
+      ] and
     n.asExpr() = c.getArgument(0) and
     kind = "path traversal"
   )
