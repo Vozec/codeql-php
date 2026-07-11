@@ -36,8 +36,6 @@ extensions:
       - ["function", "maybe_unserialize", 0, "unsafe deserialization"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["function", "esc_html"]
-      - ["function", "esc_attr"]
       - ["function", "esc_url"]
       - ["function", "esc_js"]
       - ["function", "esc_sql"]
@@ -48,20 +46,27 @@ extensions:
       - ["function", "wp_kses"]
       - ["function", "wp_kses_post"]
       - ["function", "wp_kses_data"]
-      - ["function", "esc_textarea"]
       - ["function", "esc_url_raw"]
       - ["function", "absint"]
-  # HTML-only: strips tags but leaves quotes — a barrier for XSS, NOT for SQL/path/command. Modelling
-  # these as full sanitizers would hide the sanitize-then-SQLi class (CVE-2024-1071, CVE-2023-6360).
+  # HTML-only escapers: encode < > & " ' for HTML/attribute context — a barrier for XSS, NOT for SQL/path/
+  # command (SQL metacharacters ) ( , space = -- and the REGEXP/numeric context pass straight through).
+  # Modelling these as full sanitizers hides the escape-then-SQLi class: sanitize_text_field (CVE-2024-1071,
+  # CVE-2023-6360) and esc_html/esc_attr into a REGEXP/unquoted clause (Photo Gallery CVE-2022-0169).
   - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["function", "sanitize_text_field"]
       - ["function", "sanitize_textarea_field"]
+      - ["function", "esc_html"]
+      - ["function", "esc_attr"]
+      - ["function", "esc_textarea"]
   # ...but they still CARRY taint (arg -> return) so a non-XSS sink downstream (SQL, path) is reached.
   - addsTo: { pack: codeql/php-all, extensible: stepModel }
     data:
       - ["function", "sanitize_text_field", 0, -1]
       - ["function", "sanitize_textarea_field", 0, -1]
+      - ["function", "esc_html", 0, -1]
+      - ["function", "esc_attr", 0, -1]
+      - ["function", "esc_textarea", 0, -1]
       # $wpdb->esc_like() escapes ONLY the LIKE wildcards % _ \ — it does NOT escape quotes, so a value
       # concatenated into a LIKE clause (instead of bound via prepare) is still SQLi (WooCommerce
       # CVE-2021-32790). It must CARRY taint (arg -> return), not drop it. (In a prepared query the
