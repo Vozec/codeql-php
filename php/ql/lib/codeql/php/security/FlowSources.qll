@@ -172,6 +172,21 @@ private string arrayCallableMethodName(Php::ArrayCreationExpression arr) {
     arr.getChild(1).(Php::ArrayElementInitializer).getChild(0).(StringLiteral).getValue()
 }
 
+/** Resolves an `add_filter(hook, $cb)` callback expression to its callable — an `[$this,'m']`/`['C','m']`
+ *  array-callable METHOD or an inline closure. */
+private AstNode wpQueryFilterCallback(Expr arg) {
+  result = TI::arrayCallableMethod(arg)
+  or
+  arg instanceof Php::AnonymousFunction and result = arg
+}
+
+/** Gets the body of a resolved query-filter callback (to locate its `return` statements). */
+private AstNode wpQueryFilterBody(AstNode cb) {
+  result = cb.(Php::MethodDeclaration).getBody()
+  or
+  result = cb.(Php::AnonymousFunction).getBody()
+}
+
 /** Holds if `n` is a sink of vulnerability class `kind`. */
 predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // NOTE: the direct built-in function sink (`system($x)`, …) is DATA — `sinkModel` rows applied by
@@ -234,6 +249,25 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   or
   // `include $x` / `require $x` (language construct, not a function call) — file inclusion.
   exists(IncludeExpr inc | n.asExpr() = inc.getPath() and kind = "file inclusion")
+  or
+  // WordPress query-clause filters: `add_filter('posts_where'|'posts_join'|'posts_orderby'|'posts_groupby'
+  // |'posts_clauses', $cb)` — WP_Query concatenates the callback's RETURN string straight into the SQL it
+  // runs, so a tainted return (request input built into the WHERE/ORDER clause, often only esc_like'd) is
+  // SQL injection. The actual $wpdb->get_results is in WP core, so the callback's returned expression is
+  // the sink (a whole class: "load more"/search plugins, e.g. tlp-team CVE-2025-14124). The hook names are
+  // fixed WP-core constants (generalizable, not per-app).
+  exists(FunctionCall addFilter, AstNode cb, ReturnStmt ret |
+    addFilter.getName() = "add_filter" and
+    addFilter.getArgument(0).(StringLiteral).getValue() =
+      [
+        "posts_where", "posts_where_request", "posts_join", "posts_join_request", "posts_orderby",
+        "posts_groupby", "posts_clauses", "posts_clauses_request"
+      ] and
+    cb = wpQueryFilterCallback(addFilter.getArgument(1)) and
+    ret.(Php::AstNode).getParent+() = wpQueryFilterBody(cb) and
+    n.asExpr() = ret.getValue() and
+    kind = "SQL injection"
+  )
   or
   // `header('Location: '.$url)` is an open-redirect sink — but ONLY for a `Location:` header, not
   // `header('X-Request-Uri: '.$x)`. Fire when the argument carries a `Location:` string literal.
