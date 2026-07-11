@@ -344,6 +344,23 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = "SQL injection"
   )
   or
+  // PrestaShop Db write helpers: `Db::getInstance()->delete($table, $where)` /
+  // `->update($table, $data, $where)` concatenate the WHERE clause RAW into the SQL
+  // (classes/db/Db.php: `' WHERE ' . $where`) — the row VALUES are pSQL-escaped by callers but the WHERE
+  // string is not, so a tainted WHERE is SQLi. Scoped to the recognisable Db::getInstance() receiver like
+  // the raw-query methods above. delete()'s WHERE is arg 1; update()'s WHERE is arg 2.
+  exists(MethodCall c, StaticMethodCall inst |
+    inst = c.getReceiver() and
+    inst.getMethodName() = "getInstance" and
+    inst.getTargetName() = "Db" and
+    (
+      c.getMethodName() = "delete" and n.asExpr() = c.getArgument(1)
+      or
+      c.getMethodName() = "update" and n.asExpr() = c.getArgument(2)
+    ) and
+    kind = "SQL injection"
+  )
+  or
   // Laravel filesystem via the `app('files')` service locator: `app('files')->delete($path)` / `->get` /
   // `->put` / … . Same rationale as the Storage/Db facades — the helper returns a `Filesystem` whose type
   // does not resolve, so the path argument is matched structurally on the recognisable `app('files')`
