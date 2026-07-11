@@ -103,6 +103,12 @@ extensions:
       - ["function", "stripslashes_deep", 0, -1]
       - ["function", "map_deep", 0, -1]
       - ["function", "wp_parse_args", 0, -1]
+      # apply_filters($tag, $value, ...) dispatches WP hooks and RETURNS the (filtered) $value. With no
+      # hook attached it returns $value unchanged, so it must carry taint arg1 -> return. This is THE
+      # central WP value-passing idiom (every plugin accessor/option read funnels through it); an
+      # unmodeled call otherwise silently drops taint at the filter (Web Directory Free CVE-2024-3552).
+      - ["function", "apply_filters", 1, -1]
+      - ["function", "apply_filters_ref_array", 1, -1]
       - ["function", "add_query_arg", -1, -1]                   # builds a URL from its args (XSS when echoed)
       - ["function", "remove_query_arg", -1, -1]
 
