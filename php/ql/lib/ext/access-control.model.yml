@@ -1,0 +1,93 @@
+# Access-control MAD — cross-CMS models for the AccessControl.qll layer (missing-authz / IDOR / privesc).
+# Adding coverage is a data row, never QL. Columns:
+#   entrypointModel       : subjectKind, name, handlerArg, prefixArg, argPrefix, privLevel
+#   methodEntrypointModel : namePattern, privLevel                       (glob on the method name)
+#   authorizationGuardModel : subjectKind, name
+#   sensitiveActionModel  : subjectKind, name, argIndex, category         (category: state-change|privilege|sensitive-read)
+# privLevel ∈ {unauthenticated, authenticated}.  Npm is JavaScript — out of scope for this PHP pack.
+extensions:
+
+  # ---- Entrypoints (attacker-reachable handlers) ---------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: entrypointModel }
+    data:
+      # WordPress AJAX / admin-post: privilege is encoded in the action-name prefix (arg 0), handler at arg 1.
+      - ["function", "add_action", 1, 0, "wp_ajax_nopriv_", "unauthenticated"]
+      - ["function", "add_action", 1, 0, "wp_ajax_", "authenticated"]
+      - ["function", "add_action", 1, 0, "admin_post_nopriv_", "unauthenticated"]
+      - ["function", "add_action", 1, 0, "admin_post_", "authenticated"]
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      # PrestaShop front/module controllers dispatch AJAX by convention: `ajaxProcess<Name>()` (front = guest).
+      - ["ajaxProcess%", "unauthenticated"]
+      # PrestaShop module-front action methods.
+      - ["process%", "unauthenticated"]
+
+  # ---- Authorization guards (PROVE the user may act). Deliberately NOT nonce / is_admin / is_logged_in.
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      # WordPress — capability checks (the real authorization primitive).
+      - ["function", "current_user_can"]
+      - ["function", "current_user_can_for_blog"]
+      - ["function", "author_can"]
+      - ["function", "user_can"]
+      - ["function", "map_meta_cap"]
+      # Symfony Security.
+      - ["method", "denyAccessUnlessGranted"]
+      - ["method", "isGranted"]
+      # Laravel Gate / Policy.
+      - ["method", "authorize"]
+      - ["method", "authorizeForUser"]
+      - ["method", "can"]
+      - ["method", "cannot"]
+      - ["staticmethod", "allows"]        # Gate::allows
+      - ["staticmethod", "denies"]        # Gate::denies
+      - ["staticmethod", "authorize"]     # Gate::authorize
+      # PrestaShop back-office permission check.
+      - ["method", "access"]              # $this->access('edit')
+      # Joomla ACL.
+      - ["method", "authorise"]           # $user->authorise('core.edit', ...)
+      # Drupal permission checks.
+      - ["method", "hasPermission"]       # $account->hasPermission('administer nodes')
+      - ["function", "user_access"]       # D7
+      - ["staticmethod", "allowedIfHasPermission"]
+
+  # ---- Sensitive / state-changing actions. v1 uses DISTINCTIVE names (low FP); generic delete/update/save
+  #      are deliberately deferred until precision is measured.
+  - addsTo: { pack: codeql/php-all, extensible: sensitiveActionModel }
+    data:
+      # WordPress — state change (the dominant BAC/IDOR surface).
+      - ["function", "wp_delete_post", 0, "state-change"]
+      - ["function", "wp_trash_post", 0, "state-change"]
+      - ["function", "wp_delete_attachment", 0, "state-change"]
+      - ["function", "wp_delete_comment", 0, "state-change"]
+      - ["function", "wp_delete_user", 0, "state-change"]
+      - ["function", "wp_delete_term", 0, "state-change"]
+      - ["function", "wp_insert_user", -1, "state-change"]
+      - ["function", "wp_update_user", -1, "state-change"]
+      - ["function", "wp_update_post", -1, "state-change"]
+      - ["function", "wp_insert_post", -1, "state-change"]
+      - ["function", "update_option", 0, "state-change"]
+      - ["function", "delete_option", 0, "state-change"]
+      - ["function", "update_site_option", 0, "state-change"]
+      - ["function", "update_post_meta", -1, "state-change"]
+      - ["function", "delete_post_meta", -1, "state-change"]
+      - ["function", "update_user_meta", -1, "state-change"]
+      # WordPress — privilege escalation.
+      - ["function", "grant_super_admin", 0, "privilege"]
+      - ["method", "add_role", 0, "privilege"]
+      - ["method", "add_cap", 0, "privilege"]
+      - ["method", "set_role", 0, "privilege"]
+      # PrestaShop — settings write (distinctive).
+      - ["staticmethod", "updateValue", -1, "state-change"]     # Configuration::updateValue
+      - ["staticmethod", "deleteByName", 0, "state-change"]     # Configuration::deleteByName
+      # Laravel — distinctive mutations.
+      - ["staticmethod", "destroy", 0, "state-change"]          # Model::destroy($id)
+      - ["method", "forceDelete", -1, "state-change"]
+      - ["method", "truncate", -1, "state-change"]
+      # Symfony / Doctrine — entity mutation (distinctive).
+      - ["method", "remove", 0, "state-change"]                 # EntityManager::remove
+      # Drupal — node/user mutation (D7 distinctive fns).
+      - ["function", "node_delete", 0, "state-change"]
+      - ["function", "user_delete", 0, "state-change"]
+      # Joomla — table store/publish (distinctive-ish).
+      - ["method", "store", -1, "state-change"]

@@ -1,0 +1,3 @@
+| test.php:5:5:5:44 | FunctionCallExpression | This state-change action runs in an unauthenticated-reachable handler with no authorization (capability) check \u2014 broken access control. |
+| test.php:18:5:18:41 | FunctionCallExpression | This state-change action runs in an authenticated-reachable handler with no authorization (capability) check \u2014 broken access control. |
+| test.php:24:9:24:55 | ScopedCallExpression | This state-change action runs in an unauthenticated-reachable handler with no authorization (capability) check \u2014 broken access control. |

@@ -1,0 +1,10 @@
+# Access-control queries (broken-access-control / missing-authorization / IDOR / privilege escalation).
+# Kept as a SEPARATE suite from the taint suites: this is authorization-reachability analysis, not
+# source→sink taint, and it needs its own precision baseline. Run it explicitly:
+#   codeql database analyze <db> php/ql/src/codeql-suites/php-access-control.qls --format=sarif-latest -o out.sarif
+- description: Access-control queries for PHP (cross-CMS)
+- queries: .
+  from: codeql/php-queries
+- include:
+    id:
+      - php/missing-authorization
