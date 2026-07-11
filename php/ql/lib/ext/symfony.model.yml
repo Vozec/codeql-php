@@ -78,6 +78,10 @@ extensions:
       # is a constant); a tainted CONCATENATED condition is SQLi. Taint-gated, so parameterised calls stay
       # clean. Used pervasively across Pimcore admin grid filters (CVE-2026-44741, CVE-2026-55208).
       - ["method", "setCondition", 0, "SQL injection"]
+      # Sibling of setCondition: `$list->addConditionParam($sql, $bindParams)` appends $sql to the WHERE.
+      # arg 1 is bound (safe), but arg 0 is raw — a tainted CONCATENATED condition is SQLi even when the
+      # named params are hardcoded (manual `\`$key\`` backtick-wrapping does not escape). CVE-2026-55208.
+      - ["method", "addConditionParam", 0, "SQL injection"]
       # Symfony Filesystem — distinctive path sinks (dumpFile/appendToFile/mirror).
       - ["method", "dumpFile", 0, "path traversal"]
       - ["method", "appendToFile", 0, "path traversal"]
