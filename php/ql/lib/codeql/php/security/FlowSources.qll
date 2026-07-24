@@ -980,6 +980,48 @@ private class NumericCastSanitizer extends Sanitizer {
 }
 
 /**
+ * Holds if `ty` is a scalar NUMERIC/BOOLEAN parameter type — `int`/`float`/`bool`, or their nullable
+ * `?int` form (`OptionalType` wrapping the primitive). Deliberately NOT `string`/`array`/`mixed` or a
+ * `UnionType`/`NamedType`: those can still carry an injection payload.
+ */
+private predicate isScalarNumericType(Php::AstNode ty) {
+  ty.(Php::PrimitiveType).toString() = ["int", "float", "bool"]
+  or
+  ty.(Php::OptionalType).getChild().(Php::PrimitiveType).toString() = ["int", "float", "bool"]
+}
+
+/** Holds if a variable named `name` is (re)assigned — `=`, `.=`, `+=`, `&=`, … — anywhere in `fn`'s body. */
+private predicate paramReassigned(string name, Callable fn) {
+  exists(Expr lhs |
+    (lhs = any(AssignExpr a).getLhs() or lhs = any(Php::AugmentedAssignmentExpression aa).getLeft()) and
+    lhs.(VariableAccess).getName() = name and
+    lhs.(Php::AstNode).getParent+() = fn.getBody()
+  )
+}
+
+/**
+ * A read of a parameter declared with a scalar numeric/boolean type (`int`/`float`/`bool`, incl. `?int`).
+ * PHP enforces the declaration at CALL time in BOTH strict and coercive mode: a non-numeric string
+ * `TypeError`s and a numeric string is coerced, so inside the body the value is guaranteed
+ * numeric/boolean and cannot carry an injection payload — the by-declaration analogue of an `(int)` cast.
+ * Sound because (a) only `int`/`float`/`bool` qualify (a `string`/`array`/union param still carries the
+ * payload) and (b) the parameter must NOT be reassigned in the body (else `$id = $_GET[...]` re-taints).
+ */
+private class ScalarParamBarrier extends Sanitizer {
+  ScalarParamBarrier() {
+    exists(Callable fn, Parameter p, string name, VariableAccess use |
+      p = fn.getAParameter() and
+      isScalarNumericType(p.(Php::SimpleParameter).getType()) and
+      name = p.getName() and
+      use.getName() = name and
+      use.(Php::AstNode).getParent+() = fn.getBody() and
+      not paramReassigned(name, fn) and
+      this.asExpr() = use
+    )
+  }
+}
+
+/**
  * A read of a variable that a preceding `settype($x, 'int'|'float'|'bool')` coerced to a scalar type in
  * the same function — the by-reference analogue of an `(int)` cast (settype mutates its argument in
  * place), so the value is guaranteed numeric/boolean afterward and the flow is cut. Scoped to the same
