@@ -119,8 +119,18 @@ private string subscriptConstKey(Php::SubscriptExpression sub) {
 /** Holds if `n` is the result of a sanitizer call (a taint barrier) not already covered by MAD. */
 predicate isSanitizer(DataFlow::Node n) {
   // Method sanitizers (`$pdo->quote()`, `$db->escape()`, …) are DATA — `sanitizerModel` method rows.
-  // A `(int)`/`(float)`/`(bool)` cast is a language construct (not a call), so it stays structural here.
-  exists(CastExpr cast | cast.getTypeName() = ["int", "integer", "float", "double", "bool", "boolean"] and n.asExpr() = cast)
+  // Numeric/bool CASTS `(int)$x` are handled by `NumericCastSanitizer` below (which also covers `(real)`).
+  // `array_map('intval', (array)$x)` — an elementwise scalar-coercion callback makes EVERY element
+  // numeric, so the resulting array (and any implode/join of it) is safe. Cuts the classic "coerce the
+  // array to ints before use" false path — the array/type-juggling case where a value is turned into a
+  // guaranteed-numeric list. The callback is read as a string literal (`'intval'`), matching the
+  // dynamic-callback dispatch already used for array_map sinks.
+  exists(FunctionCall c |
+    c.getName() = "array_map" and
+    c.getArgument(0).(StringLiteral).getValue() =
+      ["intval", "absint", "floatval", "boolval", "doubleval"] and
+    n.asExpr() = c
+  )
 }
 
 /**
@@ -965,6 +975,28 @@ private class NumericCastSanitizer extends Sanitizer {
     exists(CastExpr c |
       c.getTypeName() = ["int", "integer", "float", "double", "real", "bool", "boolean"] and
       this.asExpr() = c
+    )
+  }
+}
+
+/**
+ * A read of a variable that a preceding `settype($x, 'int'|'float'|'bool')` coerced to a scalar type in
+ * the same function — the by-reference analogue of an `(int)` cast (settype mutates its argument in
+ * place), so the value is guaranteed numeric/boolean afterward and the flow is cut. Scoped to the same
+ * callable and to reads TEXTUALLY AFTER the settype so an earlier tainted read is not wrongly cleared.
+ */
+private class SettypeBarrier extends Sanitizer {
+  SettypeBarrier() {
+    exists(FunctionCall st, VariableAccess use, Callable fn |
+      st.getName() = "settype" and
+      st.getArgument(1).(StringLiteral).getValue() =
+        ["int", "integer", "float", "double", "bool", "boolean"] and
+      sameAccessPath(st.getArgument(0), use) and
+      st.getArgument(0) != use and
+      st.(Php::AstNode).getParent+() = fn.getBody() and
+      use.(Php::AstNode).getParent+() = fn.getBody() and
+      st.getLocation().getStartLine() < use.getLocation().getStartLine() and
+      this.asExpr() = use
     )
   }
 }
