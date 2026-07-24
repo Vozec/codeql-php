@@ -7,6 +7,13 @@ extensions:
       - ["queryFactory", "Execute", 0, "SQL injection"]             # query_factory.php:266 dominant sink
       - ["queryFactory", "ExecuteNoCache", 0, "SQL injection"]      # :389
       - ["queryFactory", "ExecuteRandomMulti", 0, "SQL injection"]  # :400
+  # Method-name fallback: real Zen Cart uses the GLOBAL `$db` (class queryFactory) whose type doesn't
+  # resolve, so the typed rows above miss. `Execute`/`ExecuteNoCache` are distinctive (capital-E ADoDB,
+  # not PDO's lowercase `execute`) and arg0 is always SQL -> safe as bare method sinks.
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "Execute", 0, "SQL injection"]
+      - ["method", "ExecuteNoCache", 0, "SQL injection"]
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       - ["function", "zen_db_perform", 3, "SQL injection"]          # arg3 = raw WHERE (database.php:89)

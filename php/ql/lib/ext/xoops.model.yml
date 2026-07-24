@@ -21,6 +21,11 @@ extensions:
     data:
       - ["XoopsMySQLDatabase", "queryF", 0, "SQL injection"]          # raw mysqli_query(arg0) (:278)
       - ["XoopsMySQLDatabase", "queryFromFile", 0, "path traversal"]  # reads SQL from a file path (:313)
+  # Method-name fallback: real XOOPS uses the GLOBAL `$xoopsDB`/`$GLOBALS['xoopsDB']` whose type doesn't
+  # resolve. `queryF` is unique to XOOPS (zero FP) -> bare method sink for recall.
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "queryF", 0, "SQL injection"]
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       - ["function", "redirect_header", 0, "open redirect"]  # functions.php:760 (weak: forces XOOPS_URL unless $allowExternalLink)

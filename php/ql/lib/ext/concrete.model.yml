@@ -22,6 +22,15 @@ extensions:
       - ["Connection", "GetOne", 0, "SQL injection"]   # :191
       - ["Connection", "GetAll", 0, "SQL injection"]   # :220
       - ["Connection", "GetCol", 0, "SQL injection"]   # :327
+  # Method-name fallback: the ADOdb-compat Connection is often held in an untyped var (`$db =
+  # Database::connection()`), so the typed rows miss. These capitalized names are distinctive (not PDO)
+  # and arg0 is always SQL -> safe as bare method sinks. (Execute is shared with the zencart model.)
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "GetRow", 0, "SQL injection"]
+      - ["method", "GetOne", 0, "SQL injection"]
+      - ["method", "GetAll", 0, "SQL injection"]
+      - ["method", "GetCol", 0, "SQL injection"]
       # Open redirect (RedirectResponse itself is the Symfony one — already covered).
       - ["Redirect", "url", 0, "open redirect"]                 # Routing/Redirect.php:58 static
       - ["Redirect", "to", -1, "open redirect"]                 # :26 static variadic
