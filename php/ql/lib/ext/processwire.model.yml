@@ -1,0 +1,59 @@
+# ProcessWire (PW 3.x) core Models-as-Data. Input funnels through WireInput/WireInputData
+# ($input->get/post/cookie), SQL via WireDatabasePDO (PDO), sanitizing via the Sanitizer class.
+# Hookable methods are declared `___foo` but CALLED as `foo` (taint matches call-name); the entrypoint
+# glob matches the DECLARED `___execute…` name. `method query`/`escape`/`quote` are already global.
+# GAP (documented): $input->get->name property-chain (WireInput::__get) is not a call -> unmodeled.
+extensions:
+  # ---- Sources: WireInput / WireInputData method-call forms ---------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["WireInput", "get", "processwire-request"]        # WireInput.php:209
+      - ["WireInput", "post", "processwire-request"]       # :284
+      - ["WireInput", "cookie", "processwire-request"]     # :366
+      - ["WireInput", "urlSegment", "processwire-request"] # :575
+      - ["WireInput", "queryString", "processwire-request"]# :1332
+      - ["WireInput", "url", "processwire-request"]        # :965
+      - ["WireInputData", "get", "processwire-request"]    # WireInputData.php:188
+
+  # ---- SQL / file / redirect sinks (query is global; prepare/exec are the net-new SQL sinks) ------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["WireDatabasePDO", "prepare", 0, "SQL injection"] # WireDatabasePDO.php:924
+      - ["WireDatabasePDO", "exec", 0, "SQL injection"]    # :959
+      - ["Pages", "find", 0, "SQL injection"]              # Pages.php:305 selector injection (gated by selectorValue)
+      - ["Session", "redirect", 0, "open redirect"]        # Session.php:1359
+      - ["WireFileTools", "include", 0, "file inclusion"]  # WireFileTools.php:1633 require($filename)
+      - ["WireFileTools", "render", 0, "path traversal"]   # :1529
+
+  # ---- Full sanitizers: charset-restricting / numeric / selector-safe (typed, precise) -----------
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["Sanitizer", "name"]           # Sanitizer.php:478
+      - ["Sanitizer", "pageName"]       # :797
+      - ["Sanitizer", "pageNameUTF8"]   # :911
+      - ["Sanitizer", "filename"]       # :1239
+      - ["Sanitizer", "path"]           # :1302 path-traversal barrier
+      - ["Sanitizer", "selectorValue"]  # :2590 selector-injection barrier
+      - ["Sanitizer", "selectorField"]  # :2546
+      - ["Sanitizer", "int"]            # :4264 numeric coercion
+      - ["Sanitizer", "intUnsigned"]    # :4298
+      - ["Sanitizer", "email"]          # :1523
+
+  # ---- Weak-XSS sanitizers: HTML-escape only (do NOT neutralise SQL/path) ------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["method", "entities"]          # Sanitizer.php:3012 htmlspecialchars wrapper
+      - ["method", "entities1"]         # :3030
+      - ["method", "purify"]            # :3351 HTMLPurifier
+
+  # ---- Access-control: capability guards + admin Process-module entrypoints ----------------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "isSuperuser"]    # User.php:442
+      - ["method", "hasRole"]        # User.php:85
+      - ["method", "editable"]       # $page->editable()
+      - ["method", "viewable"]
+      - ["method", "deleteable"]
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["___execute%", "authenticated"]   # Process modules dispatch executeXxx (declared ___executeXxx)

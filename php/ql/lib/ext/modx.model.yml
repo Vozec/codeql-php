@@ -1,0 +1,35 @@
+# MODX Revolution 3.x Models-as-Data (verified against 3.3.0-dev). modX extends xPDO.
+# Connector input: $_GET/$_POST/$_FILES -> $scriptProperties -> Processor::$properties ->
+# getProperty()/getProperties(). NB: $modx->query/$xpdo->query and $xpdo->quote are ALREADY covered
+# by the global `method query` sink and `method quote` sanitizer — not repeated here.
+extensions:
+
+  # ---- Sources: processor request properties (generic names -> type-scoped) ----------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Processor", "getProperty", "modx-processor-request"]     # Processor.php:221
+      - ["Processor", "getProperties", "modx-processor-request"]   # Processor.php:260
+
+  # ---- Sinks ------------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "sendRedirect", 0, "open redirect"]   # modX.php:1178 -> response->sendRedirect
+      - ["method", "runSnippet", 0, "code injection"]    # modX.php:1930 tainted name loads+runs element
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "sanitizeString"]   # modX.php:382 strips quotes/parens/; -> SQL-safe
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["method", "stripTags"]        # modX.php:1995 HTML-only
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "stripTags", 0, -1]
+      - ["method", "getOption", 1, -1]  # getOption($k,$source,$def) carries taint from the merged source
+
+  # ---- Access-control: guards (hasPermission already covered by the Drupal row) ------------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "checkPolicy"]      # modAccessibleObject.php:250 policy primitive
+      - ["method", "isMember"]         # modUser.php:729 group membership

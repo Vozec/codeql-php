@@ -5,13 +5,14 @@
 # shape works for any CMS (compare wordpress/typo3/laravel/symfony models).
 extensions:
   # ---- Sources: request input -------------------------------------------------------------------
+  # Verified against PrestaShop 8.1.7. Tools::getValue returns $_POST[$k] ?? $_GET[$k] (only null-byte
+  # stripping, NOT an HTML/SQL sanitizer) = genuine raw source. `getValueRaw` was removed in 8.x (dead).
   - addsTo: { pack: codeql/php-all, extensible: sourceModel }
     data:
-      - ["staticmethod", "getValue", "prestashop-input"]        # Tools::getValue('x')
-      - ["staticmethod", "getAllValues", "prestashop-input"]    # Tools::getAllValues()
-      - ["staticmethod", "getValueRaw", "prestashop-input"]
+      - ["staticmethod", "getValue", "prestashop-input"]        # Tools::getValue('x') — Tools.php:497
+      - ["staticmethod", "getAllValues", "prestashop-input"]    # Tools::getAllValues() — Tools.php:527
 
-  # ---- Sinks: raw SQL + redirects ---------------------------------------------------------------
+  # ---- Sinks: raw SQL + redirects + SSRF --------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       # Db::getInstance()->executeS()/ExecuteS() — the raw-SQL query methods (PrestaShop-specific names,
@@ -25,6 +26,32 @@ extensions:
       - ["staticmethod", "redirect", 0, "open redirect"]
       - ["staticmethod", "redirectLink", 0, "open redirect"]
       - ["staticmethod", "redirectAdmin", 0, "open redirect"]
+      # SSRF: Tools::file_get_contents fetches remote http(s):// URLs (cURL/fopen). arg0 = URL. Distinctive.
+      - ["staticmethod", "file_get_contents", 0, "server-side request forgery"]   # Tools.php:2051
+
+  # Generic-named Db raw-SQL methods (execute/query/getValue/insert/update/delete) — GENERIC names
+  # (unlike executeS/getRow), so class-scoped to Db/DbCore to avoid flooding FPs on PDO/Doctrine. NB:
+  # real usage is `Db::getInstance()->execute($sql)`; if the factory return type is not resolved by the
+  # engine, recall drops — switch these to method-name `sinkModel` rows if empirically under-matching.
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Db", "execute", 0, "SQL injection"]        # Db.php:561 (INSERT/UPDATE/DELETE/DDL write)
+      - ["DbCore", "execute", 0, "SQL injection"]
+      - ["Db", "query", 0, "SQL injection"]          # Db.php:371 (raw)
+      - ["DbCore", "query", 0, "SQL injection"]
+      - ["Db", "getValue", 0, "SQL injection"]       # Db.php:692 (single-value fetch)
+      - ["DbCore", "getValue", 0, "SQL injection"]
+      - ["Db", "insert", 0, "SQL injection"]         # Db.php:405/472 table (unescaped)
+      - ["DbCore", "insert", 0, "SQL injection"]
+      - ["Db", "insert", 1, "SQL injection"]         # Db.php:460 data values
+      - ["DbCore", "insert", 1, "SQL injection"]
+      - ["Db", "update", 2, "SQL injection"]         # Db.php:517 $where (raw)
+      - ["DbCore", "update", 2, "SQL injection"]
+      - ["Db", "delete", 1, "SQL injection"]         # Db.php:544 $where (raw)
+      - ["DbCore", "delete", 1, "SQL injection"]
+      # DbQuery fluent builder — where()/having() store the restriction verbatim (Db module SQLi #1).
+      - ["DbQuery", "where", 0, "SQL injection"]      # DbQuery.php:202
+      - ["DbQuery", "having", 0, "SQL injection"]     # DbQuery.php:218
 
   # Typed SQL sinks — `execute()`/`getValue()` are generic names, so scope them to PrestaShop's DB
   # class (`DbCore`, aliased `Db`) to stay precise. `Db::getInstance()->execute($sql)` runs a raw
@@ -42,6 +69,32 @@ extensions:
     data:
       - ["function", "pSQL"]                                    # SQL-escape (PrestaShop)
       - ["function", "bqSQL"]                                   # backquote-escape (identifiers)
-      - ["staticmethod", "safeOutput"]                         # Tools::safeOutput — HTML-escape
-      - ["staticmethod", "htmlentitiesUTF8"]                   # Tools::htmlentitiesUTF8
       - ["staticmethod", "purifyHTML"]                         # Tools::purifyHTML (HTMLPurifier)
+  # HTML-context escapers: neutralise HTML but NOT SQL/path -> weak-XSS + carry taint (esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "safeOutput"]                         # Tools::safeOutput — HTML-escape only
+      - ["staticmethod", "htmlentitiesUTF8"]                   # Tools::htmlentitiesUTF8
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "safeOutput", 0, -1]
+      - ["staticmethod", "htmlentitiesUTF8", 0, -1]
+  # Db::getInstance()->escape() — the real SQL escaper behind pSQL. Class-scoped (generic name).
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["Db", "escape"]                                       # Db.php:789
+      - ["DbCore", "escape"]
+
+  # ---- Validator GUARDS: `if (Validate::isX($v)) { …$v… }` (static-method guards, distinctive names).
+  #      Consumed via isGuardedRead's static-method support. classes/Validate.php.
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerGuardModel }
+    data:
+      - ["isUnsignedId"]      # Validate.php:960 — id > 0 integer
+      - ["isInt"]
+      - ["isUnsignedInt"]
+      - ["isPositiveInt"]
+      - ["isBool"]
+      - ["isFloat"]
+      - ["isUnsignedFloat"]
+      - ["isCleanHtml"]       # XSS guard
+      - ["isEmail"]

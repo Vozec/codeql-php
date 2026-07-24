@@ -89,6 +89,16 @@ private Callable resolveHandler(AstNode arg) {
  */
 extensible predicate methodEntrypointModel(string namePattern, string privLevel);
 
+/**
+ * A convention-named GLOBAL FUNCTION entrypoint: some (procedural) CMS dispatch to a top-level function
+ * chosen by naming convention, not a router call or a method. SPIP's `action_<x>_dist()` (reached via
+ * `spip.php?action=<x>`) and `formulaires_<x>_traiter_dist()` are the canonical cases; classic-WordPress
+ * `*_callback` handlers and Drupal-7 `hook_*` menu callbacks are the same shape. `namePattern` is a
+ * `matches`-style glob on the function name; `privLevel` the reachability. Complements the method-only
+ * `methodEntrypointModel` and the router-based `entrypointModel` for name-dispatched procedural code.
+ */
+extensible predicate functionEntrypointModel(string namePattern, string privLevel);
+
 /** Holds if callable `c` is dispatched by an entrypoint router matching `privLevel`. A callable can match
  *  several rows (e.g. a `wp_ajax_nopriv_x` string starts with both `wp_ajax_nopriv_` and `wp_ajax_`). */
 private predicate entrypointMatch(Callable c, string privLevel) {
@@ -106,6 +116,8 @@ private predicate entrypointMatch(Callable c, string privLevel) {
   )
   or
   exists(string pat | methodEntrypointModel(pat, privLevel) | c.(Method).getName().matches(pat))
+  or
+  exists(string pat | functionEntrypointModel(pat, privLevel) | c.(Function).getName().matches(pat))
 }
 
 /** An attacker-reachable entrypoint handler callable. */

@@ -1,0 +1,67 @@
+# MediaWiki core Models-as-Data (verified against MW 1.47). MediaWiki self-annotates taint via
+# @param-taint/@return-taint (its MediaWikiSecurityCheckPlugin) — used as ground truth here.
+# CAVEAT: $dbr/$request are handed out via services/factories (getRequest(), getConnection()), never
+# `new` — so typed*Model receiver resolution may under-match; distinctive names also given bare.
+extensions:
+
+  # ---- Sources: WebRequest raw accessors (each @return-taint tainted) -----------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["WebRequest", "getVal", "mediawiki-request"]        # WebRequest.php:522
+      - ["WebRequest", "getText", "mediawiki-request"]       # :549
+      - ["WebRequest", "getRawVal", "mediawiki-request"]     # :496
+      - ["WebRequest", "getArray", "mediawiki-request"]      # :595
+      - ["WebRequest", "getValues", "mediawiki-request"]     # :720
+      - ["WebRequest", "getRawInput", "mediawiki-request"]   # :818 raw POST body
+  # getInt/getIntOrNull/getFloat/getBool/getCheck are type-coerced -> sanitizers, not sources.
+
+  # ---- SQL sinks: the Rdbms IDatabase layer (generic names -> typed) -----------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["IReadableDatabase", "select", 2, "SQL injection"]           # $conds exec_sql_numkey
+      - ["IReadableDatabase", "select", 0, "SQL injection"]           # $tables
+      - ["IReadableDatabase", "select", 1, "SQL injection"]           # $vars
+      - ["IReadableDatabase", "selectRow", 2, "SQL injection"]        # $conds
+      - ["IReadableDatabase", "selectField", 2, "SQL injection"]      # $cond
+      - ["IReadableDatabase", "selectFieldValues", 2, "SQL injection"]
+      - ["IDatabase", "query", 0, "SQL injection"]                    # $sql (also global)
+      - ["IDatabase", "update", 1, "SQL injection"]                   # $set
+      - ["IDatabase", "update", 2, "SQL injection"]                   # $conds
+      - ["IDatabase", "delete", 1, "SQL injection"]                   # $conds
+      # SSRF: HttpRequestFactory
+      - ["HttpRequestFactory", "create", 0, "server-side request forgery"]   # :77 $url
+      - ["HttpRequestFactory", "get", 0, "server-side request forgery"]      # :176
+      - ["HttpRequestFactory", "post", 0, "server-side request forgery"]     # :189
+      - ["HttpRequestFactory", "request", 1, "server-side request forgery"]  # :148 ($method,$url)
+      # Open redirect
+      - ["OutputPage", "redirect", 0, "open redirect"]               # OutputPage.php:455
+  # Distinctive-name SQL fallbacks (name-only) — help when the typed receiver can't resolve.
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "selectFieldValues", 2, "SQL injection"]
+      - ["method", "makeWhereFrom2d", -1, "SQL injection"]           # :3381 builds raw WHERE from array
+
+  # ---- Full SQL sanitizers: the DB quoting layer (all @return-taint none) -------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "addQuotes"]   # Database.php:1583
+      - ["method", "makeList"]    # Database.php:3376
+      - ["method", "buildLike"]   # Database.php:3464
+  # HTML/attribute escapers -> weak-XSS (do NOT neutralise SQL/path).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "element"]                  # Html.php:284
+      - ["staticmethod", "encodeAttribute"]          # Sanitizer.php:852
+      - ["staticmethod", "safeEncodeAttribute"]      # Sanitizer.php:897
+      - ["staticmethod", "escapeHtmlAllowEntities"]  # Sanitizer.php:1115
+
+  # ---- Access-control: Authority / PermissionManager primitives (isAllowed already global) --------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "isAllowedAny"]    # Authority.php:88
+      - ["method", "isAllowedAll"]    # Authority.php:102
+      - ["method", "userCan"]         # PermissionManager.php:260
+      - ["method", "userHasRight"]    # PermissionManager.php:1676
+      - ["method", "authorizeRead"]   # Authority.php:214
+      - ["method", "authorizeWrite"]  # Authority.php:237
+      - ["method", "authorizeAction"] # Authority.php:192

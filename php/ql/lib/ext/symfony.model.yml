@@ -32,9 +32,11 @@ extensions:
       # Doctrine DBAL / ORM (framework-specific method names)
       - ["method", "createQuery", -1, "SQL injection"]
       - ["method", "createNativeQuery", -1, "SQL injection"]
-      - ["method", "executeQuery", -1, "SQL injection"]
-      - ["method", "executeStatement", -1, "SQL injection"]
-      - ["method", "executeUpdate", -1, "SQL injection"]
+      # Doctrine DBAL executeQuery($sql, $params, $types) — ONLY arg0 is SQL; arg1 is the SAFE bindings
+      # array, so arg0 (not -1) — else every parameterized `executeQuery($sql, ['id'=>$id])` false-fires.
+      - ["method", "executeQuery", 0, "SQL injection"]
+      - ["method", "executeStatement", 0, "SQL injection"]
+      - ["method", "executeUpdate", 0, "SQL injection"]
       # `$conn->prepare($sql)` / PDO::prepare — arg 0 (the SQL string). Taint-gated: a literal
       # `prepare("… ?")`/`prepare("… %d", $x)` is safe (arg 0 not tainted); only a CONCATENATED SQL
       # string flags. `$wpdb->prepare("…%d", $x)` stays safe for the same reason (format is literal).

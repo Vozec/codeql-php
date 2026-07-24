@@ -1,0 +1,65 @@
+# e107 2.x core Models-as-Data (verified against e107 2.4.0 git). DB via e_db_mysql / e_db_pdo
+# (identical method names -> bare `method` rows, like $wpdb). SQL-escape sanitizer is $tp->toDB();
+# authorization is the getperms()/check_class() GLOBAL functions.
+extensions:
+  # ---- Sources: class-scoped request accessors --------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["e_admin_request", "getQuery", "e107-request"]    # admin_ui.php:158 ($_GET)
+      - ["e_admin_request", "getPosted", "e107-request"]   # admin_ui.php:207 ($_POST)
+      - ["eRequest", "getRequestParam", "e107-request"]    # application.php:3932
+      - ["eRequest", "getParam", "e107-request"]
+      - ["e_front_model", "getPosted", "e107-request"]     # model_class.php:2086
+
+  # ---- SQL sinks: e_db_mysql / e_db_pdo raw query & WHERE args (distinctive -> method) -----------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "db_Query", 0, "SQL injection"]      # raw SQL (mysql_class.php:321)
+      - ["method", "db_Query_all", 0, "SQL injection"]  # mysql_class.php:1046
+      - ["method", "gen", 0, "SQL injection"]           # raw SQL (mysql_class.php:982)
+      - ["method", "select", 1, "SQL injection"]        # $fields interpolated raw (:611)
+      - ["method", "select", 2, "SQL injection"]        # $arg = WHERE (:650)
+      - ["method", "db_Select", 1, "SQL injection"]     # wraps select() (e_db_legacy_trait.php:46)
+      - ["method", "db_Select", 2, "SQL injection"]
+      - ["method", "count", 2, "SQL injection"]         # $arg = WHERE (:790)
+      - ["method", "delete", 1, "SQL injection"]        # $arg = WHERE (:868)
+      - ["method", "db_Update", 1, "SQL injection"]     # $arg raw when string (e_db_legacy_trait.php:82)
+      - ["method", "retrieve", 2, "SQL injection"]      # $where (ConnectionTrait.php:986)
+      # SSRF + open redirect
+      - ["method", "getRemoteFile", 0, "server-side request forgery"]     # file_class.php:655
+      - ["method", "getRemoteContent", 0, "server-side request forgery"]  # file_class.php:804
+      - ["staticmethod", "redirect", 0, "open redirect"]                  # e107::redirect (e107_class.php:4899)
+
+  # ---- Full SANITIZERS: SQL-safe ----------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "toDB"]      # THE SQL escaper $tp->toDB() (e_parse_class.php:508)
+      - ["method", "escape"]    # $sql->escape() (ConnectionTrait.php:520)
+      - ["function", "intval"]  # numeric coercion
+
+  # ---- WEAK-XSS SANITIZERS (HTML/attr encoders — do NOT neutralise SQL) -------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["method", "toAttribute"]   # e_parse_class.php:2069
+      - ["method", "toJS"]          # e_parse_class.php:2193
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "toAttribute", 0, -1]
+      - ["method", "toJS", 0, -1]
+
+  # ---- Access-control: guards + sensitive actions + admin controller entrypoints ----------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["function", "getperms"]      # class2.php:1318 admin-perm check
+      - ["function", "check_class"]   # class2.php:1212 userclass check
+  - addsTo: { pack: codeql/php-all, extensible: sensitiveActionModel }
+    data:
+      - ["method", "db_Insert", 1, "state-change"]   # e_db_legacy_trait.php:64
+      - ["method", "db_Update", 1, "state-change"]   # e_db_legacy_trait.php:82
+  # e_admin_controller dispatches action "foo" to method fooPage / fooObserver (admin_ui.php toMethodName).
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["%Page", "authenticated"]
+      - ["%AjaxPage", "authenticated"]
+      - ["%Observer", "authenticated"]
+      - ["%AjaxObserver", "authenticated"]

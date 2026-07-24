@@ -11,16 +11,23 @@ extensions:
       - ["method", "getParam", "magento-request"]
       - ["method", "getParams", "magento-request"]
       - ["method", "getPostValue", "magento-request-body"]
-      - ["method", "getPostParam", "magento-request-body"]
+      # (getPostParam removed — no such method in M2; getPostValue is the real accessor.)
       - ["method", "getCookie", "magento-request-cookie"]
       - ["method", "getBodyParams", "magento-request-body"]      # Webapi\Rest\Request
       - ["method", "getRequestData", "magento-request-body"]
 
   # Generic names (getQuery/getPost/getServer/getContent/getFiles) — scope to the request classes.
+  # Controllers type the receiver as RequestInterface, so the get*-on-Http rows drop unless the interface
+  # is also scoped: add RequestInterface variants (67 getPost + 16 getQuery call sites go through it).
   - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
     data:
       - ["RequestInterface", "getParam", "magento-request"]
       - ["RequestInterface", "getParams", "magento-request"]
+      - ["RequestInterface", "getPost", "magento-request-body"]
+      - ["RequestInterface", "getPostValue", "magento-request-body"]
+      - ["RequestInterface", "getQuery", "magento-request"]
+      - ["RequestInterface", "getFiles", "magento-request-file"]
+      - ["RequestInterface", "getServer", "magento-request-server"]
       - ["Http", "getQuery", "magento-request"]
       - ["Http", "getPost", "magento-request-body"]
       - ["Http", "getServer", "magento-request-server"]
@@ -47,6 +54,9 @@ extensions:
       - ["method", "deleteFile", 0, "path traversal"]
       - ["method", "createDirectory", 0, "path traversal"]
       - ["method", "readDirectory", 0, "path traversal"]
+      # Filesystem Directory\Write — the higher-level API modules actually call (arg 0 = path).
+      - ["method", "writeFile", 0, "path traversal"]
+      - ["method", "openFile", 0, "path traversal"]
       # SSRF — distinctive HTTP-client names (makeRequest($method,$uri): arg 1; setUri: arg 0).
       - ["method", "makeRequest", 1, "server-side request forgery"]
       - ["method", "setUri", 0, "server-side request forgery"]
@@ -60,6 +70,10 @@ extensions:
       - ["Mysql", "query", 0, "SQL injection"]
       - ["Curl", "get", 0, "server-side request forgery"]        # HTTP\Client\Curl::get($url)
       - ["Curl", "post", 0, "server-side request forgery"]
+      # Zend_Db_Select / Magento\Framework\DB\Select::where($cond) — raw SQL fragment (1406 call sites,
+      # the canonical `$collection->getSelect()->where("x=".$id)` SQLi). Typed to Select to stay precise.
+      - ["Select", "where", 0, "SQL injection"]
+      - ["Select", "orWhere", 0, "SQL injection"]
 
   # ---- Sanitizers: Escaper (XSS) + SQL quoting --------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
@@ -71,6 +85,7 @@ extensions:
       - ["method", "escapeJsQuote"]
       - ["method", "escapeCss"]
       - ["method", "escapeQuote"]
+      - ["method", "escapeXssInUrl"]                             # Escaper::escapeXssInUrl — URL XSS sanitizer
   # SQL quoting — scope to the DB adapter (quote/quoteInto are generic names).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:

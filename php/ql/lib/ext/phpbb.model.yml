@@ -1,0 +1,66 @@
+# phpBB 4.0 core Models-as-Data (verified against 4.0.0-a3-dev, phpBB/includes/constants.php:31).
+# Input is 100% object-based `$request->variable()` in 4.0 (legacy request_var() is gone). SQL runs
+# through the DISTINCTIVE `$db->sql_query()` (not the generic `query` — so bare method rows are safe).
+extensions:
+
+  # ---- Sources: the request object (class-scoped; "variable"/"server"/"header" are generic) --------
+  # CAVEAT: variable()/untrimmed_variable() TYPE-COERCE by $default — an int/bool default => settype()
+  # => SQL-safe; a STRING default => only htmlspecialchars(ENT_COMPAT) which leaves ' and SQL metachars.
+  # raw_variable() = NO sanitisation. Modeled as sources (recall); the sort-by ORDER-BY string class is
+  # the real SQLi (string default -> weak escape -> concatenated).
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["request", "variable", "phpbb-request"]            # request.php:190
+      - ["request", "untrimmed_variable", "phpbb-request"]  # request.php:214
+      - ["request", "raw_variable", "phpbb-request"]        # request.php:222 (UNSANITISED)
+      - ["request", "server", "phpbb-request"]              # request.php:275
+      - ["request", "header", "phpbb-request"]              # request.php:299
+      - ["request_interface", "variable", "phpbb-request"]
+      - ["request_interface", "untrimmed_variable", "phpbb-request"]
+      - ["request_interface", "raw_variable", "phpbb-request"]
+      - ["request_interface", "server", "phpbb-request"]
+      - ["request_interface", "header", "phpbb-request"]
+  # Distinctive method names -> safe as bare sources even when the DI-injected receiver can't be typed.
+  # ("variable" is intentionally NOT bare — too generic.)
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["method", "raw_variable", "phpbb-request"]
+      - ["method", "untrimmed_variable", "phpbb-request"]
+
+  # ---- SQL sinks: DISTINCTIVE names (arg0 = SQL) --------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "sql_query", 0, "SQL injection"]         # driver_interface.php:349
+      - ["method", "sql_query_limit", 0, "SQL injection"]   # driver_interface.php:339
+      # Redirects.
+      - ["function", "redirect", 0, "open redirect"]        # functions.php:1700
+      - ["function", "meta_refresh", 1, "open redirect"]    # functions.php:1921 ($url is arg1)
+
+  # ---- SQL builders as taint STEPS (carry taint to the eventual sql_query) ------------------------
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "sql_build_query", 1, -1]                # driver.php:787 assembles SQL from arg1
+      - ["method", "sql_in_set", 0, -1]                     # driver.php:620 — FIELD (arg0) concatenated raw
+      - ["function", "utf8_htmlspecialchars", 0, -1]        # HTML-escape only -> carry taint to SQL/path
+      - ["function", "censor_text", 0, -1]                  # word-censor, NOT security -> carry taint
+
+  # ---- SQL sanitizer (distinctive; method row not suppressed by functionDefinedInSource) ----------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "sql_escape"]                            # driver_interface.php:446
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "utf8_htmlspecialchars"]               # HTML-escape only
+
+  # ---- SSRF: the only outbound-HTTP primitive in 4.0 (class-scoped; "get" is generic) -------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["file_downloader", "get", 0, "server-side request forgery"]  # file_downloader.php:76 ($host)
+
+  # ---- Access-control: the phpbb\auth\auth ACL capability primitive (NOT the CSRF token) ----------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "acl_get"]       # auth.php:167  $auth->acl_get('f_read', $forum_id)
+      - ["method", "acl_gets"]      # auth.php:341  variadic multi-permission OR
+      - ["method", "acl_getf"]      # auth.php:216  per-forum permission map
+      - ["method", "acl_get_list"]  # auth.php:378

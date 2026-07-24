@@ -26,8 +26,10 @@ extensions:
       - ["method", "unbuffered_query", -1, "SQL injection"]
       - ["method", "real_query", -1, "SQL injection"]
       - ["method", "createQuery", -1, "SQL injection"]
-      - ["method", "executeQuery", -1, "SQL injection"]
-      - ["method", "executeStatement", -1, "SQL injection"]
+      # Doctrine DBAL: SQL is arg0; arg1 is the SAFE bindings array -> arg0 (not -1), else every
+      # parameterized executeQuery($sql, ['id'=>$id]) false-fires as SQLi.
+      - ["method", "executeQuery", 0, "SQL injection"]
+      - ["method", "executeStatement", 0, "SQL injection"]
       - ["method", "getResult", -1, "SQL injection"]
 
   # ---- Sources: modern request objects / PSR-7 / framework globals ----------------------------

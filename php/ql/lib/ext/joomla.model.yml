@@ -13,6 +13,10 @@ extensions:
       # filter that still permits SQL metacharacters via `filter_order_Dir`).
       - ["method", "getUserStateFromRequest", "joomla-request"]
   # Generic get/getVar/getString — scope to the Input class (both legacy JInput and namespaced Input).
+  # PRECISION NOTE: Input::get($name, $default, $filter='cmd') defaults to the 'cmd' filter, which
+  # strips all but [A-Za-z0-9_.-]. So a bare $input->get('x') is effectively cmd-sanitised; it is only a
+  # truly raw source when called as get($k,$d,'raw'|'string'). MAD cannot condition on the 3rd-arg value,
+  # so this over-approximates (accepted, favours recall). (JInput is Joomla-3-only; kept for legacy code.)
   - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
     data:
       - ["Input", "get", "joomla-request"]
@@ -33,20 +37,41 @@ extensions:
       - ["method", "redirect", 0, "open redirect"]
       - ["method", "setRedirect", 0, "open redirect"]    # JApplication::setRedirect($url)
 
-  # Typed sinks: Http transport + File I/O — generic names (get/read/delete) scoped to their class.
+  # Typed sinks: Http transport + File I/O — generic names scoped to their class. All Http verbs put the
+  # URL at arg0 (request(method,url,…) at arg1). File/Folder methods put paths at arg0/arg1.
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
     data:
       - ["Http", "get", 0, "server-side request forgery"]
       - ["Http", "post", 0, "server-side request forgery"]
       - ["Http", "request", 1, "server-side request forgery"]   # request(method, URL, …)
+      - ["Http", "head", 0, "server-side request forgery"]
+      - ["Http", "put", 0, "server-side request forgery"]
+      - ["Http", "delete", 0, "server-side request forgery"]
+      - ["Http", "patch", 0, "server-side request forgery"]
+      - ["Http", "options", 0, "server-side request forgery"]
+      - ["Http", "trace", 0, "server-side request forgery"]
       - ["JHttp", "get", 0, "server-side request forgery"]
       - ["JHttp", "post", 0, "server-side request forgery"]
-      - ["File", "read", 0, "path traversal"]                   # JFile::read / File::read
+      - ["JHttp", "head", 0, "server-side request forgery"]
+      - ["JHttp", "put", 0, "server-side request forgery"]
+      - ["JHttp", "delete", 0, "server-side request forgery"]
+      # File::read was removed (JFile::read is Joomla-3 only); File/Folder write/move/copy/upload paths.
       - ["File", "write", 0, "path traversal"]
       - ["File", "delete", 0, "path traversal"]
-      - ["JFile", "read", 0, "path traversal"]
+      - ["File", "copy", 0, "path traversal"]
+      - ["File", "copy", 1, "path traversal"]
+      - ["File", "move", 0, "path traversal"]
+      - ["File", "move", 1, "path traversal"]
+      - ["File", "append", 0, "path traversal"]
+      - ["File", "upload", 1, "path traversal"]                 # $dest
       - ["JFile", "delete", 0, "path traversal"]
       - ["Folder", "delete", 0, "path traversal"]
+      - ["Folder", "create", 0, "path traversal"]
+      - ["Folder", "copy", 0, "path traversal"]
+      - ["Folder", "copy", 1, "path traversal"]
+      - ["Folder", "move", 0, "path traversal"]
+      - ["Folder", "files", 0, "path traversal"]
+      - ["Folder", "folders", 0, "path traversal"]
       - ["JFolder", "delete", 0, "path traversal"]
 
   # ---- Sanitizers: filtered getters (numeric = fully safe) + SQL quoting + output filter ---------
@@ -56,7 +81,23 @@ extensions:
       - ["method", "getUint"]
       - ["method", "getFloat"]
       - ["method", "getBool"]
-      - ["method", "cleanText"]                                  # JFilterOutput::cleanText (XSS)
+      # Charset-restricting filtered getters: strip all but a safe alphabet -> SQL/path/cmd-safe.
+      - ["method", "getCmd"]                                     # 'cmd' filter [^A-Za-z0-9_.-] stripped (85 uses)
+      - ["method", "getWord"]                                    # 'word' filter [^A-Za-z_] stripped
+      - ["method", "getAlnum"]                                   # 'alnum' filter [^A-Za-z0-9] stripped
+  # cleanText (OutputFilter::cleanText) is strip_tags -> XSS-only; weak-XSS + step so it does not
+  # silently suppress SQLi/path findings (esc_html pattern). It is called STATICALLY in modern Joomla
+  # (`OutputFilter::cleanText(...)`) — the staticmethod rows are what actually fire (the method rows are
+  # kept for the legacy `$filter->cleanText()` form). Without the staticmethod STEP, taint drops at the
+  # call and an escape-then-SQLi flow is a false negative.
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["method", "cleanText"]
+      - ["staticmethod", "cleanText"]
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "cleanText", 0, -1]
+      - ["staticmethod", "cleanText", 0, -1]
   # SQL escaping — scope quote/escape/quoteName to the DB driver (generic names).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:

@@ -1,0 +1,32 @@
+# October CMS (Laravel-based) Models-as-Data. ONLY October-specific rows — Eloquent/DB raw sinks,
+# $request->input/post/query, e()/Str sanitizers all come from laravel.model.yml (Db is a facade
+# alias, matched by method name) and are NOT duplicated here.
+extensions:
+  # ---- Sources: October global request helpers + CMS router params -------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "input", "october-request"]        # global input() helper
+      - ["function", "post", "october-request"]         # global post() helper (33 uses)
+      - ["method", "param", "october-request"]           # $this->param('id') — Cms\Controller::param
+      - ["method", "getParameter", "october-request"]    # Router.php:211
+      - ["method", "getParameters", "october-request"]   # Router.php:193
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Input", "get", "october-request"]
+      - ["Input", "post", "october-request"]
+      - ["Input", "all", "october-request"]
+      - ["Input", "only", "october-request"]
+      - ["Input", "except", "october-request"]
+
+  # ---- Access-control: AJAX handlers + backend ACL -----------------------------------------------
+  # onXxx methods dispatched by the X-OCTOBER-REQUEST-HANDLER header (HasAjaxRequests.php:124 enforces
+  # /^(?:\w+::)?on[A-Z]\w*$/). CMS-frontend onX() are anonymous; backend onX() are gated by the
+  # declarative $requiredPermissions middleware (a property, not a call -> can't be a guard row), so
+  # they are over-reported by this glob (documented FP tradeoff).
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["on%", "unauthenticated"]
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "hasAccess"]        # $user->hasAccess('author.acl') — AuthManager.php:54
+      - ["method", "hasAnyAccess"]     # Controller.php:235

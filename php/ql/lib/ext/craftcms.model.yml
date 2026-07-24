@@ -1,0 +1,44 @@
+# Craft CMS (Yii2-based) Models-as-Data. Craft-specific rows only — the Yii base (getQueryParam/
+# getBodyParam raw getters, createCommand SQL, Response::redirect, Html::encode) is covered by
+# yii.model.yml and NOT duplicated.
+extensions:
+  # ---- Sources: craft\web\Request Craft-only getters (extends yii\web\Request) --------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["Request", "getParam", "remote"]                  # src/web/Request.php:1165 GET∪body
+      - ["Request", "getRequiredParam", "remote"]          # :1188
+      - ["Request", "getRequiredBodyParam", "remote"]      # :977
+      - ["Request", "getRequiredQueryParam", "remote"]     # :1117
+      - ["Request", "getQueryParamsWithoutPath", "remote"] # :1049
+
+  # ---- SQL sinks: raw-STRING condition args (array condition is parameterised/safe) --------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Query", "where", 0, "SQL injection"]       # src/db/Query.php:184
+      - ["Query", "andWhere", 0, "SQL injection"]    # :196
+      - ["Query", "orWhere", 0, "SQL injection"]     # :208
+      - ["Db", "update", 2, "SQL injection"]         # src/helpers/Db.php:1130 $condition
+      - ["Db", "delete", 1, "SQL injection"]         # :1192 $condition
+      # SSTI -> RCE: View renders arg0 as a live Twig template.
+      - ["View", "renderString", 0, "code injection"]         # src/web/View.php:685
+      - ["View", "renderObjectTemplate", 0, "code injection"] # :750
+      # Open redirect: $this->redirect($url) on a controller.
+      - ["Controller", "redirect", 0, "open redirect"]        # src/web/Controller.php:752
+
+  # ---- Sanitizers: HTML-encode only -> weak-XSS --------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "encodeParams"]   # src/helpers/Html.php:65 (Html::encode inherited from yii)
+
+  # ---- Access-control: Yii/Craft controller actions + Craft guard set ----------------------------
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["action%", "authenticated"]   # action/<controller>/<action>; default allowAnonymous NEVER
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "requirePermission"]      # Controller.php:517
+      - ["method", "requireAuthorization"]   # Controller.php:530
+      - ["method", "requireAdmin"]           # Controller.php:495
+      - ["method", "requireElevatedSession"] # Controller.php:542
+      - ["method", "checkPermission"]        # web/User.php:342 -> $user->can()
+      - ["method", "can"]                    # UserElement::can capability primitive

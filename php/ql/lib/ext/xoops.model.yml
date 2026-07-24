@@ -1,0 +1,53 @@
+# XOOPS (XoopsCore25) Models-as-Data. Request layer = a Joomla-derived static filter class
+# (\Xmf\Request, aliased by XoopsRequest); DB = XoopsMySQLDatabase; output = MyTextSanitizer.
+# $xoopsDB->query / ->quote / ->escape are ALREADY global (method query/quote/escape) — not repeated.
+extensions:
+  # ---- Sources: raw / HTML-only-filtered request getters (getVar 'string' strips HTML, NOT SQL) ---
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["XoopsRequest", "getText", "xoops-request"]    # MASK_ALLOW_RAW = fully raw (Request.php:268)
+      - ["XoopsRequest", "getVar", "xoops-request"]     # type default 'none' = raw (:80)
+      - ["XoopsRequest", "getString", "xoops-request"]  # HTML-strip only -> SQLi source (:239)
+      - ["XoopsRequest", "getArray", "xoops-request"]   # array, no scalar filter (:254)
+      - ["XoopsRequest", "getUrl", "xoops-request"]     # open-redirect carrier (:282)
+      - ["XoopsRequest", "getPath", "xoops-request"]    # 'path' filter still allows ../ (:296)
+      - ["Request", "getText", "xoops-request"]         # \Xmf\Request short name (same bodies)
+      - ["Request", "getVar", "xoops-request"]
+      - ["Request", "getString", "xoops-request"]
+      - ["Request", "getArray", "xoops-request"]
+
+  # ---- SQL / path sinks (query is global; queryF is the net-new raw sink) ------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["XoopsMySQLDatabase", "queryF", 0, "SQL injection"]          # raw mysqli_query(arg0) (:278)
+      - ["XoopsMySQLDatabase", "queryFromFile", 0, "path traversal"]  # reads SQL from a file path (:313)
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "redirect_header", 0, "open redirect"]  # functions.php:760 (weak: forces XOOPS_URL unless $allowExternalLink)
+
+  # ---- Full SANITIZERS: numeric/charset-allowlist getters + the XOOPS-only quote alias -----------
+  #   (addSlashes is a NO-OP on PHP>=5.4 -> deliberately NOT modeled, would hide SQLi.)
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "getInt"]        # numeric (Request.php:149)
+      - ["method", "getFloat"]      # :167
+      - ["method", "getBool"]       # :185
+      - ["method", "getWord"]       # [A-Za-z_] allowlist (:203)
+      - ["method", "getCmd"]        # [A-Za-z0-9._-] allowlist (:220)
+      - ["method", "getEmail"]      # RFC validation else default (:310)
+      - ["method", "getIP"]         # IP validation else default (:325)
+      - ["method", "quoteString"]   # XOOPS-only alias of quote() (mysqldatabase.php:230)
+
+  # ---- WEAK-XSS SANITIZER (+ step so SQLi/path still flow) ---------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["method", "htmlSpecialChars"]   # real htmlspecialchars (module.textsanitizer.php:497)
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "htmlSpecialChars", 0, -1]
+
+  # ---- Access-control: real ACL (NOT the XOOPS_TOKEN CSRF check) ---------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "isAdmin"]      # XoopsUser::isAdmin($module_id) (kernel/user.php:249)
+      - ["method", "checkRight"]   # XoopsGroupPermHandler::checkRight (kernel/groupperm.php:375)

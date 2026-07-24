@@ -23,13 +23,13 @@ extensions:
   # ---- Sinks: raw SQL, redirects ----------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
-      # Drupal 7 database API — the query string (arg 0) is raw SQL.
+      # Drupal 7 database API (D7-only — removed from D8+ core) — the query string (arg 0) is raw SQL.
       - ["function", "db_query", 0, "SQL injection"]
       - ["function", "db_query_range", 0, "SQL injection"]
-      - ["function", "db_queryd", 0, "SQL injection"]
-      # Drupal 7 redirect: drupal_goto($path).
+      # (db_queryd removed — never a real public Drupal API.)
+      # Drupal 7 redirect: drupal_goto($path). (D7-only.)
       - ["function", "drupal_goto", 0, "open redirect"]
-      # Drupal fetches a remote file with no host validation — SSRF (e.g. SA-CONTRIB-2023-015).
+      # Drupal 7 remote fetch with no host validation — SSRF (D7-only).
       - ["function", "system_retrieve_file", 0, "server-side request forgery"]
       - ["function", "drupal_http_request", 0, "server-side request forgery"]
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
@@ -47,18 +47,35 @@ extensions:
       - ["Markup", "create", 0, "reflected xss"]
       - ["FormattableMarkup", "__construct", 0, "reflected xss"]
       - ["SafeMarkup", "set", 0, "reflected xss"]
+      # D8-12 SSRF: \Drupal::httpClient() is a Guzzle client (replaces D7 drupal_http_request). URL arg.
+      # Caveat: Guzzle's runtime class Client/ClientInterface is a generic name — watch FP rate.
+      - ["Client", "request", 1, "server-side request forgery"]   # Client::request($method, $uri)
+      - ["Client", "get", 0, "server-side request forgery"]
+      - ["Client", "post", 0, "server-side request forgery"]
+      - ["Client", "head", 0, "server-side request forgery"]
+      - ["ClientInterface", "request", 1, "server-side request forgery"]
 
   # ---- Sanitizers: Drupal escaping / filtering helpers ------------------------------------------
+  # D7-only full sanitizers (removed from D8+ core; kept for legacy/contrib audits).
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["function", "check_plain"]                            # Drupal 7 HTML-escape
-      - ["function", "check_url"]                              # Drupal 7 URL sanitiser
-      - ["function", "filter_xss"]                             # Drupal 7 XSS filter
+      - ["function", "check_plain"]                            # D7 HTML-escape
+      - ["function", "check_url"]                              # D7 URL sanitiser
+      - ["function", "filter_xss"]                             # D7 XSS filter
       - ["function", "filter_xss_admin"]
-      - ["staticmethod", "checkPlain"]                         # SafeMarkup::checkPlain (deprecated)
+      - ["staticmethod", "checkPlain"]                         # SafeMarkup::checkPlain (D8; removed D9 — dead but harmless)
       - ["staticmethod", "escape"]                             # Html::escape — D8+ HTML-escape
       - ["staticmethod", "escapeAttribute"]                    # Html::escapeAttribute
-      - ["staticmethod", "filter"]                             # Xss::filter — D8+ XSS filter
-      - ["staticmethod", "filterAdmin"]                        # Xss::filterAdmin
       - ["method", "escapeLike"]                               # Connection::escapeLike — LIKE-wildcard escape
       - ["method", "escapeField"]                              # Connection::escapeField — identifier escape (ORDER BY)
+      - ["method", "escapeTable"]                              # Connection::escapeTable — identifier escape (table)
+  # Xss::filter/filterAdmin are XSS-context only (strip tags, NOT SQL/path) -> weak-XSS + carry taint so
+  # an escape-then-SQLi flow is still caught (esc_html pattern), rather than a full sanitizer that hides it.
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "filterAdmin"]                        # Xss::filterAdmin
+      - ["staticmethod", "filter"]                             # Xss::filter
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "filterAdmin", 0, -1]
+      - ["staticmethod", "filter", 0, -1]

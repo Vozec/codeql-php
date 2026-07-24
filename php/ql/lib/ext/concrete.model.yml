@@ -1,0 +1,56 @@
+# Concrete CMS (concrete5) Models-as-Data. Built on Symfony Request + Doctrine DBAL (covered by
+# symfony.model.yml — dupes skipped). Concrete-specific: its own Controller get/post/request accessors,
+# the legacy ADOdb-style Connection::Get*/Execute raw-SQL wrappers, and the h()/Text sanitizers.
+# sourceType reuses "symfony-request" so input flows into the already-registered remote threat model.
+extensions:
+  # ---- Sources: Concrete's own Controller/Request accessors (not Symfony methods) -----------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["AbstractController", "get", "symfony-request"]      # AbstractController.php:185 (merges $sets+$_GET)
+      - ["AbstractController", "post", "symfony-request"]     # :259 -> Request::post()
+      - ["AbstractController", "request", "symfony-request"]  # :336 -> Request::request()
+      - ["RequestBase", "post", "symfony-request"]            # Http/RequestBase.php:178 (static; Symfony has none)
+      - ["RequestBase", "request", "symfony-request"]         # :196
+      - ["Request", "post", "symfony-request"]                # Http/Request.php extends RequestBase
+      - ["Request", "request", "symfony-request"]             # (["Request","get",..] already in symfony)
+
+  # ---- SQL sinks: legacy ADOdb-ish wrappers on Connection (arg0 raw SQL, not DBAL) ----------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Connection", "Execute", 0, "SQL injection"]  # Connection.php:88
+      - ["Connection", "GetRow", 0, "SQL injection"]   # :160
+      - ["Connection", "GetOne", 0, "SQL injection"]   # :191
+      - ["Connection", "GetAll", 0, "SQL injection"]   # :220
+      - ["Connection", "GetCol", 0, "SQL injection"]   # :327
+      # Open redirect (RedirectResponse itself is the Symfony one — already covered).
+      - ["Redirect", "url", 0, "open redirect"]                 # Routing/Redirect.php:58 static
+      - ["Redirect", "to", -1, "open redirect"]                 # :26 static variadic
+      - ["AbstractController", "redirect", -1, "open redirect"] # redirect() func_get_args -> buildRedirect
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "h"]              # bootstrap/helpers.php:80 -> Text::specialchars (HTML-context only)
+      - ["method", "specialchars"]     # Utility/Service/Text.php:168
+      - ["method", "entities"]         # :144
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "filterNonAlphaNum"]   # Text.php:511
+      - ["method", "sanitizeFileSystem"]  # Text.php:378 path-traversal barrier
+
+  # ---- Access-control: Permission\Checker convention methods + superuser; controller entrypoints --
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["method", "validate"]        # PermissionKey::validate() (Checker __call target)
+      - ["method", "canRead"]
+      - ["method", "canWrite"]
+      - ["method", "canViewPage"]
+      - ["method", "canEditPageContents"]
+      - ["method", "canDeletePage"]
+      - ["method", "canApprovePageVersions"]
+      - ["method", "canAdminPage"]
+      - ["method", "isSuperUser"]     # User/User.php:384
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["action_%", "unauthenticated"]   # single-page / block controller action dispatch
+      - ["view", "unauthenticated"]       # default controller render entrypoint

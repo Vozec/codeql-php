@@ -1,5 +1,14 @@
 # TYPO3 Models-as-Data.
+#
+# LAYERED by TYPO3 era (same discipline as wordpress.model.yml). The ≤v12 block below covers the
+# large deployed base of extensions still targeting v11/v12; the v13+ block covers idiomatic modern
+# code. Audited against v15.0.0-dev: the legacy input API (GeneralUtility::_GP/_GET/_POST/_GPmerged/
+# _GETset) was removed in v13, getIndpEnv in v15, and the $GLOBALS['TYPO3_DB'] DatabaseConnection SQL
+# API (sql_query/exec_SELECT*/admin_query, quoteStr/fullQuoteStr) back in v9 — so on a modern codebase
+# the legacy rows match nothing and the v13+ block below is what actually fires.
 extensions:
+  # ---- Sources ------------------------------------------------------------------------------------
+  # Legacy (≤v12): static request accessors. Removed in v13 (getIndpEnv in v15) but kept for old code.
   - addsTo: { pack: codeql/php-all, extensible: sourceModel }
     data:
       - ["staticmethod", "_GP", "typo3-request"]
@@ -8,13 +17,114 @@ extensions:
       - ["staticmethod", "getIndpEnv", "typo3-request"]
       - ["staticmethod", "_GPmerged", "typo3-request"]
       - ["staticmethod", "_GETset", "typo3-request"]
+  # v13+: PSR-7 ServerRequestInterface (injected into every controller/middleware) + Extbase Request
+  # (adds getArgument). Generic method names -> class-scoped. Type-hinted `ServerRequestInterface
+  # $request` params resolve exactly like the WP `WP_REST_Request` rows. getAttribute excluded:
+  # request attributes are middleware-set framework data, not user input (FP source).
+  - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
+    data:
+      - ["ServerRequestInterface", "getQueryParams", "typo3-request"]
+      - ["ServerRequestInterface", "getParsedBody", "typo3-request"]
+      - ["ServerRequestInterface", "getUploadedFiles", "typo3-request"]
+      - ["ServerRequestInterface", "getCookieParams", "typo3-request"]
+      - ["ServerRequestInterface", "getBody", "typo3-request"]
+      - ["ServerRequestInterface", "getHeader", "typo3-request"]
+      - ["ServerRequestInterface", "getHeaderLine", "typo3-request"]
+      - ["Request", "getArgument", "typo3-request"]
+      - ["Request", "getArguments", "typo3-request"]
+      - ["Request", "getQueryParams", "typo3-request"]
+      - ["Request", "getParsedBody", "typo3-request"]
+      - ["RequestInterface", "getArgument", "typo3-request"]
+      - ["RequestInterface", "getArguments", "typo3-request"]
+
+  # ---- SQL sinks ----------------------------------------------------------------------------------
+  # Legacy (≤v9): $GLOBALS['TYPO3_DB'] DatabaseConnection. Dead on modern code; kept for old extensions.
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
     data:
       - ["method", "sql_query", -1, "SQL injection"]
       - ["method", "exec_SELECTquery", -1, "SQL injection"]
       - ["method", "exec_SELECTgetRows", -1, "SQL injection"]
       - ["method", "admin_query", -1, "SQL injection"]
+  # v13+: Doctrine DBAL. Connection::executeQuery/executeStatement raw SQL is arg0; QueryBuilder
+  # predicate builders (where/having/…) are variadic raw SQL strings (arg -1); selectLiteral/groupBy/
+  # orderBy take unquoted identifiers (the classic TYPO3 order-by SQLi). QueryBuilder is obtained via
+  # ConnectionPool::getQueryBuilderForTable() (typed return) — chained ->where() resolves iff the
+  # engine tracks the factory return type.
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Connection", "executeQuery", 0, "SQL injection"]
+      - ["Connection", "executeStatement", 0, "SQL injection"]
+      - ["Connection", "query", 0, "SQL injection"]
+      - ["QueryBuilder", "where", -1, "SQL injection"]
+      - ["QueryBuilder", "andWhere", -1, "SQL injection"]
+      - ["QueryBuilder", "orWhere", -1, "SQL injection"]
+      - ["QueryBuilder", "having", -1, "SQL injection"]
+      - ["QueryBuilder", "andHaving", -1, "SQL injection"]
+      - ["QueryBuilder", "orHaving", -1, "SQL injection"]
+      - ["QueryBuilder", "selectLiteral", -1, "SQL injection"]
+      - ["QueryBuilder", "addSelectLiteral", -1, "SQL injection"]
+      - ["QueryBuilder", "groupBy", -1, "SQL injection"]
+      - ["QueryBuilder", "addGroupBy", -1, "SQL injection"]
+      - ["QueryBuilder", "orderBy", -1, "SQL injection"]
+      - ["QueryBuilder", "addOrderBy", -1, "SQL injection"]
+
+  # ---- SSRF / path / redirect sinks (GeneralUtility + HTTP client) --------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["staticmethod", "getUrl", 0, "server-side request forgery"]
+      - ["method", "request", 0, "server-side request forgery"]        # RequestFactory::request($uri,...)
+      - ["method", "createRequest", 1, "server-side request forgery"]  # RequestFactory::createRequest($method,$uri)
+      - ["staticmethod", "writeFile", 0, "path traversal"]
+      - ["staticmethod", "writeFileToTypo3tempDir", 0, "path traversal"]
+      - ["staticmethod", "mkdir", 0, "path traversal"]
+      - ["staticmethod", "mkdir_deep", 0, "path traversal"]
+      - ["staticmethod", "rmdir", 0, "path traversal"]
+      - ["staticmethod", "unlink_tempfile", 0, "path traversal"]
+      - ["staticmethod", "locationHeaderUrl", 0, "open redirect"]
+
+  # ---- Sanitizers ---------------------------------------------------------------------------------
+  # Legacy (≤v9) DatabaseConnection quoting. Blanket method-name — small FN risk (a class with an
+  # unrelated quoteStr), but the class is long gone, so kept for legacy coverage only.
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["method", "quoteStr"]
       - ["method", "fullQuoteStr"]
+  # v13+ DBAL binding/quoting — the canonical safe patterns; class-scoped to avoid blanket FNs.
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["QueryBuilder", "createNamedParameter"]
+      - ["QueryBuilder", "createPositionalParameter"]
+      - ["QueryBuilder", "quote"]
+      - ["QueryBuilder", "quoteIdentifier"]
+      - ["QueryBuilder", "quoteIdentifiers"]
+      - ["Connection", "quote"]
+      - ["Connection", "quoteIdentifier"]
+      - ["Connection", "quoteIdentifiers"]
+
+  # escapeLikeWildcards escapes only `% _` for LIKE, NOT quotes (the esc_like case): a value
+  # concatenated into a LIKE clause without binding is still SQLi -> carry taint, do NOT sanitize.
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "escapeLikeWildcards", 0, -1]
+
+  # ---- JS-context escapers: neutralise JS/HTML-attr, NOT SQL/path -> weak-XSS + carry taint --------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "quoteJSvalue"]
+      - ["staticmethod", "jsonEncodeForJavaScript"]
+      - ["staticmethod", "jsonEncodeForHtmlAttribute"]
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "quoteJSvalue", 0, -1]
+      - ["staticmethod", "jsonEncodeForJavaScript", 0, -1]
+      - ["staticmethod", "jsonEncodeForHtmlAttribute", 0, -1]
+
+  # ---- Access-control entrypoints -----------------------------------------------------------------
+  # Extbase controller actions dispatch by ?tx_ext_plugin[action]=<name>; scalar params map from
+  # request args. `authenticated` is the safe default (a bare *Action glob also matches BE module
+  # actions; the vocabulary has no class-scope to split FE-unauth from BE-auth). Making action PARAMS
+  # taint sources is not expressible today (no router call / routing attribute for Extbase) — a
+  # documented vocabulary gap, alongside array-registered eID (`?eID=`) and backend Routes.php.
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["%Action", "authenticated"]

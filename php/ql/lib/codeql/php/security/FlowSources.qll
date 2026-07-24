@@ -59,16 +59,31 @@ predicate isRemoteSource(DataFlow::Node n) {
 predicate isSanitizerGuardFunction(string name) { sanitizerGuardModel(name) }
 
 /**
+ * Holds if `g` is a call to a modelled sanitizer-guard validator, whether a global function
+ * (`ctype_alnum($x)`), a STATIC method (`Validate::isUnsignedId($x)` — PrestaShop), or an instance
+ * method (`$validator->isEmail($x)`). Guard names in `sanitizerGuardModel` are curated and distinctive,
+ * so keying on the callee name across all three call kinds keeps false-negatives (an over-eager guard)
+ * low while covering the OO validators that a function-only match missed.
+ */
+private predicate isSanitizerGuardCall(Call g) {
+  isSanitizerGuardFunction([
+      g.(FunctionCall).getName(), g.(StaticMethodCall).getMethodName(),
+      g.(MethodCall).getMethodName()
+    ])
+}
+
+/**
  * Holds if `n` is a read of a variable validated by a sanitizer guard on the branch it controls, e.g.
- * `if (ctype_alnum($x)) { … $x … }`. v1 scope: the positive (then) branch of an `if` whose condition is
- * (or contains) the guard call; dominance-based guards (early-return `if(!g($x))return;`, the `else`
- * branch, `&&` chains) are a future refinement. A CUSTOM/unknown guard is NOT matched, so its path is
- * still reported (recall-first) — modelling it is a one-row data addition, no engine change.
+ * `if (ctype_alnum($x)) { … $x … }` or `if (Validate::isUnsignedId($id)) { … $id … }`. v1 scope: the
+ * positive (then) branch of an `if` whose condition is (or contains) the guard call; dominance-based
+ * guards (early-return `if(!g($x))return;`, the `else` branch, `&&` chains) are a future refinement. A
+ * CUSTOM/unknown guard is NOT matched, so its path is still reported (recall-first) — modelling it is a
+ * one-row data addition, no engine change.
  */
 predicate isGuardedRead(DataFlow::Node n) {
-  exists(Php::IfStatement ifs, FunctionCall g, Expr checked, Expr use |
+  exists(Php::IfStatement ifs, Call g, Expr checked, Expr use |
     g.(Php::AstNode).getParent*() = ifs.getCondition() and
-    isSanitizerGuardFunction(g.getName()) and
+    isSanitizerGuardCall(g) and
     checked = g.getAnArgument() and
     use.(Php::AstNode).getParent*() = ifs.getBody() and
     sameAccessPath(checked, use) and
@@ -527,6 +542,29 @@ private class RequestPropertySource extends RemoteFlowSource {
 }
 
 /**
+ * A subscript read on a `WP_REST_Request` — `$request['author_exclude']`. `WP_REST_Request implements
+ * ArrayAccess`, so `$request[$key]` desugars to `offsetGet($key)`, exactly equivalent to the modelled
+ * `$request->get_param($key)`. WP core's own REST controllers read params THIS way — the parameter-
+ * mapping loop `$args[$wp_param] = $request[$api_param]` in `WP_REST_Posts_Controller::get_items()` —
+ * so modelling only the `get_*` methods (`typedSourceModel`) missed this whole entry form. That is the
+ * source half of the WP-core `author__not_in` SQLi (CVE-2026-63030). Type-gated on the receiver, like
+ * `TypedRemoteSource`, so an unrelated `$x[$k]` is not a source.
+ */
+private class RestRequestSubscriptSource extends RemoteFlowSource {
+  RestRequestSubscriptSource() {
+    exists(ArrayAccess aa |
+      (
+        TI::exprClass(aa.getArray()).getName() = "WP_REST_Request" or
+        TI::exprTypeName(aa.getArray()) = "WP_REST_Request"
+      ) and
+      this.asExpr() = aa
+    )
+  }
+
+  override string getSourceType() { result = "wordpress-request" }
+}
+
+/**
  * Drupal 7's array-shaped form state: `$form_state['values'][...]` / `['input'][...]` hold the
  * user-submitted form data (the D7 analogue of the D8 `FormStateInterface::getValue()` accessor). Matched
  * structurally on the well-known `$form_state` variable + `values`/`input` key so the subscripted element
@@ -552,16 +590,31 @@ private class DrupalFormStateArraySource extends RemoteFlowSource {
  * is reached through an intermediate property whose type does not resolve, so this is matched
  * structurally: a `get`/`all`/… call on a `<bag>` property of a `Request`-typed receiver.
  */
+/**
+ * Holds if `e` is (evaluates to) an HttpFoundation `Request`. Type-resolution covers a type-hinted
+ * `Request $request` var, but the request is very often obtained from a FACTORY whose return type does
+ * not flow through inference: Drupal's `\Drupal::request()`, a Symfony controller's `$this->getRequest()`,
+ * or a `RequestStack`'s `->getCurrentRequest()`/`getMainRequest()`/`getMasterRequest()`. Those getter
+ * names are distinctive enough to accept directly, which re-arms the whole `->query->get()` bag idiom on
+ * factory-obtained requests (Drupal D8+ SQLi/XSS were entirely missed without this).
+ */
+private predicate isRequestExpr(Expr e) {
+  TI::exprClass(e).getName() = "Request"
+  or
+  TI::exprTypeName(e) = "Request"
+  or
+  e.(MethodCall).getMethodName() = ["getRequest", "getCurrentRequest", "getMainRequest", "getMasterRequest"]
+  or
+  e.(StaticMethodCall).getTargetName() = "Drupal" and e.(StaticMethodCall).getMethodName() = "request"
+}
+
 private class SymfonyBagSource extends RemoteFlowSource {
   SymfonyBagSource() {
     exists(Php::MemberCallExpression get, Php::MemberAccessExpression bag |
       get.getObject() = bag and
       bag.getName().(Php::Name).getValue() =
         ["query", "request", "attributes", "cookies", "files"] and
-      (
-        TI::exprClass(bag.getObject()).getName() = "Request" or
-        TI::exprTypeName(bag.getObject()) = "Request"
-      ) and
+      isRequestExpr(bag.getObject()) and
       get.getName().(Php::Name).getValue() =
         ["get", "all", "getInt", "getBoolean", "getAlpha", "getAlnum", "getDigits", "getString", "filter"] and
       this.asExpr() = get
@@ -644,10 +697,35 @@ private class OpenCartRequestSource extends RemoteFlowSource {
       Php::SubscriptExpression sub, Php::MemberAccessExpression prop, Php::MemberAccessExpression req
     |
       prop = sub.getChild(0) and
-      prop.getName().(Php::Name).getValue() = ["get", "post", "cookie", "request"] and
+      prop.getName().(Php::Name).getValue() = ["get", "post", "cookie", "server", "files", "request"] and
       req = prop.getObject() and
       req.getName().(Php::Name).getValue() = "request" and
       this.asExpr() = sub
+    )
+  }
+
+  override string getSourceType() { result = "remote" }
+}
+
+/**
+ * ProcessWire request: `$input->get->name` / `$input->post->x` / `$input->cookie->x` (and the
+ * `$this->input->…` form used inside Wire classes). `WireInput::__get` returns a `WireInputData` whose
+ * own `__get` reads the parsed GET/POST/COOKIE array, so the idiomatic PW read is a PROPERTY CHAIN, not
+ * a call — `typedSourceModel` covers only the `$input->get('x')` method form, leaving this whole idiom
+ * unmodelled. Scoped to the `(input)->{get,post,cookie,whitelist}->X` chain so the generic property
+ * names never fire outside it. Same shape as the OpenCart source above (array-access there, chain here).
+ */
+private class ProcessWireRequestSource extends RemoteFlowSource {
+  ProcessWireRequestSource() {
+    exists(Php::MemberAccessExpression outer, Php::MemberAccessExpression bag |
+      outer.getObject() = bag and
+      bag.getName().(Php::Name).getValue() = ["get", "post", "cookie", "whitelist"] and
+      (
+        bag.getObject().(Php::VariableName).getChild().getValue() = "input"
+        or
+        bag.getObject().(Php::MemberAccessExpression).getName().(Php::Name).getValue() = "input"
+      ) and
+      this.asExpr() = outer
     )
   }
 

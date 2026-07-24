@@ -1,0 +1,41 @@
+# Zen Cart Models-as-Data. Procedural e-commerce; DB via the ADOdb-style queryFactory class
+# ($db->Execute). Input = raw PHP superglobals (already global; no custom accessor). Verified vs source.
+extensions:
+  # ---- SQL sinks: queryFactory takes a fully-built raw SQL string --------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["queryFactory", "Execute", 0, "SQL injection"]             # query_factory.php:266 dominant sink
+      - ["queryFactory", "ExecuteNoCache", 0, "SQL injection"]      # :389
+      - ["queryFactory", "ExecuteRandomMulti", 0, "SQL injection"]  # :400
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "zen_db_perform", 3, "SQL injection"]          # arg3 = raw WHERE (database.php:89)
+      - ["method", "perform", 3, "SQL injection"]                   # query_factory.php:618 raw WHERE
+      - ["function", "zen_redirect", 0, "open redirect"]            # functions_urls.php:14 (no host allow-list)
+
+  # ---- Full SANITIZERS: SQL-safe -----------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "zen_db_input"]      # database.php:27 -> $db->prepare_input()
+      - ["method", "prepare_input"]       # query_factory.php:241 = mysqli_real_escape_string
+      - ["method", "prepareInput"]        # :252 alias
+
+  # ---- WEAK-XSS SANITIZERS: HTML-only (NOT SQL); zen_db_prepare_input docblock: "NOT FOR DB QUERIES"
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "zen_output_string_protected"]   # functions_strings.php:56
+      - ["function", "zen_output_string"]             # :17
+      - ["function", "zen_sanitize_string"]           # :67 replaces <> with _
+      - ["function", "zen_db_prepare_input"]          # database.php:56 trim/stripslashes only
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "zen_output_string_protected", 0, -1]
+      - ["function", "zen_output_string", 0, -1]
+      - ["function", "zen_sanitize_string", 0, -1]
+      - ["function", "zen_db_prepare_input", 0, -1]
+
+  # ---- Access-control: admin ACL primitives ------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["function", "check_page"]        # admin_access.php:63 per-page ACL
+      - ["function", "zen_is_superuser"]  # admin_access.php:137 superuser check

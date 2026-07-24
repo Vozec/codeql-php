@@ -1,0 +1,63 @@
+# Dolibarr Models-as-Data (ERP/CRM, very procedural PHP). Verified against DOL_VERSION 24.0.0-beta.
+# Distinctive conventions: ALL request input funnels through GETPOST() (htdocs/core/lib/functions.lib.php),
+# SQL runs through the DoliDB driver `$db->query()` (already covered by the generic `method query` SQL
+# sink in modern-frameworks.model.yml, and `$db->escape()` by the generic `method escape` sanitizer in
+# php-builtins.model.yml — so neither is repeated here). HTTP dispatch is `?action=x` handled by
+# procedural `if ($action == 'x')` blocks — NOT name-globbable, so no entrypoint rows are possible.
+extensions:
+
+  # ---- A. SOURCE: the universal GET/POST accessor ------------------------------------------------
+  # GETPOST($paramname, $check='alphanohtml', ...) — functions.lib.php:1097; returns $_GET[$p] ?? $_POST[$p]
+  # then a sanitization pass keyed on the STRING $check arg ('int'/'aZ09' are SQL-safe; 'alpha'/'nohtml'/
+  # 'none' leave SQL metachars). MAD cannot read $check, so modeled RAW to favor recall (real Dolibarr
+  # SQLi is GETPOST(...,'alpha') concatenated into SQL). Over-reports for 'int'/'aZ09' callers (accepted).
+  # GETPOSTINT/GETPOSTFLOAT are int/float-coerced -> deliberately NOT sources.
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      - ["function", "GETPOST", "dolibarr-request"]
+
+  # ---- B. FRAMEWORK SINKS (distinctive function names, low FP) -----------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "dol_eval", 0, "code injection"]           # functions.lib.php:11965 -> eval()
+      - ["function", "dol_eval_new", 0, "code injection"]       # :11988
+      - ["function", "dol_eval_standard", 0, "code injection"]  # :12269
+      - ["function", "dol_include_once", 0, "file inclusion"]   # :1614 include() a resolved path
+      - ["function", "dol_buildpath", 0, "path traversal"]      # :1656 relative->fs/URL path
+      - ["function", "getURLContent", 0, "server-side request forgery"]  # geturl.lib.php:51 curl fetch
+
+  # ---- C. FULL SANITIZERS (distinctive; $db->escape/->sanitize already covered generically) -------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "price2num"]                # :7842 numeric coercion — full SQL/path barrier
+      - ["function", "dol_sanitizeFileName"]     # :1941 whitelist filename chars
+      - ["function", "dol_sanitizePathName"]     # :1979 whitelist path chars
+
+  # ---- D. WEAK-XSS SANITIZERS: HTML/JS escapers that do NOT neutralise SQL/path -------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "dol_escape_htmltag"]       # :2526 HTML entity-encode
+      - ["function", "dol_escape_js"]            # :2287 JS-string escape
+      - ["function", "dol_string_nohtmltag"]     # :9065 strip tags only
+
+  # ---- E. STEPS: keep taint flowing --------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "dol_escape_htmltag", 0, -1]
+      - ["function", "dol_escape_js", 0, -1]
+      - ["function", "dol_string_nohtmltag", 0, -1]
+      # $db->escapeforlike() escapes ONLY \ _ % (LIKE wildcards), NOT quotes -> carry taint, not sanitize.
+      - ["method", "escapeforlike", 0, -1]       # mysqli.class.php:540
+      # natural_search($fields,$value,...) builds a WHERE/LIKE fragment embedding $value -> carry arg1.
+      - ["function", "natural_search", 1, -1]    # functions.lib.php:13474
+
+  # ---- F. AUTHORIZATION GUARDS -------------------------------------------------------------------
+  # restrictedArea($user,$features,...) — security.lib.php:180, dies on failure; guards every page.
+  # $user->hasRight($module,$perm) — user.class.php:911, returns bool. (The $user->rights->module->perm
+  # property-chain form is a read, not a call -> not expressible in MAD; only hasRight() is modeled.)
+  # NB: generic CRUD state-change (create/update/delete on CommonObject) is deliberately NOT modeled as
+  # sensitiveAction — too generic for low-FP missing-authz, per the fork's distinctive-names policy.
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["function", "restrictedArea"]
+      - ["method", "hasRight"]

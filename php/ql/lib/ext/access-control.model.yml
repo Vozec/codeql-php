@@ -18,9 +18,20 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
     data:
       # PrestaShop front/module controllers dispatch AJAX by convention: `ajaxProcess<Name>()` (front = guest).
+      # NB: the glob also matches AdminController ajaxProcess*/process* (which DO require admin auth+token),
+      # so those are over-reported as unauthenticated — the name-glob cannot split front (guest) from admin.
       - ["ajaxProcess%", "unauthenticated"]
       # PrestaShop module-front action methods.
       - ["process%", "unauthenticated"]
+      # PrestaShop front controllers' third AJAX convention: `displayAjax<Name>()` (Controller.php:331-336).
+      - ["displayAjax%", "unauthenticated"]
+      # Magento 2: every action controller implements ActionInterface::execute(); GraphQL resolvers
+      # implement ResolverInterface::resolve() ($args/$value = query input). Frontend/webapi/graphql are
+      # unauth; adminhtml execute() is admin-guarded by the _isAllowed guard (modeled above), which the
+      # missing-authz query subtracts. NB: `execute`/`resolve` are generic — correct for a per-app Magento
+      # DB (the normal analysis mode); on a mixed codebase they would over-match unrelated execute() methods.
+      - ["execute", "unauthenticated"]
+      - ["resolve", "unauthenticated"]
 
   # ---- Authorization guards (PROVE the user may act). Deliberately NOT nonce / is_admin / is_logged_in.
   - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
@@ -45,11 +56,16 @@ extensions:
       # PrestaShop back-office permission check.
       - ["method", "access"]              # $this->access('edit')
       # Joomla ACL.
-      - ["method", "authorise"]           # $user->authorise('core.edit', ...)
+      - ["method", "authorise"]           # $user->authorise('core.edit', ...)  — User.php:386, 812 call sites
+      - ["staticmethod", "check"]         # Access::check($userId, 'core.edit', ...) — User.php:413
       # Drupal permission checks.
       - ["method", "hasPermission"]       # $account->hasPermission('administer nodes')
       - ["function", "user_access"]       # D7
       - ["staticmethod", "allowedIfHasPermission"]
+      - ["staticmethod", "allowedIf"]     # AccessResult::allowedIf($cond) — D8-12 _access callback guard
+      # Magento ACL.
+      - ["method", "isAllowed"]           # AuthorizationInterface::isAllowed('Vendor_Module::acl') — 228 sites
+      - ["method", "_isAllowed"]          # adminhtml controller guard override (36 controllers)
 
   # ---- Sensitive / state-changing actions. v1 uses DISTINCTIVE names (low FP); generic delete/update/save
   #      are deliberately deferred until precision is measured.

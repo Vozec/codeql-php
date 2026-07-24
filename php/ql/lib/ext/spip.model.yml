@@ -1,0 +1,104 @@
+# SPIP core Models-as-Data (SPIP 4.x — the `ecrire/` core). A French CMS with very distinctive
+# procedural conventions: request input funnels through `_request()`, SQL through the `sql_*`
+# abstraction (ecrire/base/abstract_sql.php), and HTTP dispatch is by naming convention to GLOBAL
+# functions — `action_<nom>_dist()` reached via `spip.php?action=<nom>`. Verified against SPIP 4.1.20.
+extensions:
+
+  # ---- A. SOURCES: merged GET/POST input --------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
+    data:
+      # _request('var') is THE primary raw accessor: returns $_GET[$var] ?? $_POST[$var], unsanitised.
+      # ecrire/inc/utils.php:424
+      - ["function", "_request", "spip-request"]
+      # collecter_requests($noms, ...) bulk-reads several _request() values into an array.
+      - ["function", "collecter_requests", "spip-request"]
+
+  # ---- B. ENTRYPOINTS: SPIP dispatches to GLOBAL FUNCTIONS by naming convention ------------------
+  # Requires the functionEntrypointModel predicate (function-name glob; AccessControl.qll). `?action=X`
+  # -> charger_fonction('X','action') -> action_X_dist() (ecrire/public/aiguiller.php:80). The CVT form
+  # pipeline formulaires_<f>_verifier_dist/_traiter_dist are reached the same way (aiguiller.php:251/288).
+  # exec_<n>_dist is the authenticated private space (?exec=n).
+  - addsTo: { pack: codeql/php-all, extensible: functionEntrypointModel }
+    data:
+      - ["action_%_dist", "unauthenticated"]
+      - ["formulaires_%_verifier_dist", "unauthenticated"]
+      - ["formulaires_%_traiter_dist", "unauthenticated"]
+      - ["formulaires_%_charger_dist", "unauthenticated"]
+      - ["exec_%_dist", "authenticated"]
+
+  # ---- C. SQL SINKS: the sql_* abstraction (ecrire/base/abstract_sql.php) ------------------------
+  # Where-clause / query fragments are concatenated RAW (docblocks show manual `.sql_quote(..)`), so a
+  # variable string reaching them is SQLi. argIndex per the verified signature of each function.
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["function", "sql_query", 0, "SQL injection"]     # abstract_sql.php:1589 raw SQL
+      - ["function", "sql_select", 0, "SQL injection"]    # $select   (:233)
+      - ["function", "sql_select", 1, "SQL injection"]    # $from
+      - ["function", "sql_select", 2, "SQL injection"]    # $where    (the classic)
+      - ["function", "sql_select", 3, "SQL injection"]    # $groupby
+      - ["function", "sql_select", 4, "SQL injection"]    # $orderby
+      - ["function", "sql_select", 6, "SQL injection"]    # $having
+      - ["function", "sql_fetsel", 2, "SQL injection"]    # $where     (:1646)
+      - ["function", "sql_fetsel", 4, "SQL injection"]    # $orderby
+      - ["function", "sql_allfetsel", 2, "SQL injection"] # $where     (:1723)
+      - ["function", "sql_allfetsel", 4, "SQL injection"] # $orderby
+      - ["function", "sql_getfetsel", 0, "SQL injection"] # $select    (:1785)
+      - ["function", "sql_getfetsel", 2, "SQL injection"] # $where
+      - ["function", "sql_countsel", 1, "SQL injection"]  # $where — NB shifted, no $select (:375)
+      - ["function", "sql_update", 1, "SQL injection"]    # $exp (raw SET) (:848)
+      - ["function", "sql_update", 2, "SQL injection"]    # $where
+      - ["function", "sql_updateq", 2, "SQL injection"]   # $where ($exp auto-quoted) (:903)
+      - ["function", "sql_delete", 1, "SQL injection"]    # $where     (:943)
+      - ["function", "sql_insert", 2, "SQL injection"]    # $valeurs (raw) (:702)
+      # Open redirect: redirige_par_entete($url) (ecrire/inc/headers.php:40); SPIP normally pre-filters
+      # via securiser_redirect_action() (modeled as a sanitizer below).
+      - ["function", "redirige_par_entete", 0, "open redirect"]
+
+  # ---- D. FULL SANITIZERS: SQL-safe -------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "sql_quote"]                          # abstract_sql.php:2002
+      - ["function", "_q"]                                 # connect_sql.php:387 — "'".addslashes()."'"
+      - ["function", "intval"]                             # numeric coercion — full SQL/path barrier
+      - ["function", "securiser_redirect_action"]          # same-origin redirect check (aiguiller.php:21)
+
+  # ---- E. WEAK-XSS SANITIZERS: HTML/JS escapers that do NOT neutralise SQL/path ------------------
+  #        (each also gets a stepModel below so taint keeps flowing to SQL/path sinks — esc_html pattern)
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "interdire_scripts"]                  # texte.php:148 — strips <script>/PHP
+      - ["function", "safehtml"]                           # texte_mini.php:542
+      - ["function", "echapper_html_suspect"]              # texte_mini.php:481
+      - ["function", "spip_htmlspecialchars"]              # filtres_mini.php:242
+      - ["function", "spip_htmlentities"]                  # filtres_mini.php:259
+      - ["function", "entites_html"]                       # filtres.php:843
+      - ["function", "attribut_html"]                      # filtres.php:1405
+      - ["function", "protege_champ"]                      # balise/formulaire_.php:37
+
+  # ---- F. STEPS: keep taint flowing (weak-xss carriers + URL builders) --------------------------
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "interdire_scripts", 0, -1]
+      - ["function", "safehtml", 0, -1]
+      - ["function", "echapper_html_suspect", 0, -1]
+      - ["function", "spip_htmlspecialchars", 0, -1]
+      - ["function", "spip_htmlentities", 0, -1]
+      - ["function", "entites_html", 0, -1]
+      - ["function", "attribut_html", 0, -1]
+      - ["function", "protege_champ", 0, -1]
+      - ["function", "parametre_url", 0, -1]               # rebuilds a URL from its args (redirect carrier)
+      - ["function", "parametre_url", 2, -1]
+
+  # ---- G. ACCESS-CONTROL: authorization guard + state-change actions ----------------------------
+  # autoriser($faire,$type,$id,...):bool is SPIP's ACL primitive (inc/autoriser.php:106). The CSRF token
+  # securiser_action()/verifier_cle_action() is authenticity, NOT authorization — deliberately excluded.
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["function", "autoriser"]
+  - addsTo: { pack: codeql/php-all, extensible: sensitiveActionModel }
+    data:
+      - ["function", "objet_modifier", 1, "state-change"]  # editer_objet.php:77 — $id selector
+      - ["function", "objet_inserer", -1, "state-change"]  # editer_objet.php:170
+      - ["function", "objet_supprimer", 1, "state-change"]
+      - ["function", "ecrire_meta", -1, "state-change"]    # inc/meta.php:193 — option write
+      - ["function", "effacer_meta", -1, "state-change"]   # inc/meta.php:158

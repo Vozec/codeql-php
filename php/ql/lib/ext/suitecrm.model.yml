@@ -1,0 +1,51 @@
+# SuiteCRM (SugarCRM fork) Models-as-Data. $_REQUEST/$_GET/$_POST are core sources, globally
+# securexss()'d at entry (include/entryPoint.php:93 -> clean_incoming_data — weak-XSS only, still
+# SQL/path/redirect-tainted). $db->query/quote/escape are ALREADY global — not repeated.
+# ENGINE NOTE: function-name sanitizers defined in-source (securexss/remove_xss/clean_string in
+# include/utils.php) are no-ops on a full-core scan (analyzed by body) but help plugin/module scans.
+extensions:
+  # ---- SQL sinks: DBManager raw-SQL API beyond the bare `query` name -----------------------------
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      - ["method", "limitQuery", 0, "SQL injection"]     # DBManager.php:3855
+      - ["method", "limitQuerySql", 0, "SQL injection"]  # DBManager.php:3382
+      - ["method", "getOne", 0, "SQL injection"]         # DBManager.php:1655
+      - ["method", "queryArray", 0, "SQL injection"]     # DBManager.php:3612
+      - ["method", "insertParams", 0, "SQL injection"]   # DBManager.php:532
+      # Open redirect / header injection.
+      - ["staticmethod", "redirect", 0, "open redirect"] # SugarApplication::redirect (MVC/SugarApplication.php:639)
+
+  # ---- Sanitizers -------------------------------------------------------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["staticmethod", "cleanHtml"]    # SugarCleaner::cleanHtml (HtmlSanitizer.php:114) — fires core-wide
+      - ["function", "securexss"]        # utils.php:2606 (no-op on core; helps plugin scans)
+      - ["function", "remove_xss"]       # utils.php:2250
+      - ["function", "preprocess_param"] # utils.php:2677
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "clean_string"]     # utils.php:2370 preg whitelist validator
+  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+    data:
+      - ["DBManager", "quoted"]          # DBManager.php:1570
+      - ["DBManager", "quoteIdentifier"] # DBManager.php:3787
+
+  # ---- Access-control: ACL guards, entrypoints, sensitive actions --------------------------------
+  - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }
+    data:
+      - ["staticmethod", "checkAccess"]          # ACLController::checkAccess (modules/ACL/ACLController.php:70)
+      - ["staticmethod", "checkModuleAllowed"]   # :263
+      - ["staticmethod", "requireOwner"]         # :167
+      - ["staticmethod", "requireSecurityGroup"] # :187
+      - ["method", "ACLAccess"]                  # SugarBean::ACLAccess (data/SugarBean.php:6140)
+      - ["function", "is_admin"]                 # utils.php:1782
+  # SugarController::handle_action dispatches action_<y>() (SugarController.php:595).
+  - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
+    data:
+      - ["action_%", "authenticated"]
+  - addsTo: { pack: codeql/php-all, extensible: sensitiveActionModel }
+    data:
+      - ["method", "mark_deleted", 0, "state-change"]                # SugarBean::mark_deleted($id) :5295
+      - ["method", "retrieve", 0, "sensitive-read"]                 # SugarBean::retrieve($id) :4600
+      - ["method", "retrieve_by_string_fields", 0, "sensitive-read"] # :5838
+      - ["method", "save", -1, "state-change"]                      # SugarBean::save() :2331
