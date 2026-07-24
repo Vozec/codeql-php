@@ -482,6 +482,22 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
  * receiver's inferred class matches, so `$someOtherObject->get()` is not. Re-arms the framework request
  * accessors that a bare method name could not model without false positives.
  */
+/**
+ * Holds if the receiver `recv`'s inferred class is `cls`, OR has `cls` as a (transitive) ancestor
+ * (superclass or implemented interface), OR its written type-name is `cls`. The ancestor arm lets a
+ * model keyed on a framework BASE class also fire on its subclasses — the dominant real-world shape
+ * (a MODX processor `class FooProcessor extends Processor`, a Symfony controller extending
+ * `AbstractController`, a request subclass, …). Class-scoped model rows already use specific names, so
+ * broadening to subclasses adds true positives without the FP flood a bare method name would cause.
+ */
+private predicate receiverIsClass(Expr recv, string cls) {
+  TI::exprClass(recv).getName() = cls
+  or
+  TI::exprClass(recv).getAnAncestor().getName() = cls
+  or
+  TI::exprTypeName(recv) = cls
+}
+
 private class TypedRemoteSource extends RemoteFlowSource {
   string sourceType;
 
@@ -489,9 +505,7 @@ private class TypedRemoteSource extends RemoteFlowSource {
     exists(MethodCall c, string cls, string m |
       typedSourceModel(cls, m, sourceType) and
       c.getMethodName() = m and
-      // resolve the receiver class by inference (declared classes) OR by its written type name (so
-      // framework classes in an un-extracted vendor/ — `function (Request $r)` — still match).
-      (TI::exprClass(c.getReceiver()).getName() = cls or TI::exprTypeName(c.getReceiver()) = cls) and
+      receiverIsClass(c.getReceiver(), cls) and
       this.asExpr() = c
     )
   }
@@ -744,7 +758,7 @@ private class TypedSink extends Sink {
     exists(int i, string cls, string m | typedSinkModel(cls, m, i, kind) |
       exists(MethodCall c |
         c.getMethodName() = m and
-        (TI::exprClass(c.getReceiver()).getName() = cls or TI::exprTypeName(c.getReceiver()) = cls) and
+        receiverIsClass(c.getReceiver(), cls) and
         (i = -1 and this.asExpr() = c.getAnArgument() or this.asExpr() = c.getArgument(i))
       )
       or
