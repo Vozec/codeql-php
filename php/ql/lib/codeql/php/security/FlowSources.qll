@@ -506,6 +506,17 @@ private predicate receiverIsClass(Expr recv, string cls) {
   TI::exprClass(recv).getAnAncestor().getName() = cls
   or
   TI::exprTypeName(recv) = cls
+  or
+  // Yii / Craft application request component: `Yii::$app->request` / `Craft::$app->request`. The request
+  // is a property on the application reached through a static `::$app` property, so its type never infers
+  // — treat a `->request` member access on any `::$…` static-property object as the framework `Request`,
+  // re-arming the class-scoped `["Request", get/post/…]` accessors (Yii `Yii::$app->request->get('id')`).
+  cls = "Request" and
+  exists(Php::MemberAccessExpression req |
+    req = recv and
+    req.getName().(Php::Name).getValue() = "request" and
+    req.getObject() instanceof Php::ScopedPropertyAccessExpression
+  )
 }
 
 private class TypedRemoteSource extends RemoteFlowSource {
