@@ -814,3 +814,21 @@ private class BuiltinSanitizer extends Sanitizer {
 private class GuardBarrier extends Sanitizer {
   GuardBarrier() { isGuardedRead(this) }
 }
+
+/**
+ * A value produced by a cast to a numeric or boolean type — `(int)`, `(integer)`, `(float)`,
+ * `(double)`, `(real)`, `(bool)`, `(boolean)`. Such a value cannot carry an injection / XSS / path /
+ * command payload, so it is a barrier for every taint class. This is generic to all PHP (every CMS
+ * casts request-supplied ids with `(int) $x` before using them in SQL) and complements the
+ * `intval` / `floatval` / `settype` / `absint` FUNCTION sanitizers — the cast SYNTAX was previously
+ * treated as an ordinary taint-propagating expression. `(string)` / `(binary)` / `(array)` casts still
+ * propagate, as before.
+ */
+private class NumericCastSanitizer extends Sanitizer {
+  NumericCastSanitizer() {
+    exists(CastExpr c |
+      c.getTypeName() = ["int", "integer", "float", "double", "real", "bool", "boolean"] and
+      this.asExpr() = c
+    )
+  }
+}
