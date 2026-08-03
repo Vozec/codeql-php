@@ -15,19 +15,17 @@ extensions:
     data:
       - ["function", "request", "laravel-request"]
       - ["function", "old", "laravel-request"]                 # form repopulation
-      - ["method", "input", "laravel-request"]
-      - ["method", "query", "laravel-request"]
-      - ["method", "post", "laravel-request"]
-      - ["method", "all", "laravel-request"]
-      - ["method", "only", "laravel-request"]
-      - ["method", "except", "laravel-request"]
-      - ["method", "json", "laravel-request"]
-      - ["method", "string", "laravel-request"]
-      - ["method", "getContent", "laravel-request"]
+      # NOTE: the generic accessor names (input/query/post/all/only/except/json/string/
+      # getContent) are declared ONLY as Request-typed sources in the typedSourceModel block
+      # below. Declaring them here as untyped `method` sources made EVERY ->query()/->all()/
+      # ->json() on ANY object (PDO/mysqli/$wpdb->query(), Collection->all(), Response->json())
+      # a request source — the dominant false-positive source observed on the CMS corpus
+      # (154/156 taint findings rooted at a PDO ->query()). Keep only the distinctive names.
       - ["method", "route", "laravel-route-parameter"]         # $request->route('id')
-      - ["staticmethod", "input", "laravel-request"]           # Request::input()
-      - ["staticmethod", "all", "laravel-request"]
-      - ["staticmethod", "get", "laravel-request"]
+      - ["staticmethod", "input", "laravel-request"]           # Request::input() — distinctive
+      # `Request::all()` / `Request::get()` removed: the bare static names collide with the far
+      # more common `Model::all()` (Eloquent) and `Cache::get()`/`Config::get()` facades → FP
+      # sources. `$request->all()` / `request()->all()` stay covered by the Request-typed rows.
 
   # Class-qualified request accessors: a source ONLY on a `Request` receiver, so the generic names
   # (`get`/`header`/`cookie`/`boolean`/`file`) that collide with ordinary objects no longer FP.
@@ -44,6 +42,9 @@ extensions:
       - ["Request", "all", "laravel-request"]
       - ["Request", "only", "laravel-request"]
       - ["Request", "except", "laravel-request"]
+      - ["Request", "json", "laravel-request"]
+      - ["Request", "string", "laravel-request"]
+      - ["Request", "getContent", "laravel-request"]
       - ["Request", "integer", "laravel-request"]
       - ["Request", "float", "laravel-request"]
       - ["Request", "date", "laravel-request"]
