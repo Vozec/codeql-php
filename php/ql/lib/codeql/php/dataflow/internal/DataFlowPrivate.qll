@@ -228,6 +228,22 @@ predicate isArgumentNode(ArgumentNode n, DataFlowCall call, ArgumentPosition pos
 }
 
 /**
+ * The maximum number of like-named callables for which resolving an unknown-receiver call purely by
+ * name is still worthwhile. Above this, name-only matching stops meaning "probably the one impl" and
+ * instead connects the call to every same-named method across unrelated classes — generic names such
+ * as `query` / `get` / `execute` / `delete` — which merges taint between unrelated code, creates
+ * cross-file/cross-app false flows, and explodes path counts. Generic (not per-CMS); tunable and
+ * validated by bench/run.sh. Functions and rare method names have few definitions and are unaffected.
+ */
+private int nameFallbackMaxArity() { result = 8 }
+
+/** Holds if resolving a call to a callable named `name` purely by name is acceptable (see above). */
+bindingset[name]
+private predicate nameFallbackAcceptable(string name) {
+  count(DataFlowCallable cbl | cbl.getName() = name) <= nameFallbackMaxArity()
+}
+
+/**
  * Gets a viable target of `call`. A method call whose receiver class is inferred resolves precisely
  * to that class's method (type-based dispatch); otherwise resolution falls back to matching by name
  * (recall-first). Functions and static calls always resolve by name.
@@ -243,9 +259,12 @@ DataFlowCallable viableCallable(DataFlowCall call) {
   // (unknown receiver class, OR a class that lacks a matching method: trait/mixin/`__call`, or an
   // under-approximated type). Gating on "no typed callee was found" (not merely "no type was inferred")
   // keeps this recall-first — an inferred-but-methodless receiver must not silently drop the edge (B.4).
+  // The `nameFallbackAcceptable` gate additionally drops ubiquitous names whose name-only resolution
+  // would just over-connect unrelated classes (the dominant source of cross-file false flow).
   call.getName() = result.getName() and
   not exists(call.getTypedCallee()) and
-  not exists(call.getStaticTypedCallee())
+  not exists(call.getStaticTypedCallee()) and
+  nameFallbackAcceptable(call.getName())
   or
   result = call.getInlineCallee()
   or
