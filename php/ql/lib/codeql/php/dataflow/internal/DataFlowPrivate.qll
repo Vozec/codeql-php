@@ -807,7 +807,9 @@ predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c)
       (
         c = TI::inferredMethod(mc)
         or
-        not TI::hasInferredReceiver(mc) and c.getName() = mc.getMethodName()
+        not TI::hasInferredReceiver(mc) and
+        c.getName() = mc.getMethodName() and
+        nameFallbackAcceptable(mc.getMethodName())
       )
     )
     or
