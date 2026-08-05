@@ -7,11 +7,4 @@ members = [
     "shared/yeast",
     "shared/yeast-macros",
     "php/extractor",
-    "ruby/extractor",
-    "unified/extractor",
-    "unified/extractor/tree-sitter-swift",
-    "rust/extractor",
-    "rust/extractor/macros",
-    "rust/ast-generator",
-    "rust/autobuild",
 ]
