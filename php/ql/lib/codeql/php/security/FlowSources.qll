@@ -1046,6 +1046,68 @@ private class GuardBarrier extends Sanitizer {
 }
 
 /**
+ * A `typedSanitizerModel` method call resolved through the STRONG receiver predicate (`receiverIsClass` —
+ * type inference + ancestors + typehint), the same one typed sinks/sources use. ModelExtensions already
+ * has a `TypedSanitizer` keyed on the weaker literal/`new`/`$wpdb` resolution; this additive class also
+ * recognises a DI-/factory-injected receiver (`$this->db->prepare($sql)` where `db` is a typed property),
+ * so a correctly-parameterised query on an injected connection is no longer flagged SQLi (Tier-1-D).
+ */
+private class TypedSanitizerStrong extends Sanitizer {
+  TypedSanitizerStrong() {
+    exists(MethodCall c, string cls |
+      typedSanitizerModel(cls, c.getMethodName()) and
+      receiverIsClass(c.getReceiver(), cls) and
+      this.asExpr() = c
+    )
+  }
+}
+
+/**
+ * Gets the literal text of a CONSTANT (non-interpolated) string literal — a single-quoted `Php::String`
+ * or a double-quoted `EncapsedString` whose every child is literal `StringContent` (i.e. no `$var`
+ * interpolation, which would make the value attacker-influenced). Multiple content chunks are joined in
+ * source order.
+ */
+private string constStringText(Expr s) {
+  s instanceof Php::String and
+  not exists(Php::AstNode ch |
+    ch = s.(Php::String).getChild(_) and not ch instanceof Php::StringContent
+  ) and
+  result =
+    concat(int i, string t | t = s.(Php::String).getChild(i).(Php::StringContent).getValue() | t order by i)
+  or
+  s instanceof Php::EncapsedString and
+  not exists(Php::AstNode ch |
+    ch = s.(Php::EncapsedString).getChild(_) and not ch instanceof Php::StringContent
+  ) and
+  result =
+    concat(int i, string t |
+      t = s.(Php::EncapsedString).getChild(i).(Php::StringContent).getValue() | t order by i
+    )
+}
+
+/**
+ * A `sprintf`/`printf`-family result whose CONSTANT format string uses only NUMERIC conversion specifiers
+ * (`%d %i %u %b %o %x %X %e %f %g` + flags/width/precision/positional) and NO `%s`/`%c`. Every argument is
+ * therefore coerced to a number in the output, so the result cannot carry an injection/XSS payload — a
+ * barrier for all classes. The canonical safe `sprintf("… id=%d", $_GET['id'])` was flagged because
+ * `sprintf` is a generic taint STEP; this narrows that step out when the format is numeric-only (Tier-2-I).
+ */
+private class SprintfNumericBarrier extends Sanitizer {
+  SprintfNumericBarrier() {
+    exists(FunctionCall c, string fmt |
+      c.getName() = ["sprintf", "printf", "vsprintf", "vprintf"] and
+      fmt = constStringText(c.getArgument(0)) and
+      this.asExpr() = c and
+      // at least one numeric conversion …
+      fmt.regexpMatch(".*%[-+ 0#'.,0-9*$]*[bdiouxXeEfFgG].*") and
+      // … and NO string/char conversion (ignoring the literal `%%` escape).
+      not fmt.regexpReplaceAll("%%", "").regexpMatch(".*%[-+ 0#'.,0-9*$]*[sc].*")
+    )
+  }
+}
+
+/**
  * A value produced by a cast to a numeric or boolean type — `(int)`, `(integer)`, `(float)`,
  * `(double)`, `(real)`, `(bool)`, `(boolean)`. Such a value cannot carry an injection / XSS / path /
  * command payload, so it is a barrier for every taint class. This is generic to all PHP (every CMS

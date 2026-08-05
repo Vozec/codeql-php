@@ -277,15 +277,48 @@ private class DataStep extends AdditionalTaintStep {
 }
 
 /**
- * Holds if a function named `name` is DEFINED in the analysed source. A name-based sanitizer model is a
- * promise about EXTERNAL (framework) code; if the codebase ships its own function of that name, the
- * dataflow engine can and must analyse its real body instead — otherwise a same-named no-op
- * (`function sanitize_text_field($x){ return $x; }`) would be silently assumed to sanitize, hiding a real
- * vulnerability (a false negative, the dangerous direction for a sanitizer).
+ * Holds if `pname` is assigned/rebound anywhere in `f`'s body (`$p = …`, `$p .= …`, `$p =& …`), so a
+ * `return $pname` no longer yields the ORIGINAL parameter value.
+ */
+private predicate paramRebound(Function f, string pname) {
+  exists(VariableAccess lhs |
+    lhs.getName() = pname and
+    lhs.(Php::AstNode).getParent*() = f.getBody() and
+    (
+      lhs = any(Php::AssignmentExpression a).getLeft() or
+      lhs = any(Php::AugmentedAssignmentExpression a).getLeft() or
+      lhs = any(Php::ReferenceAssignmentExpression a).getLeft()
+    )
+  )
+}
+
+/**
+ * Holds if `f` is a TRIVIAL PASS-THROUGH: it `return`s one of its parameters unchanged (the parameter is
+ * never rebound in the body). Such a function neutralises nothing, so a same-named sanitizer model is a
+ * LIE for this codebase and must be distrusted. A real framework sanitizer (`esc_sql`, `sanitize_email`,
+ * … with an actual escaping body) is NOT a pass-through, so its model is kept.
+ */
+private predicate isTrivialPassthrough(Function f) {
+  exists(ReturnStmt r, string pname |
+    r.(Php::AstNode).getParent*() = f.getBody() and
+    pname = f.getAParameter().getName() and
+    r.getValue().(VariableAccess).getName() = pname and
+    not paramRebound(f, pname)
+  )
+}
+
+/**
+ * Holds if a function named `name` is defined in the analysed source AS A TRIVIAL PASS-THROUGH. A
+ * name-based sanitizer model is a promise about EXTERNAL (framework) code; a same-named source no-op
+ * (`function sanitize_text_field($x){ return $x; }`) would otherwise be silently assumed to sanitize,
+ * hiding a real vulnerability. The pass-through gate is critical for WHOLE-CMS scans: analysing WordPress
+ * core (which DEFINES the real `esc_sql`/`sanitize_email`) previously turned those sanitizers OFF, so
+ * every escaped query false-fired (the wp2shell target). Now only a genuine no-op disables the model; the
+ * real framework body — whose escaping the engine may not see through — keeps its trusted model.
  */
 bindingset[name]
 private predicate functionDefinedInSource(string name) {
-  exists(Function f | f.getName().toLowerCase() = name.toLowerCase())
+  exists(Function f | f.getName().toLowerCase() = name.toLowerCase() and isTrivialPassthrough(f))
 }
 
 private class DataSanitizer extends Sanitizer {
