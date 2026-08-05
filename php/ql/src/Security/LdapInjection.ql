@@ -1,9 +1,10 @@
 /**
  * @name LDAP injection
- * @description User input reaches a LDAP query, enabling LDAP injection.
+ * @description User input concatenated into an LDAP filter or DN without escaping enables LDAP
+ *              injection (authentication bypass, unauthorized attribute disclosure).
  * @kind path-problem
  * @problem.severity error
- * @security-severity 8.8
+ * @security-severity 8.5
  * @precision high
  * @id php/ldap-injection
  * @tags security
@@ -18,7 +19,7 @@ import codeql.php.security.FlowSources
 module Cfg implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node n) { n instanceof RemoteFlowSource }
 
-  predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "LDAP injection" }
+  predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "ldap injection" }
 
   predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
 }
