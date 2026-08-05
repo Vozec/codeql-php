@@ -416,6 +416,20 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     n.asExpr() = c.getArgument(cb) and
     kind = "code injection"
   )
+  or
+  // `preg_replace('/…/e', $replacement, $subject)` — the deprecated `e` (PREG_REPLACE_EVAL) modifier
+  // executes the REPLACEMENT (arg 1) as PHP code, first expanding backreferences from the SUBJECT
+  // (arg 2). A classic PHP<7 RCE (still shipped in the many legacy D5/6/7 modules in the wild). When
+  // the pattern (arg 0) is a constant string whose trailing modifier flags include `e`, both the
+  // replacement and the subject are code-injection sinks. Detected structurally on the constant
+  // pattern: after a PCRE delimiter, only valid modifier letters, one of them `e`.
+  exists(FunctionCall c |
+    c.getName() = "preg_replace" and
+    constantStringValue(c.getArgument(0))
+        .regexpMatch("(?s).*[/#~!@%|][imsxuADSUXJ]*e[imsxuADSUXJ]*") and
+    n.asExpr() = [c.getArgument(1), c.getArgument(2)] and
+    kind = "code injection"
+  )
 }
 
 /**
