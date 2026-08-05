@@ -551,8 +551,11 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   // pattern: after a PCRE delimiter, only valid modifier letters, one of them `e`.
   exists(FunctionCall c |
     c.getName() = "preg_replace" and
+    // Closing delimiter then PCRE modifier flags including `e`. The class covers both single-char
+    // delimiters (`/ # ~ ! @ % | , + = : .`) and the CLOSING half of paired delimiters (`) } ] >`),
+    // so `preg_replace('(pat)e', …)` / `preg_replace('{pat}e', …)` are caught (previously missed).
     constantStringValue(c.getArgument(0))
-        .regexpMatch("(?s).*[/#~!@%|][imsxuADSUXJ]*e[imsxuADSUXJ]*") and
+        .regexpMatch("(?s).*[/#~!@%|,+=:.)\\]}>][imsxuADSUXJ]*e[imsxuADSUXJ]*") and
     n.asExpr() = [c.getArgument(1), c.getArgument(2)] and
     kind = "code injection"
   )
@@ -1084,6 +1087,28 @@ private string constStringText(Expr s) {
     concat(int i, string t |
       t = s.(Php::EncapsedString).getChild(i).(Php::StringContent).getValue() | t order by i
     )
+}
+
+/**
+ * `filter_var($x, FILTER_…)` is a barrier ONLY for the genuinely-neutralizing NUMERIC filters, whose
+ * output is a number (or `false`) regardless of input: FILTER_VALIDATE_INT/FLOAT/BOOLEAN and
+ * FILTER_SANITIZE_NUMBER_INT/FLOAT. The VALIDATE_URL/EMAIL/IP filters return the input UNCHANGED (they
+ * validate, they do not sanitize) and FILTER_DEFAULT/UNSAFE_RAW is a no-op — modelling filter_var as a
+ * blanket sanitizer hid those (SSRF via a validated URL, etc.). Non-numeric filter_var stays a taint STEP
+ * (php-builtins.model.yml) so the value flows on (Tier-2-K).
+ */
+private class FilterVarNumericBarrier extends Sanitizer {
+  FilterVarNumericBarrier() {
+    exists(FunctionCall c |
+      c.getName() = "filter_var" and
+      c.getArgument(1).(Php::Name).getValue() =
+        [
+          "FILTER_VALIDATE_INT", "FILTER_VALIDATE_FLOAT", "FILTER_VALIDATE_BOOLEAN",
+          "FILTER_SANITIZE_NUMBER_INT", "FILTER_SANITIZE_NUMBER_FLOAT"
+        ] and
+      this.asExpr() = c
+    )
+  }
 }
 
 /**

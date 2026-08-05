@@ -155,7 +155,9 @@ extensions:
       - ["function", "settype"]
       - ["function", "basename"]
       - ["function", "realpath"]
-      - ["function", "filter_var"]
+      # NB: filter_var is NOT a blanket sanitizer — FILTER_VALIDATE_URL/EMAIL/IP return the input UNCHANGED
+      # (validation only -> SSRF/injection FN) and FILTER_DEFAULT/UNSAFE_RAW is a no-op. It is a taint STEP
+      # below; only the genuinely-neutralizing numeric filters barrier (FilterVarNumericBarrier in QL).
       # NB: preg_quote is a REGEX-context escaper (escapes . \ + * ? [ ^ ] $ ( ) { } = ! < > | : - # and an
       # optional delimiter) — it does NOT escape quotes, semicolons or angle brackets, so it is NOT a
       # barrier for SQL/command/XSS. Modeled as a taint STEP below, not a sanitizer.
@@ -224,6 +226,7 @@ extensions:
       - ["function", "htmlentities", 0, -1]
       - ["function", "strip_tags", 0, -1]
       - ["function", "preg_quote", 0, -1]
+      - ["function", "filter_var", 0, -1]     # carries taint; numeric-filter barrier is FilterVarNumericBarrier
       - ["function", "strtolower", -1, -1]
       - ["function", "ucfirst", -1, -1]
       - ["function", "ucwords", -1, -1]

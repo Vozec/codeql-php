@@ -26,7 +26,10 @@ import codeql.php.security.FlowSources
 private predicate hostPinnedConcatOperand(DataFlow::Node n) {
   exists(ConcatExpr ce |
     ce.getRightOperand() = n.asExpr() and
-    ce.getLeftOperand().(StringLiteral).getValue().regexpMatch("(?s).*https?://[A-Za-z0-9._~%-]+.*")
+    // The host must be TERMINATED by `/`, `?` or `#` inside the CONSTANT prefix, so appended input lands in
+    // the path/query/fragment — not the host. Without the terminator `"https://good.com".$x` (x=".evil.com/")
+    // yields `good.com.evil.com` and was wrongly cleared (a real open-redirect false negative).
+    ce.getLeftOperand().(StringLiteral).getValue().regexpMatch("(?s).*https?://[A-Za-z0-9._~%-]+[/?#].*")
   )
 }
 
