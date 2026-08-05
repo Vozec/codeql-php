@@ -45,6 +45,12 @@ extensions:
       - ["method", "entities"]          # Sanitizer.php:3012 htmlspecialchars wrapper
       - ["method", "entities1"]         # :3030
       - ["method", "purify"]            # :3351 HTMLPurifier
+  # Paired carry-taint steps (XSS-only barrier must still reach SQL/path sinks — see esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "entities", 0, -1]
+      - ["method", "entities1", 0, -1]
+      - ["method", "purify", 0, -1]
 
   # ---- Access-control: capability guards + admin Process-module entrypoints ----------------------
   - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }

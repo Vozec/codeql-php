@@ -46,6 +46,12 @@ extensions:
       - ["function", "h"]              # bootstrap/helpers.php:80 -> Text::specialchars (HTML-context only)
       - ["method", "specialchars"]     # Utility/Service/Text.php:168
       - ["method", "entities"]         # :144
+  # Paired carry-taint steps (XSS-only barrier must still reach SQL/path sinks — see esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "h", 0, -1]
+      - ["method", "specialchars", 0, -1]
+      - ["method", "entities", 0, -1]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["method", "filterNonAlphaNum"]   # Text.php:511

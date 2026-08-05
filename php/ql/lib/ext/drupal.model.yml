@@ -56,26 +56,36 @@ extensions:
       - ["ClientInterface", "request", 1, "server-side request forgery"]
 
   # ---- Sanitizers: Drupal escaping / filtering helpers ------------------------------------------
-  # D7-only full sanitizers (removed from D8+ core; kept for legacy/contrib audits).
+  # Identifier escapers only: they wrap the value in the identifier-quote char, neutralising SQL
+  # identifier injection (ORDER BY / table). These are genuinely SQL-context barriers -> full sanitizer.
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["function", "check_plain"]                            # D7 HTML-escape
-      - ["function", "check_url"]                              # D7 URL sanitiser
-      - ["function", "filter_xss"]                             # D7 XSS filter
-      - ["function", "filter_xss_admin"]
-      - ["staticmethod", "checkPlain"]                         # SafeMarkup::checkPlain (D8; removed D9 — dead but harmless)
-      - ["staticmethod", "escape"]                             # Html::escape — D8+ HTML-escape
-      - ["staticmethod", "escapeAttribute"]                    # Html::escapeAttribute
-      - ["method", "escapeLike"]                               # Connection::escapeLike — LIKE-wildcard escape
-      - ["method", "escapeField"]                              # Connection::escapeField — identifier escape (ORDER BY)
-      - ["method", "escapeTable"]                              # Connection::escapeTable — identifier escape (table)
-  # Xss::filter/filterAdmin are XSS-context only (strip tags, NOT SQL/path) -> weak-XSS + carry taint so
-  # an escape-then-SQLi flow is still caught (esc_html pattern), rather than a full sanitizer that hides it.
+      - ["method", "escapeField"]                             # Connection::escapeField — identifier escape (ORDER BY)
+      - ["method", "escapeTable"]                             # Connection::escapeTable — identifier escape (table)
+  # HTML/URL/XSS-context escapers: neutralise HTML output but NOT SQL/path/command -> weak-XSS + carry
+  # taint (esc_html pattern), so an escape-then-SQLi flow is still caught rather than hidden.
+  # escapeLike escapes ONLY the LIKE wildcards % _ \ (not quotes), so a value concatenated into a LIKE
+  # clause is still SQLi -> it must CARRY taint (step), never a full barrier (WooCommerce esc_like pattern).
   - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
-      - ["staticmethod", "filterAdmin"]                        # Xss::filterAdmin
-      - ["staticmethod", "filter"]                             # Xss::filter
+      - ["function", "check_plain"]                           # D7 HTML-escape
+      - ["function", "check_url"]                             # D7 URL sanitiser
+      - ["function", "filter_xss"]                            # D7 XSS filter
+      - ["function", "filter_xss_admin"]
+      - ["staticmethod", "checkPlain"]                        # SafeMarkup::checkPlain (D8)
+      - ["staticmethod", "escape"]                            # Html::escape — D8+ HTML-escape
+      - ["staticmethod", "escapeAttribute"]                   # Html::escapeAttribute
+      - ["staticmethod", "filterAdmin"]                       # Xss::filterAdmin
+      - ["staticmethod", "filter"]                            # Xss::filter
   - addsTo: { pack: codeql/php-all, extensible: stepModel }
     data:
+      - ["function", "check_plain", 0, -1]
+      - ["function", "check_url", 0, -1]
+      - ["function", "filter_xss", 0, -1]
+      - ["function", "filter_xss_admin", 0, -1]
+      - ["staticmethod", "checkPlain", 0, -1]
+      - ["staticmethod", "escape", 0, -1]
+      - ["staticmethod", "escapeAttribute", 0, -1]
       - ["staticmethod", "filterAdmin", 0, -1]
       - ["staticmethod", "filter", 0, -1]
+      - ["method", "escapeLike", 0, -1]                       # LIKE-wildcard escaper — carry taint, not a barrier

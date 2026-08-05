@@ -28,6 +28,11 @@ extensions:
       - ["Response", "redirect", 0, "open redirect"]           # Yii::$app->response->redirect($url)
 
   # ---- Sanitizers -------------------------------------------------------------------------------
-  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+  # Html::encode is an HTML-context escaper (not SQL/path/command) -> weak-XSS + carry taint, so
+  # escape-then-SQLi is not hidden (esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["staticmethod", "encode"]                             # yii\helpers\Html::encode($x) — HTML escape
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "encode", 0, -1]

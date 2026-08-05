@@ -24,6 +24,11 @@ extensions:
       - ["SelectQuery", "offset", 0, "SQL injection"]
 
   # ---- Sanitizers -------------------------------------------------------------------------------
-  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+  # `h()` is Cake's HTML-escape helper (HTML context only, not SQL/path/command) -> weak-XSS + carry
+  # taint, so escape-then-SQLi is not hidden (esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["function", "h"]                                      # Cake's global HTML-escape helper
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "h", 0, -1]

@@ -22,6 +22,14 @@ extensions:
       - ["function", "securexss"]        # utils.php:2606 (no-op on core; helps plugin scans)
       - ["function", "remove_xss"]       # utils.php:2250
       - ["function", "preprocess_param"] # utils.php:2677
+  # Paired carry-taint steps: an XSS-only barrier must still propagate taint (arg -> return) so a downstream
+  # SQL/path sink is reached (without this the value drops entirely at the escaper = whole-corpus FN).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "cleanHtml", 0, -1]
+      - ["function", "securexss", 0, -1]
+      - ["function", "remove_xss", 0, -1]
+      - ["function", "preprocess_param", 0, -1]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["function", "clean_string"]     # utils.php:2370 preg whitelist validator

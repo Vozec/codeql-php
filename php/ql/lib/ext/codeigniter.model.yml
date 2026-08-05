@@ -27,9 +27,17 @@ extensions:
       - ["BaseConnection", "query", 0, "SQL injection"]        # CI4 $db->query($sql)
 
   # ---- Sanitizers -------------------------------------------------------------------------------
+  # SQL escapers (escape_str/escapeString neutralise SQL quotes) stay full sanitizers — genuine SQL barrier.
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["method", "escape_str"]                               # $this->db->escape_str($x)
+      - ["method", "escapeString"]                             # CI4 $db->escapeString($x)
+  # HTML/XSS-context escapers -> weak-XSS + carry taint (esc_html pattern), so escape-then-SQLi is not hidden.
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["function", "html_escape"]                            # CI global HTML-escape helper
       - ["method", "xss_clean"]                                # $this->security->xss_clean($x)
-      - ["method", "escape_str"]                               # $this->db->escape_str($x)
-      - ["method", "escapeString"]                             # CI4 $db->escapeString($x)
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "html_escape", 0, -1]
+      - ["method", "xss_clean", 0, -1]

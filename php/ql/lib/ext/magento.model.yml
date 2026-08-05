@@ -76,7 +76,9 @@ extensions:
       - ["Select", "orWhere", 0, "SQL injection"]
 
   # ---- Sanitizers: Escaper (XSS) + SQL quoting --------------------------------------------------
-  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+  # Magento\Framework\Escaper output escapers neutralise HTML/JS/CSS/URL context but NOT SQL/path/command
+  # -> weak-XSS barrier + carry taint (esc_html pattern), so escape-then-SQLi is not hidden.
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["method", "escapeHtml"]
       - ["method", "escapeHtmlAttr"]
@@ -86,6 +88,16 @@ extensions:
       - ["method", "escapeCss"]
       - ["method", "escapeQuote"]
       - ["method", "escapeXssInUrl"]                             # Escaper::escapeXssInUrl — URL XSS sanitizer
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["method", "escapeHtml", 0, -1]
+      - ["method", "escapeHtmlAttr", 0, -1]
+      - ["method", "escapeUrl", 0, -1]
+      - ["method", "escapeJs", 0, -1]
+      - ["method", "escapeJsQuote", 0, -1]
+      - ["method", "escapeCss", 0, -1]
+      - ["method", "escapeQuote", 0, -1]
+      - ["method", "escapeXssInUrl", 0, -1]
   # SQL quoting — scope to the DB adapter (quote/quoteInto are generic names).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:

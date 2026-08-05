@@ -54,6 +54,13 @@ extensions:
       - ["staticmethod", "encodeAttribute"]          # Sanitizer.php:852
       - ["staticmethod", "safeEncodeAttribute"]      # Sanitizer.php:897
       - ["staticmethod", "escapeHtmlAllowEntities"]  # Sanitizer.php:1115
+  # Paired carry-taint steps (XSS-only barrier must still reach SQL/path sinks — see esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "element", 0, -1]
+      - ["staticmethod", "encodeAttribute", 0, -1]
+      - ["staticmethod", "safeEncodeAttribute", 0, -1]
+      - ["staticmethod", "escapeHtmlAllowEntities", 0, -1]
 
   # ---- Access-control: Authority / PermissionManager primitives (isAllowed already global) --------
   - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }

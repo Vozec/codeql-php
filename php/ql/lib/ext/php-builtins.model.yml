@@ -262,6 +262,18 @@ extensions:
       - ["function", "utf8_encode", -1, -1]
       - ["function", "hex2bin", -1, -1]
       - ["function", "quotemeta", -1, -1]
+      # Multibyte / encoding / search string transforms (ubiquitous in i18n + CMS) — the string argument
+      # flows to the result; without these, taint drops through a mb_*/iconv/strstr rewrite (FN).
+      - ["function", "mb_substr", -1, -1]
+      - ["function", "mb_strtolower", -1, -1]
+      - ["function", "mb_strtoupper", -1, -1]
+      - ["function", "mb_convert_case", -1, -1]
+      - ["function", "mb_convert_encoding", -1, -1]
+      - ["function", "iconv", -1, -1]
+      - ["function", "strstr", -1, -1]
+      - ["function", "stristr", -1, -1]
+      - ["function", "strrchr", -1, -1]
+      - ["function", "preg_filter", -1, -1]
       # Array higher-order: the data array (any argument) flows to the result. The callback transforms
       # each element; taint is preserved regardless of callback kind (string / variable / inline).
       - ["function", "array_map", -1, -1]

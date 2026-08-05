@@ -31,6 +31,11 @@ extensions:
     data:
       - ["function", "txpspecialchars"]   # :191 htmlspecialchars wrapper (XSS-only)
       - ["function", "escape_title"]      # :259
+  # Paired carry-taint steps (XSS-only barrier must still reach SQL/path sinks — see esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "txpspecialchars", 0, -1]
+      - ["function", "escape_title", 0, -1]
 
   # ---- Access-control: privilege gates ----------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: authorizationGuardModel }

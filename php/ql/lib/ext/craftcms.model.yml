@@ -29,6 +29,10 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["staticmethod", "encodeParams"]   # src/helpers/Html.php:65 (Html::encode inherited from yii)
+  # Paired carry-taint step (XSS-only barrier must still reach SQL/path sinks — see esc_html pattern).
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["staticmethod", "encodeParams", 0, -1]
 
   # ---- Access-control: Yii/Craft controller actions + Craft guard set ----------------------------
   - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }

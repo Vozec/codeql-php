@@ -580,13 +580,15 @@ private predicate receiverIsClass(Expr recv, string cls) {
   or
   // Yii / Craft application request component: `Yii::$app->request` / `Craft::$app->request`. The request
   // is a property on the application reached through a static `::$app` property, so its type never infers
-  // — treat a `->request` member access on any `::$…` static-property object as the framework `Request`,
-  // re-arming the class-scoped `["Request", get/post/…]` accessors (Yii `Yii::$app->request->get('id')`).
+  // — treat a `->request` member access reached through a `Yii::`/`Craft::` static-property object as the
+  // framework `Request`, re-arming the class-scoped `["Request", get/post/…]` accessors. Scoped to the two
+  // real application classes (not any `::$prop`) so an unrelated `Foo::$bar->request` is not a source.
   cls = "Request" and
-  exists(Php::MemberAccessExpression req |
+  exists(Php::MemberAccessExpression req, Php::ScopedPropertyAccessExpression app |
     req = recv and
     req.getName().(Php::Name).getValue() = "request" and
-    req.getObject() instanceof Php::ScopedPropertyAccessExpression
+    app = req.getObject() and
+    app.getScope().toString() = ["Yii", "Craft"]
   )
 }
 
