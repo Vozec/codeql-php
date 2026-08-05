@@ -12,7 +12,7 @@ extensions:
       - ["method", "get_var", -1, "SQL injection"]
       - ["method", "get_col", -1, "SQL injection"]
       - ["method", "get_row", -1, "SQL injection"]
-      - ["method", "query", -1, "SQL injection"]
+      - ["method", "query", 0, "SQL injection"]
       # HTTP fetch helpers — every WP remote wrapper is an SSRF sink on its URL argument.
       - ["function", "wp_remote_get", 0, "server-side request forgery"]
       - ["function", "wp_remote_post", 0, "server-side request forgery"]

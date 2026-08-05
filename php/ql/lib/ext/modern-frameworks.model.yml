@@ -21,7 +21,7 @@ extensions:
       - ["method", "createRequest", 1, "server-side request forgery"]
       - ["method", "createUri", 0, "server-side request forgery"]
       # SQL: raw query methods (PDO / mysqli / Doctrine). NB `prepare` is SAFE (parameterised).
-      - ["method", "query", -1, "SQL injection"]
+      - ["method", "query", 0, "SQL injection"]
       - ["method", "exec", -1, "SQL injection"]
       - ["method", "unbuffered_query", -1, "SQL injection"]
       - ["method", "real_query", -1, "SQL injection"]
