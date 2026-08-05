@@ -763,21 +763,48 @@ private class GetenvSource extends RemoteFlowSource {
 }
 
 /**
- * Dolibarr `GETPOST(name, type, …)` request accessor. The 2nd arg selects a sanitiser: `'int'`, `'alpha'`,
- * `'aZ09'`, … neutralise the value, so those calls are NOT sources; only the clearly-raw forms are — no
- * type arg, or the explicit `'none'` type. (`GETPOSTINT` is always-int and never matches.) This mirrors
- * the getenv split: model the accessor as a source only where it actually returns unsanitised input.
+ * Dolibarr `GETPOST(name, type, …)` request accessor. The 2nd arg selects a sanitiser, but only the
+ * NUMERIC/alphanumeric coercions (`int`/`intcomma`/`aZ09`/`aZ`) make the value SQL-safe. The HTML filters
+ * (`restricthtml`/`nohtml`/`alphanohtml`/`alpha`) strip tags but do NOT escape quotes, so the value is
+ * still an injection source for SQL/command/path — modelling them as fully-safe (the previous behaviour)
+ * hid a whole class of Dolibarr SQLi. So GETPOST is a source UNLESS the type is a genuine SQL-safe coercion;
+ * the HTML types are additionally an XSS barrier below (kind-aware: raw for SQL, safe for XSS).
  */
+private string getpostSqlSafeType() {
+  result = ["int", "integer", "intcomma", "aZ09", "aZ09comma", "aZ"]
+}
+
+private string getpostHtmlType() {
+  result = ["restricthtml", "restricthtmlallowclass", "nohtml", "alphanohtml", "alpha"]
+}
+
 private class GetpostSource extends RemoteFlowSource {
   GetpostSource() {
     exists(FunctionCall c | c.getName() = "GETPOST" and this.asExpr() = c |
       not exists(c.getArgument(1))
       or
-      constantStringValue(c.getArgument(1)) = "none"
+      // fires unless the type arg is a constant SQL-safe coercion (a dynamic/non-constant type is
+      // treated conservatively as a source).
+      not constantStringValue(c.getArgument(1)) = getpostSqlSafeType()
     )
   }
 
   override string getSourceType() { result = "remote" }
+}
+
+/**
+ * `GETPOST(name, 'restricthtml'|'nohtml'|'alphanohtml'|'alpha')` strips HTML/scripts, so the value is
+ * XSS-safe even though it stays a SQL source (above). Barriering XSS at the source node suppresses the XSS
+ * finding while the SQL/command/path flow proceeds — the kind-aware half of the Dolibarr GETPOST fix.
+ */
+private class GetpostHtmlXssBarrier extends XssSanitizer {
+  GetpostHtmlXssBarrier() {
+    exists(FunctionCall c |
+      c.getName() = "GETPOST" and
+      constantStringValue(c.getArgument(1)) = getpostHtmlType() and
+      this.asExpr() = c
+    )
+  }
 }
 
 /**
@@ -1193,22 +1220,31 @@ private class ScalarParamBarrier extends Sanitizer {
 }
 
 /**
- * A read of a variable that a preceding `settype($x, 'int'|'float'|'bool')` coerced to a scalar type in
- * the same function — the by-reference analogue of an `(int)` cast (settype mutates its argument in
- * place), so the value is guaranteed numeric/boolean afterward and the flow is cut. Scoped to the same
- * callable and to reads TEXTUALLY AFTER the settype so an earlier tainted read is not wrongly cleared.
+ * A read of a variable that a preceding `settype($x, 'int'|'float'|'bool')` coerced to a scalar type — the
+ * by-reference analogue of an `(int)` cast (settype mutates its argument in place), so the value is
+ * guaranteed numeric/boolean afterward and the flow is cut. The settype must DOMINATE the read: its
+ * enclosing statement is a strictly-earlier sibling of the read's enclosing statement in the SAME
+ * straight-line block. This replaces the old line-number test, which was CFG-blind — a `settype` nested in
+ * `if($c){ settype($x,'int'); }` wrongly cleared a later `sink($x)` reached on the `$c == false` path (FN).
  */
 private class SettypeBarrier extends Sanitizer {
   SettypeBarrier() {
-    exists(FunctionCall st, VariableAccess use, Callable fn |
+    exists(FunctionCall st, VariableAccess use |
       st.getName() = "settype" and
       st.getArgument(1).(StringLiteral).getValue() =
         ["int", "integer", "float", "double", "bool", "boolean"] and
       sameAccessPath(st.getArgument(0), use) and
       st.getArgument(0) != use and
-      st.(Php::AstNode).getParent+() = fn.getBody() and
-      use.(Php::AstNode).getParent+() = fn.getBody() and
-      st.getLocation().getStartLine() < use.getLocation().getStartLine() and
+      exists(Php::AstNode blk, int i, int j, Php::AstNode stStmt, Php::AstNode useStmt |
+        // settype's OWN statement must be a straight-line child of `blk` (getParent, not getParent*): a
+        // settype nested in an `if`/loop within `blk` does NOT dominate a later use in `blk`.
+        orderedBlockChild(blk, i, stStmt) and
+        stStmt = st.(Php::AstNode).getParent() and
+        // the use may be nested arbitrarily deep under a later sibling statement (still dominated).
+        orderedBlockChild(blk, j, useStmt) and
+        useStmt = use.(Php::AstNode).getParent*() and
+        i < j
+      ) and
       this.asExpr() = use
     )
   }

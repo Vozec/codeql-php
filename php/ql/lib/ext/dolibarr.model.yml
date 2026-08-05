@@ -8,13 +8,12 @@ extensions:
 
   # ---- A. SOURCE: the universal GET/POST accessor ------------------------------------------------
   # GETPOST($paramname, $check='alphanohtml', ...) — functions.lib.php:1097; returns $_GET[$p] ?? $_POST[$p]
-  # then a sanitization pass keyed on the STRING $check arg ('int'/'aZ09' are SQL-safe; 'alpha'/'nohtml'/
-  # 'none' leave SQL metachars). MAD cannot read $check, so modeled RAW to favor recall (real Dolibarr
-  # SQLi is GETPOST(...,'alpha') concatenated into SQL). Over-reports for 'int'/'aZ09' callers (accepted).
+  # then a sanitization pass keyed on the STRING $check arg. The $check arg IS read (kind-aware) by the
+  # `GetpostSource` / `GetpostHtmlXssBarrier` classes in FlowSources.qll: 'int'/'intcomma'/'aZ09'/'aZ' are
+  # SQL-safe (NOT sources); 'alpha'/'nohtml'/'restricthtml'/'alphanohtml' leave SQL metachars (SQL sources
+  # but XSS-barriered); 'none'/absent/dynamic are raw. A blunt unconditional `sourceModel` row here would
+  # over-report every 'int'/'aZ09' caller, so it is intentionally NOT used — the QL classes model it precisely.
   # GETPOSTINT/GETPOSTFLOAT are int/float-coerced -> deliberately NOT sources.
-  - addsTo: { pack: codeql/php-all, extensible: sourceModel }
-    data:
-      - ["function", "GETPOST", "dolibarr-request"]
 
   # ---- B. FRAMEWORK SINKS (distinctive function names, low FP) -----------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sinkModel }
