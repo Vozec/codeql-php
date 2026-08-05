@@ -11,7 +11,17 @@ import codeql.php.security.ModelExtensions
 /** Holds if `n` is attacker-controlled input (request superglobals and common input helpers). */
 predicate isRemoteSource(DataFlow::Node n) {
   n.asExpr().(VariableAccess).getName() =
-    ["_GET", "_POST", "_REQUEST", "_COOKIE", "_SERVER", "_FILES", "_ENV", "HTTP_RAW_POST_DATA"]
+    ["_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "_ENV", "HTTP_RAW_POST_DATA"]
+  or
+  // `$_SERVER` is a MIX: request-derived keys (`REQUEST_URI`, `QUERY_STRING`, `HTTP_*`, `PHP_SELF`,
+  // `PATH_INFO`, …) are attacker-influenced, but `SCRIPT_FILENAME`/`DOCUMENT_ROOT`/`PWD`/`SERVER_ADDR`/…
+  // are SERVER-controlled. Treating the whole array as remote floods file/path/include sinks — e.g. the
+  // pervasive fixed-path bootstrap `require $_SERVER['SCRIPT_FILENAME'] . '/…/bootstrap.inc'`. Mirror the
+  // `getenv()` split: a `$_SERVER` read is a source UNLESS it is subscripted with a constant
+  // server-controlled key. Dynamic/absent keys and the bare array stay sources (conservative).
+  exists(VariableAccess sv | sv.getName() = "_SERVER" and n.asExpr() = sv |
+    not serverControlledServerRead(sv)
+  )
   or
   // NOTE: built-in request/env source functions (getenv, filter_input, apache_request_headers, …) are
   // DATA — `sourceModel` rows in `ext/php-builtins.model.yml`, applied by `DataRemoteSource` (Phase C).
@@ -105,6 +115,26 @@ predicate isSanitizer(DataFlow::Node n) {
  * resolved structurally in QL and then looked up here.
  */
 string sinkFunctionKind(string fname) { sinkModel("function", fname, -1, result) }
+
+/**
+ * Holds if `sv` (a `$_SERVER` variable access) is read via a constant, clearly SERVER-controlled key —
+ * filesystem/identity CGI variables the client cannot influence. These must NOT be remote sources (they
+ * flood file/path/include sinks). Request-derived keys (`REQUEST_URI`, `QUERY_STRING`, `HTTP_*`,
+ * `PHP_SELF`, `PATH_INFO`, `SERVER_NAME`, …) are deliberately excluded from this list so they stay sources.
+ */
+private predicate serverControlledServerRead(VariableAccess sv) {
+  sv.getName() = "_SERVER" and
+  exists(Php::SubscriptExpression sub, string k |
+    sub.getChild(0) = sv.(Php::AstNode) and
+    k = sub.getChild(1).(Php::String).getChild(_).(Php::StringContent).getValue().toUpperCase() and
+    k =
+      [
+        "SCRIPT_FILENAME", "DOCUMENT_ROOT", "CONTEXT_DOCUMENT_ROOT", "PWD", "SERVER_ADDR",
+        "SERVER_SOFTWARE", "SERVER_ADMIN", "SERVER_SIGNATURE", "GATEWAY_INTERFACE", "SERVER_PORT",
+        "SERVER_PROTOCOL", "CONTEXT_PREFIX", "REQUEST_TIME", "REQUEST_TIME_FLOAT"
+      ]
+  )
+}
 
 /** Gets the constant string value of a single- or double-quoted string literal `e`. */
 private string constantStringValue(Expr e) {
