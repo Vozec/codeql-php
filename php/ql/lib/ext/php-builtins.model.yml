@@ -135,16 +135,11 @@ extensions:
       pack: codeql/php-all
       extensible: sanitizerModel
     data:
-      - ["function", "htmlspecialchars"]
-      - ["function", "htmlentities"]
-      - ["function", "strip_tags"]
-      - ["function", "esc_html"]
-      - ["function", "esc_attr"]
-      - ["function", "esc_url"]
-      - ["function", "esc_js"]
-      - ["function", "sanitize_email"]
-      - ["function", "wp_kses"]
-      - ["function", "wp_kses_post"]
+      # NB: htmlspecialchars/htmlentities/strip_tags are HTML-context escapers — moved to
+      # weakXssSanitizerModel + stepModel below (barrier for XSS, but carry taint to SQL/path/command,
+      # so escape-then-SQLi is not hidden). The WordPress esc_html/esc_attr/esc_url/esc_js/sanitize_email/
+      # wp_kses[_post] escapers are modeled (correctly split) in wordpress.model.yml — declaring them as
+      # FULL sanitizers here would OVERRIDE that split (full sanitizer wins) and re-hide escape-then-SQLi.
       - ["function", "escapeshellarg"]
       - ["function", "escapeshellcmd"]
       - ["function", "mysqli_real_escape_string"]
@@ -161,7 +156,9 @@ extensions:
       - ["function", "basename"]
       - ["function", "realpath"]
       - ["function", "filter_var"]
-      - ["function", "preg_quote"]
+      # NB: preg_quote is a REGEX-context escaper (escapes . \ + * ? [ ^ ] $ ( ) { } = ! < > | : - # and an
+      # optional delimiter) — it does NOT escape quotes, semicolons or angle brackets, so it is NOT a
+      # barrier for SQL/command/XSS. Modeled as a taint STEP below, not a sanitizer.
       - ["function", "urlencode"]
       - ["function", "rawurlencode"]
       - ["function", "base64_encode"]
@@ -173,6 +170,17 @@ extensions:
       - ["method", "quote"]
       - ["method", "escape"]
       - ["method", "real_escape_string"]
+
+  # ---- HTML-context escapers: a barrier for XSS only, NOT for SQL/path/command --------------------
+  # htmlspecialchars/htmlentities encode < > & " (' with ENT_QUOTES) for HTML/attribute context; strip_tags
+  # removes tags. None neutralise SQL metacharacters () , space -- or a shell ; | & — so modelling them as
+  # FULL sanitizers hides escape-then-SQLi / escape-then-command (e.g. htmlspecialchars($x) concatenated into
+  # a query). Weak-XSS barrier + a carry-taint step (same pattern as WordPress esc_html/esc_attr).
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "htmlspecialchars"]
+      - ["function", "htmlentities"]
+      - ["function", "strip_tags"]
 
   # ---- Sanitizer GUARDS: validators used as `if (g($x)) { …safe… }` branch conditions ----------
   - addsTo:
@@ -210,6 +218,12 @@ extensions:
       # (receiver -> return). Paired with the `new *Exception($msg)` message step in TaintTrackingPrivate.
       - ["method", "getMessage", -2, -1]
       - ["function", "strtoupper", -1, -1]
+      # HTML-context escapers + preg_quote carry taint (arg 0 -> return) so a downstream SQL/path/command
+      # sink is still reached (they are weak-XSS barriers / non-sanitizers for those kinds — see above).
+      - ["function", "htmlspecialchars", 0, -1]
+      - ["function", "htmlentities", 0, -1]
+      - ["function", "strip_tags", 0, -1]
+      - ["function", "preg_quote", 0, -1]
       - ["function", "strtolower", -1, -1]
       - ["function", "ucfirst", -1, -1]
       - ["function", "ucwords", -1, -1]
