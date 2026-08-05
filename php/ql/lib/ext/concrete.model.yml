@@ -31,7 +31,11 @@ extensions:
       - ["method", "GetOne", 0, "SQL injection"]
       - ["method", "GetAll", 0, "SQL injection"]
       - ["method", "GetCol", 0, "SQL injection"]
-      # Open redirect (RedirectResponse itself is the Symfony one — already covered).
+  # Open redirect — class-scoped (these are static `Redirect::url()`/`Redirect::to()` and the
+  # `$this->redirect()` controller method; they must be typedSinkModel, not sinkModel — a bare
+  # "Redirect"/"AbstractController" subjectKind never matches). RedirectResponse itself is the Symfony one.
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
       - ["Redirect", "url", 0, "open redirect"]                 # Routing/Redirect.php:58 static
       - ["Redirect", "to", -1, "open redirect"]                 # :26 static variadic
       - ["AbstractController", "redirect", -1, "open redirect"] # redirect() func_get_args -> buildRedirect

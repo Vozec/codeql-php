@@ -30,7 +30,6 @@ extensions:
       # parameterized executeQuery($sql, ['id'=>$id]) false-fires as SQLi.
       - ["method", "executeQuery", 0, "SQL injection"]
       - ["method", "executeStatement", 0, "SQL injection"]
-      - ["method", "getResult", -1, "SQL injection"]
 
   # ---- Sources: modern request objects / PSR-7 / framework globals ----------------------------
   - addsTo:
@@ -51,11 +50,9 @@ extensions:
       - ["method", "getHeaderLine", "remote"]
       - ["method", "getParsedBodyParam", "remote"]           # Slim helper
       - ["method", "getQueryParam", "remote"]                # Slim / Yii helper
-      # Symfony ParameterBag / InputBag (`$request->query->get(...)`, `$request->request->all()`)
-      - ["method", "getBoolean", "remote"]
-      - ["method", "getInt", "remote"]
-      - ["method", "getAlpha", "remote"]
-      - ["method", "getDigits", "remote"]
+      # NB: Symfony ParameterBag getInt/getBoolean/getAlpha/getDigits are NOT sources — they type-coerce
+      # / charset-restrict the value (non-injectable), and are modeled as SANITIZERS elsewhere
+      # (joomla/xoops/mediawiki getInt). Listing them as sources was an FP + a direct contradiction.
       # Laravel / generic request object accessors (matched by method name, framework-agnostic).
       # NOTE: only request-DISTINCTIVE method names are listed. Generic names that collide with ordinary
       # getters/collections/DB/HTTP objects (`get`, `post`, `all`, `query`, `header`, `json`, `fetch`,

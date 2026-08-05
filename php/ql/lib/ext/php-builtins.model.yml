@@ -122,16 +122,13 @@ extensions:
       - ["function", "fsockopen", -1, "server-side request forgery"]
       - ["function", "stream_socket_client", -1, "server-side request forgery"]
       - ["function", "get_headers", -1, "server-side request forgery"]
-      # LDAP injection
-      - ["function", "ldap_search", -1, "LDAP injection"]
-      - ["function", "ldap_list", -1, "LDAP injection"]
-      - ["function", "ldap_read", -1, "LDAP injection"]
-      - ["function", "ldap_bind", -1, "LDAP injection"]
+      # LDAP injection — modeled precisely (correct arg indices + lowercase kind) in
+      # ldap-injection.model.yml; these bare `-1` "LDAP injection" (wrong-case kind) rows were dead.
       # XPath injection: SimpleXMLElement::xpath($expr) — `xpath` is a distinctive method name, so
       # matching by name is precise. (DOMXPath::query/evaluate use generic names -> typed sinks below.)
       - ["method", "xpath", -1, "xpath injection"]
       # unsafe deserialization
-      - ["function", "unserialize", -1, "unsafe deserialization"]
+      - ["function", "unserialize", 0, "unsafe deserialization"]   # arg0 only; arg1 is the (safe) options array
 
   # ---- Sanitizers: built-in encoders / escapers / validators (value-returning) ----------------
   - addsTo:
@@ -155,7 +152,6 @@ extensions:
       - ["function", "pg_escape_string"]
       - ["function", "pg_escape_literal"]
       - ["function", "addslashes"]
-      - ["function", "quote"]
       - ["function", "intval"]
       - ["function", "floatval"]
       - ["function", "doubleval"]
@@ -224,7 +220,6 @@ extensions:
       - ["function", "substr", -1, -1]
       - ["function", "str_replace", -1, -1]
       - ["function", "str_ireplace", -1, -1]
-      - ["function", "str_contains", 0, -1]
       - ["function", "preg_replace", -1, -1]
       - ["function", "preg_replace_callback", -1, -1]
       - ["function", "sprintf", -1, -1]

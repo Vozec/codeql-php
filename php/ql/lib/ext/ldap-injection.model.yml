@@ -13,6 +13,8 @@ extensions:
       - ["function", "ldap_search", 1, "ldap injection"]
       - ["function", "ldap_list", 1, "ldap injection"]
       - ["function", "ldap_read", 1, "ldap injection"]
+      # ldap_bind($link, $dn, $password) — a tainted bind DN (arg 1) is an LDAP auth-bypass vector.
+      - ["function", "ldap_bind", 1, "ldap injection"]
   - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
     data:
       # Symfony\Component\Ldap\Ldap::query($dn, $filter, $options) — filter (arg 1) and base DN (arg 0).

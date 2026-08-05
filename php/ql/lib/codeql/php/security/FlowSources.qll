@@ -11,7 +11,9 @@ import codeql.php.security.ModelExtensions
 /** Holds if `n` is attacker-controlled input (request superglobals and common input helpers). */
 predicate isRemoteSource(DataFlow::Node n) {
   n.asExpr().(VariableAccess).getName() =
-    ["_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "_ENV", "HTTP_RAW_POST_DATA"]
+    ["_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "HTTP_RAW_POST_DATA"]
+  // ($_ENV is process/server environment — NOT attacker-controlled by default; request-derived CGI vars
+  //  live in $_SERVER, handled with the constant-key split below.)
   or
   // `$_SERVER` is a MIX: request-derived keys (`REQUEST_URI`, `QUERY_STRING`, `HTTP_*`, `PHP_SELF`,
   // `PATH_INFO`, …) are attacker-influenced, but `SCRIPT_FILENAME`/`DOCUMENT_ROOT`/`PWD`/`SERVER_ADDR`/…
@@ -38,7 +40,7 @@ predicate isRemoteSource(DataFlow::Node n) {
   or
   // Deserialization gadget (POP chain): when `unserialize()` runs on attacker data, the object's
   // class and field values are attacker-controlled, so `$this->field` inside the magic lifecycle
-  // methods (`__wakeup`/`__destruct`/`__unserialize`/`__toString`) is a remote source.
+  // methods (`__wakeup`/`__destruct`/`__unserialize`) is a remote source.
   exists(Php::MemberAccessExpression ma, Method m |
     m.getName() = ["__wakeup", "__destruct", "__unserialize"] and
     ma.(Php::AstNode).getParent+() = m.(Php::MethodDeclaration).getBody() and
@@ -127,8 +129,12 @@ predicate isSanitizer(DataFlow::Node n) {
   // dynamic-callback dispatch already used for array_map sinks.
   exists(FunctionCall c |
     c.getName() = "array_map" and
-    c.getArgument(0).(StringLiteral).getValue() =
-      ["intval", "absint", "floatval", "boolval", "doubleval"] and
+    // callback given as a string literal `'intval'` (opt. leading `\`) OR a PHP 8.1 first-class callable
+    // `array_map(intval(...), $x)`.
+    [
+      c.getArgument(0).(StringLiteral).getValue().regexpReplaceAll("^\\\\", ""),
+      firstClassCallableName(c.getArgument(0))
+    ] = ["intval", "absint", "floatval", "boolval", "doubleval"] and
     n.asExpr() = c
   )
 }
@@ -446,7 +452,7 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
   )
   or
   exists(MethodCall c |
-    c.getMethodName() = ["loadXML", "loadHTML", "load"] and
+    c.getMethodName() = ["loadXML", "load"] and  // NOT loadHTML — HTML parsing does not expand XML entities
     unsafeLibxmlFlag(c.getAnArgument()) and
     n.asExpr() = c.getArgument(0) and
     kind = "xxe"
