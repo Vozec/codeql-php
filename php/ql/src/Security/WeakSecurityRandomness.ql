@@ -21,9 +21,10 @@ import codeql.php.DataFlow
 import codeql.php.TaintTracking
 import codeql.php.Concepts
 
-/** A call to a non-cryptographic PRNG whose output is predictable. */
+/** A call to a non-cryptographic PRNG whose output is predictable. `uniqid()` is time(microsecond)-based
+ *  and therefore predictable, so a bare `uniqid()` seeding a token (`md5(uniqid())`) is itself weak. */
 class WeakRandomCall extends FunctionCall {
-  WeakRandomCall() { this.getName() = ["rand", "mt_rand", "lcg_value"] }
+  WeakRandomCall() { this.getName() = ["rand", "mt_rand", "lcg_value", "uniqid"] }
 }
 
 /** Holds if `name` denotes a security-sensitive secret/token (strong indicators only). */
@@ -56,6 +57,16 @@ class WeakSecretSink extends DataFlow::Node {
       h.getName() = ["md5", "sha1", "hash", "hash_hmac", "crypt"] and
       this.asExpr() = h.getAnArgument() and
       inSecurityContext(h)
+    )
+    or
+    // Un-hashed weak random assigned DIRECTLY to a secret/token (`$token = mt_rand();`) — no hash to sink
+    // before, so the assigned value itself is the sink.
+    exists(AssignExpr a |
+      this.asExpr() = a.getRhs() and
+      (
+        isSecretName(a.getLhs().(VariableAccess).getName()) or
+        isSecretName(a.getLhs().(FieldAccess).getFieldName())
+      )
     )
   }
 }
