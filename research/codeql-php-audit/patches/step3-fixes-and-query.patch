@@ -1,0 +1,308 @@
+From adb609897f09a6c4e08ca988ceaf3acb8c2e206c Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 11:56:41 +0000
+Subject: [PATCH] models: fix FP request-source collisions + add PrestaShop
+ raw-SQL sinks; new weak-randomness query
+
+- laravel: move generic accessor names (query/all/json/string/input/...) from
+  untyped sourceModel to the Request-typed block; drop Request::all()/get()
+  static facades. Untyped 'query' made every PDO/mysqli/$wpdb->query() a
+  request source (dominant FP on real code).
+- prestashop: add typed SQL sinks Db/DbCore::execute() and ::getValue()
+  (raw write/read; 521 execute() uses were unmodelled).
+- new query php/weak-security-randomness: predictable PRNG (rand/mt_rand/
+  uniqid/lcg_value) used to derive a security hash/token (CWE-338/330).
+---
+ php/ql/lib/ext/laravel.model.yml              | 25 ++++-----
+ php/ql/lib/ext/prestashop.model.yml           | 11 ++++
+ php/ql/src/Security/WeakSecurityRandomness.ql | 51 +++++++++++++++++++
+ 3 files changed, 75 insertions(+), 12 deletions(-)
+ create mode 100644 php/ql/src/Security/WeakSecurityRandomness.ql
+
+diff --git a/php/ql/lib/ext/laravel.model.yml b/php/ql/lib/ext/laravel.model.yml
+index f867d133e84..024e7cd5c7c 100644
+--- a/php/ql/lib/ext/laravel.model.yml
++++ b/php/ql/lib/ext/laravel.model.yml
+@@ -15,19 +15,17 @@ extensions:
+     data:
+       - ["function", "request", "laravel-request"]
+       - ["function", "old", "laravel-request"]                 # form repopulation
+-      - ["method", "input", "laravel-request"]
+-      - ["method", "query", "laravel-request"]
+-      - ["method", "post", "laravel-request"]
+-      - ["method", "all", "laravel-request"]
+-      - ["method", "only", "laravel-request"]
+-      - ["method", "except", "laravel-request"]
+-      - ["method", "json", "laravel-request"]
+-      - ["method", "string", "laravel-request"]
+-      - ["method", "getContent", "laravel-request"]
++      # NOTE: the generic accessor names (input/query/post/all/only/except/json/string/
++      # getContent) are declared ONLY as Request-typed sources in the typedSourceModel block
++      # below. Declaring them here as untyped `method` sources made EVERY ->query()/->all()/
++      # ->json() on ANY object (PDO/mysqli/$wpdb->query(), Collection->all(), Response->json())
++      # a request source — the dominant false-positive source observed on the CMS corpus
++      # (154/156 taint findings rooted at a PDO ->query()). Keep only the distinctive names.
+       - ["method", "route", "laravel-route-parameter"]         # $request->route('id')
+-      - ["staticmethod", "input", "laravel-request"]           # Request::input()
+-      - ["staticmethod", "all", "laravel-request"]
+-      - ["staticmethod", "get", "laravel-request"]
++      - ["staticmethod", "input", "laravel-request"]           # Request::input() — distinctive
++      # `Request::all()` / `Request::get()` removed: the bare static names collide with the far
++      # more common `Model::all()` (Eloquent) and `Cache::get()`/`Config::get()` facades → FP
++      # sources. `$request->all()` / `request()->all()` stay covered by the Request-typed rows.
+ 
+   # Class-qualified request accessors: a source ONLY on a `Request` receiver, so the generic names
+   # (`get`/`header`/`cookie`/`boolean`/`file`) that collide with ordinary objects no longer FP.
+@@ -44,6 +42,9 @@ extensions:
+       - ["Request", "all", "laravel-request"]
+       - ["Request", "only", "laravel-request"]
+       - ["Request", "except", "laravel-request"]
++      - ["Request", "json", "laravel-request"]
++      - ["Request", "string", "laravel-request"]
++      - ["Request", "getContent", "laravel-request"]
+       - ["Request", "integer", "laravel-request"]
+       - ["Request", "float", "laravel-request"]
+       - ["Request", "date", "laravel-request"]
+diff --git a/php/ql/lib/ext/prestashop.model.yml b/php/ql/lib/ext/prestashop.model.yml
+index d187e3d6862..319cbf0a683 100644
+--- a/php/ql/lib/ext/prestashop.model.yml
++++ b/php/ql/lib/ext/prestashop.model.yml
+@@ -26,6 +26,17 @@ extensions:
+       - ["staticmethod", "redirectLink", 0, "open redirect"]
+       - ["staticmethod", "redirectAdmin", 0, "open redirect"]
+ 
++  # Typed SQL sinks — `execute()`/`getValue()` are generic names, so scope them to PrestaShop's DB
++  # class (`DbCore`, aliased `Db`) to stay precise. `Db::getInstance()->execute($sql)` runs a raw
++  # write/DDL query (521 uses in the 9.x corpus) and `Db::getValue($sql)` a raw single-value read —
++  # both were unmodelled recall gaps (only executeS/ExecuteS/getRow were covered).
++  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
++    data:
++      - ["Db", "execute", 0, "SQL injection"]
++      - ["DbCore", "execute", 0, "SQL injection"]
++      - ["Db", "getValue", 0, "SQL injection"]
++      - ["DbCore", "getValue", 0, "SQL injection"]
++
+   # ---- Sanitizers -------------------------------------------------------------------------------
+   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+     data:
+diff --git a/php/ql/src/Security/WeakSecurityRandomness.ql b/php/ql/src/Security/WeakSecurityRandomness.ql
+new file mode 100644
+index 00000000000..0c0210c199b
+--- /dev/null
++++ b/php/ql/src/Security/WeakSecurityRandomness.ql
+@@ -0,0 +1,51 @@
++/**
++ * @name Weak randomness used to derive a security secret or token
++ * @description A value from a predictable PRNG (rand / mt_rand / uniqid / lcg_value) is used as the
++ *              material for a security hash (md5 / sha1 / hash / hash_hmac / crypt). The resulting
++ *              secret is guessable — e.g. a predictable password-reset or CSRF token, which enables
++ *              account takeover. Use random_bytes() / random_int() instead.
++ * @kind path-problem
++ * @problem.severity warning
++ * @security-severity 7.5
++ * @precision high
++ * @id php/weak-security-randomness
++ * @tags security
++ *       external/cwe/cwe-338
++ *       external/cwe/cwe-330
++ */
++
++import codeql.php.AST
++import codeql.php.DataFlow
++import codeql.php.TaintTracking
++import codeql.php.Concepts
++
++/** A call to a non-cryptographic PRNG whose output is predictable. */
++class WeakRandomCall extends FunctionCall {
++  WeakRandomCall() { this.getName() = ["rand", "mt_rand", "uniqid", "lcg_value"] }
++}
++
++/** An argument of a hashing call — the material a secret/token is derived from. */
++class SecurityHashArg extends DataFlow::Node {
++  SecurityHashArg() {
++    exists(FunctionCall fc |
++      fc.getName() = ["md5", "sha1", "hash", "hash_hmac", "crypt"] and
++      this.asExpr() = fc.getAnArgument()
++    )
++  }
++}
++
++module Cfg implements DataFlow::ConfigSig {
++  predicate isSource(DataFlow::Node n) { n.asExpr() instanceof WeakRandomCall }
++
++  predicate isSink(DataFlow::Node n) { n instanceof SecurityHashArg }
++}
++
++module Flow = TaintTracking::Global<Cfg>;
++
++import Flow::PathGraph
++
++from Flow::PathNode source, Flow::PathNode sink
++where Flow::flowPath(source, sink)
++select sink.getNode(), source, sink,
++  "This security hash is derived from a predictable PRNG value ($@), yielding a guessable secret/token.",
++  source.getNode(), "weak randomness"
+-- 
+2.43.0
+
+From f4189aa52d42d81d70c312d09689f8c2d460079e Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 14:07:39 +0000
+Subject: [PATCH] query: tighten weak-security-randomness precision (sink =
+ security context)
+
+First cut sinked on any md5/sha1 argument -> 738 findings on PrestaShop (the
+md5(uniqid(mt_rand())) filename idiom dominates). Tightened: sink is a security
+context only (setcookie value, or assignment to a token/secret/csrf/nonce/
+api_key/password/secure_key/session_id target); hashing is a taint step so a
+hashed weak value still reaches the sink; dropped uniqid as a source and
+base64/bin2hex steps; regex kept to strong indicators only.
+---
+ php/ql/src/Security/WeakSecurityRandomness.ql | 57 ++++++++++++++-----
+ 1 file changed, 43 insertions(+), 14 deletions(-)
+
+diff --git a/php/ql/src/Security/WeakSecurityRandomness.ql b/php/ql/src/Security/WeakSecurityRandomness.ql
+index 0c0210c199b..1a7f766c440 100644
+--- a/php/ql/src/Security/WeakSecurityRandomness.ql
++++ b/php/ql/src/Security/WeakSecurityRandomness.ql
+@@ -1,9 +1,10 @@
+ /**
+  * @name Weak randomness used to derive a security secret or token
+- * @description A value from a predictable PRNG (rand / mt_rand / uniqid / lcg_value) is used as the
+- *              material for a security hash (md5 / sha1 / hash / hash_hmac / crypt). The resulting
+- *              secret is guessable — e.g. a predictable password-reset or CSRF token, which enables
+- *              account takeover. Use random_bytes() / random_int() instead.
++ * @description A value from a predictable PRNG (rand / mt_rand / uniqid / lcg_value) reaches a
++ *              security-sensitive context (a cookie value, or a token / secret / CSRF / session /
++ *              password / reset-key field) — optionally after hashing, which does not add entropy.
++ *              The resulting secret is guessable, enabling e.g. a predictable password-reset token
++ *              and account takeover. Use random_bytes() / random_int() instead.
+  * @kind path-problem
+  * @problem.severity warning
+  * @security-severity 7.5
+@@ -19,17 +20,36 @@ import codeql.php.DataFlow
+ import codeql.php.TaintTracking
+ import codeql.php.Concepts
+ 
+-/** A call to a non-cryptographic PRNG whose output is predictable. */
++/**
++ * A call to a non-cryptographic PRNG whose output is predictable. `uniqid` is deliberately excluded:
++ * it folds in the current time and (with `$more_entropy`) the pid, so `md5(uniqid())` — the ubiquitous
++ * PHP filename/cache-key idiom — is not the target and would swamp the query with noise.
++ */
+ class WeakRandomCall extends FunctionCall {
+-  WeakRandomCall() { this.getName() = ["rand", "mt_rand", "uniqid", "lcg_value"] }
++  WeakRandomCall() { this.getName() = ["rand", "mt_rand", "lcg_value"] }
++}
++
++/**
++ * Holds if `name` denotes a security-sensitive secret/token. Kept to *strong* indicators only —
++ * broad words like `reset`, `salt`, `_key`, `activation` matched too many ordinary fields.
++ */
++bindingset[name]
++predicate isSecretName(string name) {
++  name.regexpMatch("(?i).*(token|secret|csrf|nonce|api_?key|passwd|password|secure_?key|session_?id).*")
+ }
+ 
+-/** An argument of a hashing call — the material a secret/token is derived from. */
+-class SecurityHashArg extends DataFlow::Node {
+-  SecurityHashArg() {
+-    exists(FunctionCall fc |
+-      fc.getName() = ["md5", "sha1", "hash", "hash_hmac", "crypt"] and
+-      this.asExpr() = fc.getAnArgument()
++/**
++ * A security-sensitive sink: the value of a cookie, or the value assigned to a variable/property
++ * whose name denotes a secret/token. (Non-secret uses of `md5(uniqid(mt_rand()))` — filenames,
++ * cache keys, checksums — do NOT reach one of these, which is what keeps the query precise.)
++ */
++class SecuritySink extends DataFlow::Node {
++  SecuritySink() {
++    exists(FunctionCall c | c.getName() = "setcookie" and this.asExpr() = c.getArgument(1))
++    or
++    exists(AssignExpr a | this.asExpr() = a.getRhs() |
++      isSecretName(a.getLhs().(VariableAccess).getName()) or
++      isSecretName(a.getLhs().(FieldAccess).getFieldName())
+     )
+   }
+ }
+@@ -37,7 +57,16 @@ class SecurityHashArg extends DataFlow::Node {
+ module Cfg implements DataFlow::ConfigSig {
+   predicate isSource(DataFlow::Node n) { n.asExpr() instanceof WeakRandomCall }
+ 
+-  predicate isSink(DataFlow::Node n) { n instanceof SecurityHashArg }
++  predicate isSink(DataFlow::Node n) { n instanceof SecuritySink }
++
++  /** Hashing does not remove predictability — let taint pass through md5/sha1/hash/crypt. */
++  predicate isAdditionalFlowStep(DataFlow::Node pred, DataFlow::Node succ) {
++    exists(FunctionCall h |
++      h.getName() = ["md5", "sha1", "hash", "hash_hmac", "crypt"] and
++      pred.asExpr() = h.getAnArgument() and
++      succ.asExpr() = h
++    )
++  }
+ }
+ 
+ module Flow = TaintTracking::Global<Cfg>;
+@@ -47,5 +76,5 @@ import Flow::PathGraph
+ from Flow::PathNode source, Flow::PathNode sink
+ where Flow::flowPath(source, sink)
+ select sink.getNode(), source, sink,
+-  "This security hash is derived from a predictable PRNG value ($@), yielding a guessable secret/token.",
++  "This secret/token is derived from a predictable PRNG value ($@), making it guessable.",
+   source.getNode(), "weak randomness"
+-- 
+2.43.0
+
+From c5ebef77437923aebff230f392eb4c028bacaa3f Mon Sep 17 00:00:00 2001
+From: claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 14:50:48 +0000
+Subject: [PATCH] bench: fastscan.sh - module-scoped extract + cached analyze
+ for fast query tuning
+
+Full-app taint analysis is heap-bound and slow on modest RAM (15GB -> ~3.3GB
+heap, no stage caching). fastscan.sh scopes extraction to one module and
+re-analyses WITHOUT --rerun so the disk cache is reused: measured 52s cold ->
+6s cached on prestashop/classes (328 files).
+---
+ bench/fastscan.sh | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100755 bench/fastscan.sh
+
+diff --git a/bench/fastscan.sh b/bench/fastscan.sh
+new file mode 100755
+index 00000000000..3e17a4eddae
+--- /dev/null
++++ b/bench/fastscan.sh
+@@ -0,0 +1,29 @@
++#!/usr/bin/env bash
++# Fast iterate on a query while tuning: extract ONE module (not the whole app) once,
++# then analyse repeatedly hitting the disk cache (no --rerun). 10x faster than full-app.
++#   fastscan.sh <source-dir> <query.ql> [more.ql ...]
++# Env: TOOL (codeql-php root), EXT (built extractor pack). Re-extracts only if SRC changed.
++set -eu
++TOOL="${TOOL:-$(cd "$(dirname "$0")/.." && pwd)}"
++EXT="${EXT:-/tmp/php-ext}"
++SRC="$1"; shift
++DB="/tmp/fastscan-$(echo "$SRC" | tr '/ ' '__').db"
++CODEQL="$TOOL/.tooling/codeql/codeql"
++# build extractor pack if missing
++if [ ! -f "$EXT/tools/linux64/extractor" ]; then
++  ( cd "$TOOL/php/extractor" && cargo build --release >/dev/null )
++  mkdir -p "$EXT/tools/linux64"
++  cp "$TOOL/php/codeql-extractor.yml" "$TOOL/php/ql/lib/php.dbscheme" "$TOOL/php/ql/lib/php.dbscheme.stats" "$EXT/"
++  cp "$TOOL/target/release/codeql-extractor-php" "$EXT/tools/linux64/extractor"
++  cp -r "$TOOL/php/tools/"* "$EXT/tools/" 2>/dev/null || true
++fi
++# extract once (skip if the DB is newer than the source tree)
++if [ ! -d "$DB" ] || [ -n "$(find "$SRC" -newer "$DB" -name '*.php' -print -quit 2>/dev/null)" ]; then
++  echo ">> extracting $(find "$SRC" -name '*.php'|wc -l) files -> $DB"
++  "$CODEQL" database create "$DB" --language=php --source-root="$SRC" --search-path="$EXT" --ram=8000 --threads=4 --overwrite >/dev/null 2>&1
++fi
++# analyse WITHOUT --rerun so the disk cache is reused across edits
++echo ">> analysing (cache on)"; t=$(date +%s)
++"$CODEQL" database analyze "$DB" "$@" --format=csv --output=/tmp/fastscan.csv \
++  --search-path="$TOOL/php" --additional-packs="$TOOL" --threads=4 --ram=8000 --max-disk-cache=8000 >/dev/null 2>&1
++echo ">> $(($(date +%s)-t))s | $(wc -l </tmp/fastscan.csv) findings -> /tmp/fastscan.csv"
+-- 
+2.43.0
+
