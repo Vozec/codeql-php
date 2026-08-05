@@ -137,6 +137,17 @@ private predicate hasNamedArgument(Call c) {
 }
 
 /**
+ * Holds if a method named `name` is defined in few enough places that resolving an unknown-receiver
+ * call to it purely by name is worthwhile rather than over-connecting unrelated classes (same generic
+ * rationale as `nameFallbackAcceptable` in the call graph — see DataFlowPrivate). Bounds spurious
+ * by-ref / named-argument taint steps on ubiquitous names like `query`/`get`/`execute`.
+ */
+bindingset[name]
+private predicate methodNameNotTooAmbiguous(string name) {
+  count(Php::MethodDeclaration m | m.getName().getValue() = name) <= 8
+}
+
+/**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
  * "no inferred receiver" (as in `viableCallable`) avoids matching a same-named method on an unrelated
@@ -148,7 +159,8 @@ private predicate resolvesToCallee(Call call, AstNode callee) {
   callee = TI::inferredMethod(call)
   or
   callee.(Php::MethodDeclaration).getName().getValue() = call.(MethodCall).getMethodName() and
-  not TI::hasInferredReceiver(call)
+  not TI::hasInferredReceiver(call) and
+  methodNameNotTooAmbiguous(call.(MethodCall).getMethodName())
   or
   // `new C(...)` resolves to `C::__construct` (so named-args and by-ref work for constructors too).
   exists(ClassLike cls |

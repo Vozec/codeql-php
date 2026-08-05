@@ -26,6 +26,17 @@ extensions:
       - ["staticmethod", "redirectLink", 0, "open redirect"]
       - ["staticmethod", "redirectAdmin", 0, "open redirect"]
 
+  # Typed SQL sinks — `execute()`/`getValue()` are generic names, so scope them to PrestaShop's DB
+  # class (`DbCore`, aliased `Db`) to stay precise. `Db::getInstance()->execute($sql)` runs a raw
+  # write/DDL query (521 uses in the 9.x corpus) and `Db::getValue($sql)` a raw single-value read —
+  # both were unmodelled recall gaps (only executeS/ExecuteS/getRow were covered).
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      - ["Db", "execute", 0, "SQL injection"]
+      - ["DbCore", "execute", 0, "SQL injection"]
+      - ["Db", "getValue", 0, "SQL injection"]
+      - ["DbCore", "getValue", 0, "SQL injection"]
+
   # ---- Sanitizers -------------------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:

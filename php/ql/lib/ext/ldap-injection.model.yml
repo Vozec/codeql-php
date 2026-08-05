@@ -1,0 +1,26 @@
+# LDAP injection Models-as-Data. User input concatenated into an LDAP filter/DN without `ldap_escape`
+# lets an attacker alter the search — auth bypass (`*)(uid=*))(|(uid=*`), attribute disclosure, etc.
+# (CWE-090). The filter argument is the sink; `ldap_escape` is the sanitizer. Procedural PHP LDAP +
+# Symfony\Component\Ldap (used by Drupal `ldap`, ldap_addressbook, ldap_integration, pubcookie, …).
+extensions:
+  - addsTo: { pack: codeql/php-all, extensible: sinkModel }
+    data:
+      # ldap_search($link, $base, $filter, …) / ldap_list / ldap_read — the FILTER is arg 2 (0-based).
+      - ["function", "ldap_search", 2, "ldap injection"]
+      - ["function", "ldap_list", 2, "ldap injection"]
+      - ["function", "ldap_read", 2, "ldap injection"]
+      # The base DN (arg 1) is also injectable when built from user input.
+      - ["function", "ldap_search", 1, "ldap injection"]
+      - ["function", "ldap_list", 1, "ldap injection"]
+      - ["function", "ldap_read", 1, "ldap injection"]
+  - addsTo: { pack: codeql/php-all, extensible: typedSinkModel }
+    data:
+      # Symfony\Component\Ldap\Ldap::query($dn, $filter, $options) — filter (arg 1) and base DN (arg 0).
+      - ["Ldap", "query", 1, "ldap injection"]
+      - ["Ldap", "query", 0, "ldap injection"]
+      # Adapter/Connection query variants some versions expose.
+      - ["LdapInterface", "query", 1, "ldap injection"]
+      - ["LdapInterface", "query", 0, "ldap injection"]
+  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+    data:
+      - ["function", "ldap_escape"]          # PHP 5.6+ RFC-4515/4514 escaper — the correct fix

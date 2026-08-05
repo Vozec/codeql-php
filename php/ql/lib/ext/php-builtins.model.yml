@@ -70,7 +70,10 @@ extensions:
       - ["function", "readfile", -1, "path traversal"]
       - ["function", "file", -1, "path traversal"]
       - ["function", "unlink", -1, "path traversal"]
-      - ["function", "fwrite", -1, "path traversal"]
+      # NB: fwrite($handle, $data) / fputs are NOT path sinks — arg 0 is a resource (file OR SOCKET) and
+      # arg 1 is the written data; the path decision already lives at the fopen() sink above. Modelling
+      # fwrite here flagged socket writes (fwrite(fsockopen(), $x) — email_verify) and echoed-data as
+      # "path traversal". No corpus positive relies on fwrite (fopen covers the real write-path chain).
       # move_uploaded_file($tmp, $dest) — the canonical upload sink. The DESTINATION (arg 1) decides
       # where (and under what name/extension) the upload lands; an attacker-controlled destination is
       # arbitrary file write => webshell/RCE. arg 0 is the server-set temp path, so scope to arg 1.
@@ -194,6 +197,13 @@ extensions:
       - ["in_array"]
       - ["array_key_exists"]
       - ["preg_match"]
+      # `method_exists($obj, $name)` bounds a subsequent dynamic method call `$obj->$name()` to the
+      # DECLARED methods of a concrete object — i.e. not arbitrary code execution. This is the standard
+      # guarded-dispatch idiom (`if (method_exists($o,$m)) { $o->$m(...); }`); without it the
+      # code-injection query reports every such call as RCE (the dominant dynamic-dispatch FP class:
+      # er24-rechtstexte, t3-cat-search, femanager setters, …). NOT is_callable/function_exists — those
+      # are true for `system`/`exec`, so they do not bound the callee.
+      - ["method_exists"]
 
   # ---- Taint steps: string built-ins that propagate any argument to the result ----------------
   - addsTo:
