@@ -74,23 +74,88 @@ private predicate isSanitizerGuardCall(Call g) {
     ])
 }
 
+/** Holds if `u` is a logical-NOT `!e`. */
+private predicate isLogicalNot(Php::UnaryOpExpression u) { u.getOperator().toString() = "!" }
+
 /**
- * Holds if `n` is a read of a variable validated by a sanitizer guard on the branch it controls, e.g.
- * `if (ctype_alnum($x)) { … $x … }` or `if (Validate::isUnsignedId($id)) { … $id … }`. v1 scope: the
- * positive (then) branch of an `if` whose condition is (or contains) the guard call; dominance-based
- * guards (early-return `if(!g($x))return;`, the `else` branch, `&&` chains) are a future refinement. A
- * CUSTOM/unknown guard is NOT matched, so its path is still reported (recall-first) — modelling it is a
- * one-row data addition, no engine change.
+ * Gets the number of logical-NOT operators between the guard call `g` and the condition root of `ifs`
+ * (i.e. how many `!` wrap `g`). Its PARITY is the guard's polarity: even = the guard's truth controls the
+ * THEN branch (`if (g($x))`); odd = it controls the ELSE branch / a negated early-exit (`if (!g($x))`).
+ */
+private int guardNegationCount(Call g, Php::IfStatement ifs) {
+  isSanitizerGuardCall(g) and
+  g.(Php::AstNode).getParent*() = ifs.getCondition() and
+  result =
+    count(Php::UnaryOpExpression u |
+      isLogicalNot(u) and
+      g.(Php::AstNode).getParent+() = u and
+      u.(Php::AstNode).getParent*() = ifs.getCondition()
+    )
+}
+
+/** Holds if statement `s` unconditionally leaves the current straight-line flow (return/throw/exit/…). */
+private predicate stmtExits(Php::AstNode s) {
+  s instanceof Php::ReturnStatement or
+  s instanceof Php::ExitStatement or
+  s instanceof Php::ContinueStatement or
+  s instanceof Php::BreakStatement or
+  s.(Php::ExpressionStatement).getChild() instanceof Php::ThrowExpression
+}
+
+/** Holds if the THEN body of `ifs` exits (a direct `return;`/`throw`/`exit`/`continue`/`break`). */
+private predicate ifBodyExits(Php::IfStatement ifs) {
+  stmtExits(ifs.getBody()) or
+  stmtExits(ifs.getBody().(Php::CompoundStatement).getChild(_))
+}
+
+/** Gets the `i`-th ordered statement child of a straight-line block (`{…}` or the top-level program). */
+private predicate orderedBlockChild(Php::AstNode blk, int i, Php::AstNode child) {
+  child = blk.(Php::CompoundStatement).getChild(i)
+  or
+  child = blk.(Php::Program).getChild(i)
+}
+
+/** Holds if `use` is (inside) a statement that comes AFTER `ifs` in the same straight-line block. */
+private predicate readAfterInSameBlock(Php::IfStatement ifs, Expr use) {
+  exists(Php::AstNode blk, int i, int j, Php::AstNode afterStmt |
+    orderedBlockChild(blk, i, ifs) and
+    orderedBlockChild(blk, j, afterStmt) and
+    j > i and
+    use.(Php::AstNode).getParent*() = afterStmt
+  )
+}
+
+/**
+ * Holds if `n` is a read of a variable validated by a sanitizer guard on the branch it actually controls.
+ * POLARITY-AWARE (the guard's `!`-parity decides then vs else) + EARLY-EXIT aware:
+ *   - `if (g($x))      { … $x … }`             — positive guard, THEN branch is safe;
+ *   - `if (!g($x)) {…} else { … $x … }`        — negated guard, ELSE branch is safe;
+ *   - `if (!g($x)) return;  … $x …`            — negated early-exit, the fall-through is safe.
+ * The two previously-mishandled cases — a negated guard with the read in the THEN branch (false NEGATIVE:
+ * `if(!ctype_digit($id)){query($id);}`) and a negated early-exit read reported as unguarded (false
+ * POSITIVE: `if(!g($x))return; sink($x);`) — are now correct. A CUSTOM/unknown guard is still NOT matched,
+ * so its path stays reported (recall-first); `&&`/`||` structure is folded into the `!`-parity count.
  */
 predicate isGuardedRead(DataFlow::Node n) {
-  exists(Php::IfStatement ifs, Call g, Expr checked, Expr use |
-    g.(Php::AstNode).getParent*() = ifs.getCondition() and
-    isSanitizerGuardCall(g) and
+  exists(Php::IfStatement ifs, Call g, Expr checked, Expr use, int neg |
+    neg = guardNegationCount(g, ifs) and
     checked = g.getAnArgument() and
-    use.(Php::AstNode).getParent*() = ifs.getBody() and
     sameAccessPath(checked, use) and
     use != checked and
-    n.asExpr() = use
+    n.asExpr() = use and
+    (
+      // positive polarity (even `!`s): read guarded in the THEN branch
+      neg % 2 = 0 and use.(Php::AstNode).getParent*() = ifs.getBody()
+      or
+      // negative polarity (odd `!`s): read guarded in the ELSE branch
+      neg % 2 = 1 and use.(Php::AstNode).getParent*() = ifs.getAlternative(_)
+      or
+      // negated early-exit `if (!g($x)) return;` — the fall-through past the `if` is guarded
+      neg % 2 = 1 and
+      ifBodyExits(ifs) and
+      not exists(ifs.getAlternative(_)) and
+      readAfterInSameBlock(ifs, use)
+    )
   )
 }
 
