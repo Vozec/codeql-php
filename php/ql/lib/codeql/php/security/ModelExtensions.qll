@@ -90,6 +90,18 @@ extensible predicate outRefModel(string name, int fromArg, int toRefArg);
 extensible predicate typedSanitizerModel(string className, string methodName);
 
 /**
+ * A KIND-SCOPED sanitizer: neutralises ONLY the given `vulnKind`, not every class. A SQL escaper
+ * (`real_escape_string`/`pSQL`/`quote`) is safe for SQL but leaves `<>`/shell metacharacters, so it must not
+ * barrier XSS/command; and conversely an HTML escaper must not barrier SQL. Consumed per-query as
+ * `n.(KindSanitizer).getKind() = "<that query's kind>"`. This is the general form of the weak-XSS+step
+ * apparatus (which special-cases `reflected XSS`). `kindSanitizerModel` is by name; `typedKindSanitizerModel`
+ * is class-scoped for generic method names.
+ */
+extensible predicate kindSanitizerModel(string subjectKind, string name, string vulnKind);
+
+extensible predicate typedKindSanitizerModel(string className, string methodName, string vulnKind);
+
+/**
  * A framework router that dispatches a user request to a handler CALLABLE: a call to `name`
  * (subjectKind `function`/`method`/`staticmethod`) whose argument at `handlerArgIndex` is the request
  * handler (e.g. `Route::get('/u/{id}', function ($id) { … })` → `["staticmethod","get",1]`). The
@@ -228,6 +240,34 @@ private class TypedSanitizer extends Sanitizer {
       this.asExpr() = c
     )
   }
+}
+
+/**
+ * A kind-scoped sanitizer result (from `kindSanitizerModel` / `typedKindSanitizerModel`). NOT a `Sanitizer`
+ * (which would barrier every kind) — a plain node carrying its `vulnKind`, which each query adds to its
+ * `isBarrier` as `n.(KindSanitizer).getKind() = "<that kind>"`. So a `["method","escape",…,"SQL injection"]`
+ * row barriers the SQL query only, leaving the escaped value tainted for the XSS/command/path queries.
+ */
+class KindSanitizer extends DataFlow::Node {
+  string vulnKind;
+
+  KindSanitizer() {
+    exists(Call c, string sk, string nm |
+      kindSanitizerModel(sk, nm, vulnKind) and callMatches(c, sk, nm) and this.asExpr() = c
+    )
+    or
+    exists(MethodCall c, string cls |
+      typedKindSanitizerModel(cls, c.getMethodName(), vulnKind) and
+      (
+        receiverClassName(c.getReceiver()) = cls or
+        TI::exprTypeName(c.getReceiver()) = cls or
+        propertyReceiverClassName(c.getReceiver()) = cls
+      ) and
+      this.asExpr() = c
+    )
+  }
+
+  string getKind() { result = vulnKind }
 }
 
 /** Gets the `i`th argument of call `c`, any argument when `i = -1`, or the RECEIVER when `i = -2`

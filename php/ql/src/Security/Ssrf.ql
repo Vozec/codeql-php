@@ -20,7 +20,7 @@ module Cfg implements DataFlow::ConfigSig {
 
   predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "server-side request forgery" }
 
-  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
+  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer or n.(KindSanitizer).getKind() = "server-side request forgery" }
 }
 
 module Flow = TaintTracking::Global<Cfg>;

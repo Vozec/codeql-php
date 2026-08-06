@@ -20,7 +20,9 @@ module Cfg implements DataFlow::ConfigSig {
 
   predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "reflected XSS" }
 
-  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer or n instanceof XssSanitizer }
+  predicate isBarrier(DataFlow::Node n) {
+    n instanceof Sanitizer or n instanceof XssSanitizer or n.(KindSanitizer).getKind() = "reflected XSS"
+  }
 }
 
 module Flow = TaintTracking::Global<Cfg>;

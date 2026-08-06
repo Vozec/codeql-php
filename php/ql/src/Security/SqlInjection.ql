@@ -20,7 +20,7 @@ module Cfg implements DataFlow::ConfigSig {
 
   predicate isSink(DataFlow::Node n) { n.(Sink).getKind() = "SQL injection" }
 
-  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
+  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer or n.(KindSanitizer).getKind() = "SQL injection" }
 }
 
 module Flow = TaintTracking::Global<Cfg>;

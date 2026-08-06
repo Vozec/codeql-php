@@ -43,6 +43,8 @@ module Cfg implements DataFlow::ConfigSig {
   predicate isBarrier(DataFlow::Node n) {
     n instanceof Sanitizer
     or
+    n.(KindSanitizer).getKind() = "open redirect"
+    or
     hostPinnedConcatOperand(n)
   }
 }
