@@ -19,7 +19,8 @@ extensions:
       - ["InputBag", "get", "symfony-request"]
       - ["InputBag", "all", "symfony-request"]
       - ["InputBag", "getString", "symfony-request"]
-      - ["InputBag", "getInt", "symfony-request"]
+      # NB: InputBag::getInt is NOT a source — it casts to a genuine int (non-injectable). Contradicted
+      # modern-frameworks (which deleted these) and joomla/xoops (which model getInt as a SANITIZER).
       - ["ParameterBag", "get", "symfony-request"]
       - ["ParameterBag", "all", "symfony-request"]
       - ["HeaderBag", "get", "symfony-request"]
@@ -92,7 +93,9 @@ extensions:
       - ["method", "setTargetUrl", 0, "open redirect"]
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["staticmethod", "escape"]
+      # NB: bare `["staticmethod","escape"]` (a full sanitizer) was REMOVED — it globally overrode Drupal's
+      # deliberate weak-XSS+step `Html::escape` split (a full-sanitizer bare row wins over a weak-XSS bare
+      # row of the same name), re-hiding escape-then-SQLi. Drupal's weak-XSS `escape` covers all escape() calls.
       - ["method", "quoteIdentifier"]                          # Doctrine Connection::quoteIdentifier
   # Doctrine DBAL string/identifier quoting — SQL-escape; scope quote to Connection (generic name).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }

@@ -202,8 +202,15 @@ extensions:
   # ---- Sanitizers -------------------------------------------------------------------------------
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
-      - ["function", "e"]                                      # Blade escape
       - ["staticmethod", "slug"]                             # Str::slug
+  # Blade `e()` = htmlspecialchars — HTML-context only (leaves SQL quotes), so weak-XSS + carry taint,
+  # else `DB::raw("… ".e($request->x))` (escape-then-SQLi) is hidden.
+  - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
+    data:
+      - ["function", "e"]                                      # Blade escape
+  - addsTo: { pack: codeql/php-all, extensible: stepModel }
+    data:
+      - ["function", "e", 0, -1]
       # NOTE: `$request->validate()`/`validated()`/`safe()` are NOT sanitizers — validation checks
       # format/presence, it does not neutralise injection. The validated data is still user-controlled,
       # so it is modelled as a SOURCE (below), fixing false negatives on the ubiquitous validate-then-

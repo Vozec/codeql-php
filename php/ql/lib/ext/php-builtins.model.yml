@@ -152,7 +152,8 @@ extensions:
       - ["function", "doubleval"]
       - ["function", "abs"]
       - ["function", "count"]
-      - ["function", "settype"]
+      # NB: `settype` removed — it returns bool and mutates its arg BY REFERENCE, so a sanitizerModel row
+      # (which barriers the bool RETURN, not the value) sanitizes nothing. Handled by SettypeBarrier in QL.
       - ["function", "basename"]
       - ["function", "realpath"]
       # NB: filter_var is NOT a blanket sanitizer — FILTER_VALIDATE_URL/EMAIL/IP return the input UNCHANGED

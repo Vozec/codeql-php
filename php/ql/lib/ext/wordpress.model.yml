@@ -37,15 +37,11 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["function", "esc_url"]
-      - ["function", "esc_js"]
       - ["function", "esc_sql"]
       - ["function", "sanitize_email"]
       - ["function", "sanitize_key"]
       - ["function", "sanitize_title"]
       - ["function", "sanitize_file_name"]
-      - ["function", "wp_kses"]
-      - ["function", "wp_kses_post"]
-      - ["function", "wp_kses_data"]
       - ["function", "esc_url_raw"]
       - ["function", "absint"]
   # HTML-only escapers: encode < > & " ' for HTML/attribute context — a barrier for XSS, NOT for SQL/path/
@@ -59,6 +55,12 @@ extensions:
       - ["function", "esc_html"]
       - ["function", "esc_attr"]
       - ["function", "esc_textarea"]
+      # esc_js (JS-string escaper: `'`->`\'`, not SQL-safe in ANSI/Postgres) and the wp_kses* HTML
+      # allow-list filters (permit attribute values containing quotes) neutralise HTML but NOT SQL.
+      - ["function", "esc_js"]
+      - ["function", "wp_kses"]
+      - ["function", "wp_kses_post"]
+      - ["function", "wp_kses_data"]
   # ...but they still CARRY taint (arg -> return) so a non-XSS sink downstream (SQL, path) is reached.
   - addsTo: { pack: codeql/php-all, extensible: stepModel }
     data:
@@ -67,6 +69,10 @@ extensions:
       - ["function", "esc_html", 0, -1]
       - ["function", "esc_attr", 0, -1]
       - ["function", "esc_textarea", 0, -1]
+      - ["function", "esc_js", 0, -1]
+      - ["function", "wp_kses", 0, -1]
+      - ["function", "wp_kses_post", 0, -1]
+      - ["function", "wp_kses_data", 0, -1]
       # $wpdb->esc_like() escapes ONLY the LIKE wildcards % _ \ — it does NOT escape quotes, so a value
       # concatenated into a LIKE clause (instead of bound via prepare) is still SQLi (WooCommerce
       # CVE-2021-32790). It must CARRY taint (arg -> return), not drop it. (In a prepared query the

@@ -38,12 +38,24 @@ extensions:
       - ["function", "sql_select", 3, "SQL injection"]    # $groupby
       - ["function", "sql_select", 4, "SQL injection"]    # $orderby
       - ["function", "sql_select", 6, "SQL injection"]    # $having
+      # sql_fetsel / sql_allfetsel / sql_getfetsel share sql_select's signature, so the SAME injectable
+      # args (select/from/groupby/having) apply — modelling only where/orderby left a SQLi FN.
+      - ["function", "sql_fetsel", 0, "SQL injection"]    # $select
+      - ["function", "sql_fetsel", 1, "SQL injection"]    # $from
       - ["function", "sql_fetsel", 2, "SQL injection"]    # $where     (:1646)
+      - ["function", "sql_fetsel", 3, "SQL injection"]    # $groupby
       - ["function", "sql_fetsel", 4, "SQL injection"]    # $orderby
+      - ["function", "sql_fetsel", 6, "SQL injection"]    # $having
+      - ["function", "sql_allfetsel", 0, "SQL injection"] # $select
+      - ["function", "sql_allfetsel", 1, "SQL injection"] # $from
       - ["function", "sql_allfetsel", 2, "SQL injection"] # $where     (:1723)
+      - ["function", "sql_allfetsel", 3, "SQL injection"] # $groupby
       - ["function", "sql_allfetsel", 4, "SQL injection"] # $orderby
+      - ["function", "sql_allfetsel", 6, "SQL injection"] # $having
       - ["function", "sql_getfetsel", 0, "SQL injection"] # $select    (:1785)
+      - ["function", "sql_getfetsel", 1, "SQL injection"] # $from
       - ["function", "sql_getfetsel", 2, "SQL injection"] # $where
+      - ["function", "sql_getfetsel", 4, "SQL injection"] # $orderby
       - ["function", "sql_countsel", 1, "SQL injection"]  # $where — NB shifted, no $select (:375)
       - ["function", "sql_update", 1, "SQL injection"]    # $exp (raw SET) (:848)
       - ["function", "sql_update", 2, "SQL injection"]    # $where

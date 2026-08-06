@@ -74,4 +74,5 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: methodEntrypointModel }
     data:
       - ["action_%", "unauthenticated"]   # single-page / block controller action dispatch
-      - ["view", "unauthenticated"]       # default controller render entrypoint
+      # NB: bare `view` was REMOVED — unlike the `action_%` glob it matched EVERY method named view() in the
+      # codebase as an unauthenticated entrypoint, flooding MissingAuthorization/Idor on unrelated classes.
