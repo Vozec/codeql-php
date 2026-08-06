@@ -270,6 +270,15 @@ cross-cutting+dead-code), current tree, no DB builds. Cross-corroboration noted 
 | Q1..Q3 | 23 | OpenRedirect port `:`; TypeJuggling name word-boundary + negative literal; WeakRandom salt/reset names + setrawcookie/session_id |
 | P0-J | 24 | paramRebound foreach/list/global (recall-safe) |
 | T3-5 | 24 | isSensitiveAction gated to state-change/privilege (missing-auth double-fire) |
+| T1f/T1h | 25 | getInvokeCallee + array-callable class-name fan-out caps |
+| T3-4 | 26 | propertyReceiverClassName uniqueness gate (multi-assign no longer a definite sanitizer receiver) |
+| resolveHandler | 26 | string-handler entrypoint uniqueness cap |
+| T5-2 | 27 | XXE `xml_parse` (expat) unconditional sink |
+| stored cmd/path | 27 | StoredInjection second-order command/path/SSRF/LDAP sinks |
+
+**T1e (cross-kind name resolution) deferred** — a naive function-only/method-only gate on the viableCallable
+name-fallback regressed the corpus (200/201); the DataFlowCallable↔AST kind relation needs a more careful
+predicate than `instanceof Php::MethodDeclaration`.
 
 **Remaining (not yet applied — all documented above with fixes):**
 - **Engine T1e/T1f/T1g/T1h** — cross-kind name resolution split; `getInvokeCallee` cap; collecting-variadic param; array-callable class-name cap. (Contained, corpus-validatable.)
