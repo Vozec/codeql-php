@@ -1403,3 +1403,185 @@ predicate isNumericValueBarrier(DataFlow::Node n) {
   n instanceof SettypeBarrier or
   n instanceof FilterVarNumericBarrier
 }
+
+// --- Constant sibling-key barrier (field-sensitive arrays, recursive) ---------------------------
+//
+// The engine's array handling is FIELD-INSENSITIVE for recall: writing ANY element re-taints the whole
+// container at node level (`$d['name']=$_GET[...]` marks all of `$d`), and reading ANY element inherits
+// that node taint (the subscript base→result taint step). Together they FALSELY taint a SIBLING constant
+// key that was written a constant:
+//     $d['name']  = $_GET['name'];   // taints $d
+//     $d['table'] = 'users';         // constant
+//     $db->query("… " . $d['table']);   // FP: $d['table'] is 'users', not attacker data
+// This barrier recovers precision WITHOUT losing recall by being a pure MUST-analysis: it neutralises a
+// read `$base[K]` (constant key, recursively for nested `$e['sub']['table']`) ONLY when it can PROVE the
+// value is constant — i.e. some write assigns that exact cell a constant literal AND no write in scope
+// could taint it (same-cell/ancestor non-constant assign, dynamic-key/append write, by-ref/global rebind).
+// Because it only ever REMOVES a flow it has proven safe, an unseen taint source just leaves the flow in
+// place (no false negative); the corpus is the recall guardrail.
+
+/** Holds if `name` is a PHP superglobal — never a barrierable local array root. */
+bindingset[name]
+private predicate isSuperglobalName(string name) {
+  name =
+    [
+      "_GET", "_POST", "_REQUEST", "_COOKIE", "_FILES", "_SERVER", "_ENV", "_SESSION", "GLOBALS",
+      "HTTP_RAW_POST_DATA"
+    ]
+}
+
+/** The innermost enclosing callable of `n` (function / method / closure / arrow-fn), or the `Program`
+ *  top level if none — delimits variable identity by scope (PHP variables are function-scoped). */
+private Php::AstNode enclosingCallableOrProgram(Php::AstNode n) {
+  result = n.getParent+() and
+  (
+    result instanceof Php::FunctionDefinition or
+    result instanceof Php::MethodDeclaration or
+    result instanceof Php::AnonymousFunction or
+    result instanceof Php::ArrowFunction or
+    result instanceof Php::Program
+  ) and
+  not exists(Php::AstNode mid |
+    mid = n.getParent+() and
+    mid.getParent+() = result and
+    (
+      mid instanceof Php::FunctionDefinition or
+      mid instanceof Php::MethodDeclaration or
+      mid instanceof Php::AnonymousFunction or
+      mid instanceof Php::ArrowFunction
+    )
+  )
+}
+
+/** STRICT constant subscript key: an integer literal or a NON-interpolated string literal. No result for
+ *  a dynamic/interpolated key, so a dynamic key can never masquerade as constant (over-barriering = FN). */
+private string strictSubscriptKey(Php::SubscriptExpression sub) {
+  result = sub.getChild(1).(Php::Integer).getValue()
+  or
+  sub.getChild(1) instanceof Php::String and
+  not exists(Php::AstNode ch |
+    ch = sub.getChild(1).(Php::String).getChild(_) and not ch instanceof Php::StringContent
+  ) and
+  result =
+    concat(int i, string t |
+      t = sub.getChild(1).(Php::String).getChild(i).(Php::StringContent).getValue() | t order by i
+    )
+}
+
+/**
+ * Holds if `a` and `b` are constant-key access chains — same root variable (same name, same scope, not a
+ * superglobal) and an identical constant-key sequence. RECURSIVE: `$e['sub']['table']` matches another
+ * `$e['sub']['table']` and neither matches `$e['sub']['name']`.
+ */
+private predicate sameConstChain(Expr a, Expr b) {
+  a.(VariableAccess).getName() = b.(VariableAccess).getName() and
+  not isSuperglobalName(a.(VariableAccess).getName()) and
+  enclosingCallableOrProgram(a) = enclosingCallableOrProgram(b)
+  or
+  strictSubscriptKey(a.(Php::SubscriptExpression)) = strictSubscriptKey(b.(Php::SubscriptExpression)) and
+  sameConstChain(a.(Php::SubscriptExpression).getChild(0), b.(Php::SubscriptExpression).getChild(0))
+}
+
+/** Holds if `e` is a fully constant-key chain rooted at a non-superglobal local variable. */
+private predicate fullConstChain(Expr e) { sameConstChain(e, e) }
+
+/** Gets `r` itself or any of its base sub-chains (`$e['sub']['table']` → itself, `$e['sub']`, `$e`). */
+private Expr ancestorOrSelf(Expr r) {
+  result = r
+  or
+  result = ancestorOrSelf(r.(Php::SubscriptExpression).getChild(0))
+}
+
+/** Gets the root variable of a (possibly nested) subscript chain. */
+private VariableAccess chainRoot(Expr e) {
+  result = e.(VariableAccess)
+  or
+  result = chainRoot(e.(Php::SubscriptExpression).getChild(0))
+}
+
+/** Holds if `a` and `b` denote the same local (non-superglobal) variable in the same scope. */
+private predicate sameRootVarScope(VariableAccess a, VariableAccess b) {
+  a.getName() = b.getName() and
+  not isSuperglobalName(a.getName()) and
+  enclosingCallableOrProgram(a) = enclosingCallableOrProgram(b)
+}
+
+/** Holds if `e` is a CONSTANT literal: a scalar (int/float/bool/null/non-interpolated string) or an array
+ *  literal whose every element (key and value) is itself constant — so `[]` and `['a'=>1]` count. */
+private predicate isConstLiteral(Expr e) {
+  e instanceof Php::Integer or
+  e instanceof Php::Float or
+  e instanceof Php::Boolean or
+  e instanceof Php::Null or
+  exists(constStringText(e)) or
+  e instanceof Php::ArrayCreationExpression and
+  forall(Php::ArrayElementInitializer el | el = e.(Php::ArrayCreationExpression).getChild(_) |
+    forall(Expr part | part = el.getChild(_) | isConstLiteral(part))
+  )
+}
+
+/** Gets the left-hand side of any write (plain / augmented / reference assignment). */
+private Expr anyWriteLhs() {
+  result = any(AssignExpr a).getLhs() or
+  result = any(Php::AugmentedAssignmentExpression a).getLeft() or
+  result = any(Php::ReferenceAssignmentExpression a).getLeft()
+}
+
+/**
+ * Holds if the constant-key cell read by `r` could be tainted by SOME write in scope — the analysis is
+ * conservative (recall-first): if any of these hold, `r` is NOT barriered.
+ */
+private predicate cellPossiblyTainted(Expr r) {
+  // A NON-constant plain assignment to this exact cell or one of its ancestors (`$d['table']=$x`,
+  // `$e['sub']=$x`, `$d=$_GET`).
+  exists(AssignExpr w, Expr target |
+    target = ancestorOrSelf(r) and sameConstChain(w.getLhs(), target) and not isConstLiteral(w.getRhs())
+  )
+  or
+  // An augmented / reference assignment to this cell or an ancestor (`$d['table'].=$x`, `$d=&$ref`).
+  exists(Php::AugmentedAssignmentExpression w, Expr target |
+    target = ancestorOrSelf(r) and sameConstChain(w.getLeft(), target)
+  )
+  or
+  exists(Php::ReferenceAssignmentExpression w, Expr target |
+    target = ancestorOrSelf(r) and sameConstChain(w.getRight(), target)
+  )
+  or
+  // A DYNAMIC-key / append / non-constant-chain write to the SAME root array (`$d[$x]=…`, `$d[]=…`,
+  // `$d[$x]['table']=…`) — a dynamic segment could alias this cell.
+  exists(Php::SubscriptExpression lhs |
+    lhs = anyWriteLhs() and
+    sameRootVarScope(chainRoot(lhs), chainRoot(r)) and
+    not fullConstChain(lhs)
+  )
+  or
+  // The root array is iterated BY REFERENCE (`foreach($d as &$v){ $v = … }`) — the alias mutates elements.
+  exists(Php::ForeachStatement fe, Php::ByRef ref |
+    ref = fe.getChild(_) and
+    sameRootVarScope(fe.getChild(0).(VariableAccess), chainRoot(r))
+  )
+  or
+  // The root is rebound via `global $d;` — its content comes from an unknown outer scope.
+  exists(Php::GlobalDeclaration g |
+    g.getChild(_).(Php::VariableName).getChild().getValue() = chainRoot(r).getName() and
+    enclosingCallableOrProgram(g) = enclosingCallableOrProgram(chainRoot(r))
+  )
+}
+
+/**
+ * A read `$base[K]` (constant key chain, recursively) proven to hold a constant value: some write assigns
+ * this exact cell a constant literal, and no write in scope could taint it. Neutralises the sibling-key FP
+ * while leaving genuine flows (same-key taint, dynamic keys, whole-array consumers) untouched.
+ */
+private class ConstantSiblingKeyBarrier extends Sanitizer {
+  ConstantSiblingKeyBarrier() {
+    exists(Php::SubscriptExpression r |
+      this.asExpr() = r and
+      fullConstChain(r) and
+      // proven: this exact cell is assigned a constant literal somewhere in scope
+      exists(AssignExpr w | sameConstChain(w.getLhs(), r) and isConstLiteral(w.getRhs())) and
+      // and nothing in scope could taint it
+      not cellPossiblyTainted(r)
+    )
+  }
+}
