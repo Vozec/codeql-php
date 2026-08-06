@@ -289,3 +289,40 @@ The `NumericCastSanitizer` / `ScalarParamBarrier` / `sprintf` (except the custom
 *Methodology: 9 static-analysis agents (query files; FlowSources; ModelExtensions+AccessControl; dataflow engine;
 flagship models; remaining CMS models; builtins+cross-cutting; adversarial review of the 9 batches; deferred-item
 feasibility + new systemic), current tree, no DB builds. Cross-corroboration noted per finding.*
+
+---
+
+## IMPLEMENTATION STATUS (v2 batches 10–17 — corpus held 201/201, 0 un-annotated throughout, each probe-verified)
+
+**Fixed & verified:**
+
+| Item | Batch | Fix |
+|------|-------|-----|
+| P0-A | 11 | passthrough gate requires EVERY return to be a passthrough + `directlyInBody` (no closure leak) — closes the re-opened wp2shell FP |
+| P0-B | 10 | guard barrier rejects `&&`/`||` conditions (`guardUnderLogicalConnective`) |
+| P0-C | 12 | IDOR engine subtracts the new numeric barriers (`isNumericValueBarrier`) + `real` cast — recovers typed-id IDOR |
+| P0-D | 13 | removed Concrete5 `AbstractController` source rows (Symfony collision → FP flood) |
+| P0-F | 10 | guard early-exit & settype barriers kill on reassignment between barrier and use (`accessPathReassignedBetween`) |
+| P0-G | 13 | TypeJuggling: non-zero numeric / `true` literals are benign (`$passes == 3` no longer FPs) |
+| P0-H | 13 | Dolibarr GETPOST uses interpolation-rejecting `constStringText` |
+| P0-I | 13 | sprintf barrier consumes custom-pad `%'<c>` tokens |
+| T1-1..9 | 14 | drupal `"reflected XSS"` case; laravel `e()` + wp `esc_js`/`wp_kses*` → weak-XSS+step; symfony `getInt` source + bare `escape` removed; spip `sql_fetsel` args; concrete `view` entrypoint; dead `settype` sanitizer |
+| T2-1 | 15 | fan-out cap mirrored to array-callable / function / try-catch resolvers |
+| T2-2 | 15 | query-builder step covers UPDATE/INSERT clauses (`set`/`values`/`addSelect`/`join`) |
+| T2-3 | 16 | constructor resolution bounded by short-name fan-out cap |
+| T2-4 | 16 | `static::` late-static-binding subtype dispatch (capped) |
+| T3-1 | 12 | IDOR `isNumericGuardedRead` reuses the sound `isGuardedReadByName` (polarity/early-exit) |
+| T4-3 | 16 | StoredInjection write-side `isBarrier` (over-approximated user-writable keys) |
+| T4-4 | 17 | laravel Collection negative-type-guard barrier (recall-monotone FP subtraction) |
+
+**Confirmed already-done (stale deferral):** T4-1 — Tier-2-N named-arg taint is implemented at `TaintTrackingPrivate.qll:806-822`.
+
+**Remaining (not yet applied):**
+- **T4-2** StoredInjection → stored-XSS (CWE-79) — new `StoredXssConfig` with `Sanitizer`+`XssSanitizer` barriers, two PathGraphs merged in the select. Self-contained, recall-safe; a genuine new detection.
+- **T3-2 / T3-3 / T3-4 / T3-5** AccessControl `callIn` closure leak, `reaches`/`directCallee` namespace-blind explosion, flow-insensitive `propertyReceiverClassName`, `isSensitiveAction` argIndex dup. T3-4 (typed-sanitizer receiver) is corpus-risky (WP `$wpdb->prepare` relies on the flow-insensitive resolution) — needs careful SSA gating. T3-2/3/5 are in the tuned access-control subsystem with no missing-auth corpus ground truth.
+- **T4-5** POP-gadget source distinct `getSourceType` + exclusion from XSS/redirect/SSRF queries.
+- **T3-6** raise Idor/MissingAuthorization to `@precision high` (or document the extended-suite requirement).
+- **P0-E** subtype fan-out `<=8` hard cliff (>8 implementors drop all dispatch) — narrow (pure-interface case; the exact-class arm rescues most), perf-trade, corpus-validated at 8.
+- **P0-J** `paramRebound` misses by-ref/list/foreach/global rebinds (rare passthrough-decoy FP; the every-return-passthrough rule already covers the dominant case).
+- **Tier-5 residuals**: `<?=` short-echo whitespace gap (FN), `RequestPropertySource` tainting Symfony bag objects (FP), `array_map` key-content (FN, needs field-sensitivity), moodle `optional_param` coercion (FP), craftcms/mediawiki/typo3 array-condition `where` (FP, needs a query-side array barrier), `getMessage`/`argOf(-2)` staticmethod dead-arm.
+- **Tier-4 array field-sensitivity** and the per-kind `vulnKind` sanitizer column remain the two structural items behind several residuals (documented in round-1 audit).
