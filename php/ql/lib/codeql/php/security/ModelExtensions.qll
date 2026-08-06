@@ -293,18 +293,46 @@ private predicate paramRebound(Function f, string pname) {
 }
 
 /**
- * Holds if `f` is a TRIVIAL PASS-THROUGH: it `return`s one of its parameters unchanged (the parameter is
- * never rebound in the body). Such a function neutralises nothing, so a same-named sanitizer model is a
- * LIE for this codebase and must be distrusted. A real framework sanitizer (`esc_sql`, `sanitize_email`,
- * … with an actual escaping body) is NOT a pass-through, so its model is kept.
+ * Holds if `node` is inside `f`'s body but NOT inside a nested callable (closure / arrow-fn / inner
+ * function/method) declared within it — i.e. it belongs to `f` itself, not to a lambda `f` happens to
+ * contain. Without this, a `function($x){ return $x; }` closure inside `f` was wrongly attributed to `f`.
  */
-private predicate isTrivialPassthrough(Function f) {
-  exists(ReturnStmt r, string pname |
-    r.(Php::AstNode).getParent*() = f.getBody() and
+private predicate directlyInBody(Php::AstNode node, Function f) {
+  node.getParent*() = f.getBody() and
+  not exists(Php::AstNode inner |
+    node.getParent+() = inner and
+    inner.getParent+() = f.getBody() and
+    (
+      inner instanceof Php::AnonymousFunction or
+      inner instanceof Php::ArrowFunction or
+      inner instanceof Php::FunctionDefinition or
+      inner instanceof Php::MethodDeclaration
+    )
+  )
+}
+
+/** Holds if `r` (a return in `f`) returns one of `f`'s parameters unchanged. */
+private predicate returnsUnmodifiedParam(ReturnStmt r, Function f) {
+  exists(string pname |
     pname = f.getAParameter().getName() and
     r.getValue().(VariableAccess).getName() = pname and
     not paramRebound(f, pname)
   )
+}
+
+/**
+ * Holds if `f` is a TRIVIAL PASS-THROUGH: EVERY `return` in its own body yields a parameter unchanged (and
+ * there is at least one such return). Such a function neutralises nothing on any path, so a same-named
+ * sanitizer model is a LIE for this codebase and must be distrusted. Crucially, a real framework sanitizer
+ * with an early-out guard — `function esc_sql($v){ if(!is_scalar($v)) return $v; … return $escaped; }` —
+ * has a non-pass-through return (`return $escaped`), so it is NOT trivial and its model is KEPT (the fix
+ * that closed the wp2shell FP would otherwise re-open, since the early-out `return $v` alone used to match).
+ */
+private predicate isTrivialPassthrough(Function f) {
+  // at least one pass-through return that belongs to f (not a nested closure)…
+  exists(ReturnStmt r | directlyInBody(r, f) and returnsUnmodifiedParam(r, f)) and
+  // …and NO return that belongs to f does real work (returns anything but an unmodified parameter).
+  not exists(ReturnStmt r | directlyInBody(r, f) and not returnsUnmodifiedParam(r, f))
 }
 
 /**
