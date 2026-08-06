@@ -282,6 +282,11 @@ cross-cutting+dead-code), current tree, no DB builds. Cross-corroboration noted 
 | T1g | 33 | collecting variadic param `...$parts` receives all trailing arguments |
 | T1d | 34 | TypedSanitizerStrong drops the ancestor arm (no subclass over-barriering) |
 
+| Part B | 35 | NEW php/variable-injection query (mass assignment / `extract($_POST)`, CWE-621) |
+| T3-2 | 36 | callIn nearest-enclosing-callable (guard-in-closure no longer suppresses) |
+| T1e | 36 | reverted — root cause found (cast not instanceof), but even the correct cast regresses the corpus; needs per-flow analysis |
+| Part D | 37 | array field-sensitivity — execution-ready plan `ARRAY_FIELD_SENSITIVITY.md` (de-risked consumer checklist); not implemented (FN-risky Stage 2 + FP-unmeasurable here) |
+
 **Still open:** the per-kind mechanism now EXISTS and Stage 1 (SQL) is done — extending it to shell escapers
 (`escapeshellarg`→command) and path escapers (`basename`/`realpath`→path/file-read/file-inclusion) is a
 straightforward follow-on (move the rows + paired steps, same pattern). Also: array field-sensitivity
