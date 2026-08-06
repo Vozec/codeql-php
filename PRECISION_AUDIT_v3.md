@@ -250,3 +250,31 @@ Batch-13 sprintf-pad regex are sound.
 *Methodology: 9 static agents (adversarial review of v2; FlowSources; dataflow engine; AccessControl+IDOR+
 ModelExtensions; query files + StoredXss plan; flagship+builtins models; remaining CMS models; systemic+structural;
 cross-cutting+dead-code), current tree, no DB builds. Cross-corroboration noted per finding.*
+
+---
+
+## IMPLEMENTATION STATUS (v3 batches 18–24 — corpus held 201/201, 0 un-annotated throughout, each probe-verified)
+
+**Fixed & verified:**
+
+| Item | Batch | Fix |
+|------|-------|-----|
+| R1 | 18 | polarity-aware guard connective rejection (positive-then rejects `||`, negated arms reject `&&`) |
+| R3 | 18 | LaravelCollectionBarrier restricted to `collect(...)`-rooted receivers + column arg |
+| R4 | 19 | passthrough gate follows copies/casts + treats a constant-return arm as neutral |
+| R2 | 19 | StoredInjection write barrier restricted to kind-agnostic numeric coercions |
+| R5 | 20 | generic query-builder setters (`set`/`select`/`values`) gated on a builder-chain receiver |
+| T1a | 21 | dropped the coercing bag accessors (getInt/getBoolean/…) from SymfonyBagSource |
+| T1b/T1c | 21 | ScalarParamBarrier / RouteParamSource no longer leak into nested closures (`notInNestedCallable`) |
+| M1..M4 | 22 | laravel coercing sources removed; prestashop purifyHTML→weak-XSS; spip getfetsel/countsel + moodle *_select gaps; array_walk step removed |
+| Q1..Q3 | 23 | OpenRedirect port `:`; TypeJuggling name word-boundary + negative literal; WeakRandom salt/reset names + setrawcookie/session_id |
+| P0-J | 24 | paramRebound foreach/list/global (recall-safe) |
+| T3-5 | 24 | isSensitiveAction gated to state-change/privilege (missing-auth double-fire) |
+
+**Remaining (not yet applied — all documented above with fixes):**
+- **Engine T1e/T1f/T1g/T1h** — cross-kind name resolution split; `getInvokeCallee` cap; collecting-variadic param; array-callable class-name cap. (Contained, corpus-validatable.)
+- **T1d** — `receiverIsClass` ancestor arm over-barriers generic typed sanitizers (needs distinctive-name gating for `TypedSanitizerStrong`).
+- **Access-control**: T3-4 (`propertyReceiverClassName` uniqueness gate — SAFE per agent 4), `resolveHandler` uniqueness cap (SAFE); T3-2/T3-3 (NEEDS-CORPUS); T3-6 (suite include).
+- **New capabilities**: T5-1 StoredXss (CWE-79), T5-2 XXE `xml_parse`/XMLReader/property-forms, T5-3 audit `php-audit.qls`, T4 StoredInjection command/path sinks + severity split.
+- **Tier-5 residuals**: header/CRLF `setcookie`, `accessPathReassignedBetween` foreach/list, `subscriptConstKey` interpolation, Yii `::$app` property check.
+- **Structural (Tier 6)**: per-kind `vulnKind` sanitizer column (resolves T1-4 + the escaper churn) and array field-sensitivity — both with staged, recall-corpus-validatable designs.
