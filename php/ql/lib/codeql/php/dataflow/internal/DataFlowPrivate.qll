@@ -87,6 +87,17 @@ class DataFlowCallable instanceof Cfg::CfgScope {
   /** Gets the CFG node of this callable's `pos`th parameter. */
   Cfg::CfgNode getParameterCfgNode(int pos) {
     result.getAstNode() = parameterName(formalParametersOf(this).getChild(pos))
+    or
+    // A COLLECTING variadic `function q(...$parts)` at index `k` receives EVERY argument at position >= k,
+    // so each such argument's taint must reach `$parts` (`q($col, $userInput)` where q does
+    // `implode(' AND ', $parts)`). Without this, only the first collected argument bound and the rest dropped.
+    exists(int k |
+      formalParametersOf(this).getChild(k) instanceof Php::VariadicParameter and
+      // bounded collection window (keeps `pos` enumerable for the reverse `getParameterCfgNode(_)` use;
+      // 32 covers realistic variadic call arities).
+      pos = [k .. k + 31] and
+      result.getAstNode() = parameterName(formalParametersOf(this).getChild(k))
+    )
   }
 
   int totalorder() { none() }
