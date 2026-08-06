@@ -6,9 +6,11 @@ extensions:
   # ---- Sources: Concrete's own Controller/Request accessors (not Symfony methods) -----------------
   - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
     data:
-      - ["AbstractController", "get", "symfony-request"]      # AbstractController.php:185 (merges $sets+$_GET)
-      - ["AbstractController", "post", "symfony-request"]     # :259 -> Request::post()
-      - ["AbstractController", "request", "symfony-request"]  # :336 -> Request::request()
+      # NB: the Concrete5 `AbstractController` get/post/request accessors were REMOVED — the short class
+      # name `AbstractController` collides with Symfony's ubiquitous `Symfony\…\Controller\AbstractController`
+      # (whose `get()` is a SERVICE LOCATOR, not user input), and the subtype/ancestor arm of receiverIsClass
+      # then turned every Symfony controller's `$this->get('svc')` into a remote source → cross-framework FP
+      # flood on all taint queries. Concrete5 input is still covered by the distinctive Request/RequestBase rows.
       - ["RequestBase", "post", "symfony-request"]            # Http/RequestBase.php:178 (static; Symfony has none)
       - ["RequestBase", "request", "symfony-request"]         # :196
       - ["Request", "post", "symfony-request"]                # Http/Request.php extends RequestBase

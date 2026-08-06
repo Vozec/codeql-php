@@ -19,11 +19,14 @@ private predicate hashFunction(string name) {
 }
 
 /**
- * Holds if `e` is a BENIGN constant string operand: a string literal whose text is neither a PHP
- * "magic-hash" form (`0e123…`, which juggles to 0) nor a numeric string. A loose comparison of a
- * sensitive value against such a constant (`$hash_algo == 'sha256'`, `$token == ''`) is an ordinary
- * string equality that does NOT type-juggle, so it must not be reported (the dominant FP at @precision
- * high). A magic-hash/numeric literal (`== '0e830400'`, `== '0'`) stays reportable.
+ * Holds if `e` is a BENIGN constant operand — a loose comparison of a sensitive value against it does NOT
+ * type-juggle, so it must not be reported (the dominant FP at @precision high). Benign:
+ *  - a string literal that is neither a PHP "magic-hash" form (`0e123…`) nor a numeric string
+ *    (`$hash_algo == 'sha256'`);
+ *  - a NON-ZERO integer/float literal (`$passes == 3` — a hash/secret can't equal a fixed non-zero number
+ *    via juggling; only `== 0` is the magic-hash trap);
+ *  - the boolean `true`.
+ * The juggle-exploitable forms — `0`, `0.0`, `'0'`, `''`, `false`, `null`, magic-hash strings — stay reportable.
  */
 private predicate benignConstStr(Expr e) {
   (e instanceof TS::Php::String or e instanceof TS::Php::EncapsedString) and
@@ -33,6 +36,14 @@ private predicate benignConstStr(Expr e) {
   |
     v.regexpMatch("(?i)0+e[0-9]+") or v.regexpMatch("[0-9]+([.][0-9]+)?")
   )
+  or
+  // a non-zero integer / float literal
+  exists(string v | v = e.(TS::Php::Integer).getValue() or v = e.(TS::Php::Float).getValue() |
+    not v.regexpMatch("0+([.]0+)?")
+  )
+  or
+  // the boolean `true` (comparisons against `false`/`null` stay reportable)
+  e.(TS::Php::Boolean).getValue().toLowerCase() = "true"
 }
 
 /** Holds if `e` is a hash-function result or a secret-looking variable/property. */

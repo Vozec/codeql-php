@@ -841,9 +841,10 @@ private class GetpostSource extends RemoteFlowSource {
     exists(FunctionCall c | c.getName() = "GETPOST" and this.asExpr() = c |
       not exists(c.getArgument(1))
       or
-      // fires unless the type arg is a constant SQL-safe coercion (a dynamic/non-constant type is
-      // treated conservatively as a source).
-      not constantStringValue(c.getArgument(1)) = getpostSqlSafeType()
+      // fires unless the type arg is a constant SQL-safe coercion (a dynamic/non-constant/INTERPOLATED
+      // type is treated conservatively as a source — `constStringText` rejects interpolation, so
+      // `GETPOST('id', "int$suffix")` is NOT mistaken for the SQL-safe literal 'int').
+      not constStringText(c.getArgument(1)) = getpostSqlSafeType()
     )
   }
 
@@ -859,7 +860,7 @@ private class GetpostHtmlXssBarrier extends XssSanitizer {
   GetpostHtmlXssBarrier() {
     exists(FunctionCall c |
       c.getName() = "GETPOST" and
-      constantStringValue(c.getArgument(1)) = getpostHtmlType() and
+      constStringText(c.getArgument(1)) = getpostHtmlType() and
       this.asExpr() = c
     )
   }
@@ -1210,9 +1211,10 @@ private class SprintfNumericBarrier extends Sanitizer {
       fmt = constStringText(c.getArgument(0)) and
       this.asExpr() = c and
       // at least one numeric conversion …
-      fmt.regexpMatch(".*%[-+ 0#'.,0-9*$]*[bdiouxXeEfFgG].*") and
-      // … and NO string/char conversion (ignoring the literal `%%` escape).
-      not fmt.regexpReplaceAll("%%", "").regexpMatch(".*%[-+ 0#'.,0-9*$]*[sc].*")
+      fmt.regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[bdiouxXeEfFgG].*") and
+      // … and NO string/char conversion. The flag run allows a custom-pad token `%'<c>` (`'.`) so an
+      // out-of-flag pad char like `%'@10s` does not hide the following `s` (P0-I). `%%` escape ignored.
+      not fmt.regexpReplaceAll("%%", "").regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[sc].*")
     )
   }
 }
