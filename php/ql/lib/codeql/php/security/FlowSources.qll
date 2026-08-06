@@ -613,6 +613,16 @@ predicate isSinkOfKind(DataFlow::Node n, string kind) {
     kind = "xxe"
   )
   or
+  // expat (`xml_parse`) EXPANDS external entities BY DEFAULT — no flag gate; the parsed data (arg 1) is the
+  // sink whenever it is attacker-controlled. Also `libxml_disable_entity_loader(false)` and the property
+  // forms `DOMDocument::$substituteEntities/$resolveExternals = true` re-enable the unsafe behaviour, so a
+  // subsequent parse of a tainted string is dangerous even without an explicit LIBXML_NOENT flag.
+  exists(FunctionCall c |
+    c.getName() = "xml_parse" and
+    n.asExpr() = c.getArgument(1) and
+    kind = "xxe"
+  )
+  or
   // Dynamic class instantiation `new $c(...)` / `new $arr['k'](...)` where the CLASS NAME is
   // attacker-controlled — arbitrary object instantiation (autoloader / constructor side effects).
   exists(Php::ObjectCreationExpression oc |

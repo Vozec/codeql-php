@@ -110,7 +110,12 @@ module StoredConfig implements DataFlow::ConfigSig {
 
   predicate isSink(DataFlow::Node n) {
     n.(Sink).getKind() =
-      ["unsafe deserialization", "code injection", "template injection", "SQL injection"]
+      [
+        "unsafe deserialization", "code injection", "template injection", "SQL injection",
+        // second-order RCE / LFI / SSRF / LDAP: a stored option read into system()/include()/… is the same
+        // second-order class; the Sanitizer barrier is already correct for these kinds.
+        "command injection", "path traversal", "server-side request forgery", "ldap injection"
+      ]
   }
 
   predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
