@@ -154,6 +154,16 @@ private predicate functionNameNotTooAmbiguous(string name) {
   count(Php::FunctionDefinition f | f.getName().getValue() = name) <= 8
 }
 
+/** Holds if `e` is (a fluent chain rooted at) a query-builder-INITIATING method (`createQueryBuilder`,
+ *  `->update(t)`, `->insert(t)`, `->from(t)`, `->table(t)`, …), so a generic setter chained onto it
+ *  (`->set(...)`, `->values(...)`) is a real query-builder clause, not an ordinary object method. */
+private predicate isQueryBuilderChain(Expr e) {
+  e.(Php::MemberCallExpression).getName().(Php::Name).getValue() =
+    ["createQueryBuilder", "update", "insert", "delete", "from", "table", "newQuery"]
+  or
+  isQueryBuilderChain(e.(Php::MemberCallExpression).getObject())
+}
+
 /**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
@@ -267,14 +277,21 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // later reaches a SQL sink, so a stray `->order()` on an unrelated object stays inert. (Doctrine
     // `andWhere`/`orWhere`/`having`/`orderBy`, Joomla/CakePHP `where`/`order`/`group` — CVE-2025-22207.)
     exists(Php::MemberCallExpression m |
-      m.getName().(Php::Name).getValue() =
-        [
-          "where", "andWhere", "orWhere", "having", "order", "orderBy", "group", "groupBy",
-          // UPDATE/INSERT value-carrying clauses (Doctrine QueryBuilder `->update()->set('c',$v)`,
-          // `->insert()->values(...)`, `->setValue(...)`, `addSelect`, `join`/`innerJoin`) — omitting these
-          // dropped taint before the sink for the whole UPDATE/INSERT injection shape.
-          "set", "setValue", "values", "select", "addSelect", "join", "innerJoin", "leftJoin"
-        ] and
+      (
+        // query-DISTINCTIVE clause names — low collision, allowed on any receiver.
+        m.getName().(Php::Name).getValue() =
+          [
+            "where", "andWhere", "orWhere", "having", "order", "orderBy", "group", "groupBy", "addSelect",
+            "innerJoin", "leftJoin"
+          ]
+        or
+        // GENERIC setter names (`set`/`select`/`values`/`join`) collide with ordinary objects
+        // (`$config->set(...)`, `$dropdown->select(...)`), so require the receiver to be a query-builder
+        // CHAIN (rooted at update/insert/from/table/createQueryBuilder) — the UPDATE/INSERT injection shape
+        // without the any-object false positive.
+        m.getName().(Php::Name).getValue() = ["set", "setValue", "values", "select", "join"] and
+        isQueryBuilderChain(m.getObject())
+      ) and
       nodeFrom.asExpr() = m.getArguments().getChild(_).(Php::Argument).getChild() and
       nodeTo.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject()
     )
