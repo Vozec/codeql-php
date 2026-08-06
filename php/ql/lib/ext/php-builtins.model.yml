@@ -140,8 +140,9 @@ extensions:
       # so escape-then-SQLi is not hidden). The WordPress esc_html/esc_attr/esc_url/esc_js/sanitize_email/
       # wp_kses[_post] escapers are modeled (correctly split) in wordpress.model.yml — declaring them as
       # FULL sanitizers here would OVERRIDE that split (full sanitizer wins) and re-hide escape-then-SQLi.
-      - ["function", "escapeshellarg"]
-      - ["function", "escapeshellcmd"]
+      # NB: escapeshellarg/escapeshellcmd (COMMAND-context) and basename/realpath (PATH-context) moved to the
+      # kindSanitizerModel blocks below — a shell escaper must not barrier SQL/XSS, and basename() removing
+      # `../` does not stop `system("… ".basename($x))` command injection.
       # NB: the SQL escapers (mysqli/mysql_real_escape_string, pg_escape_*, addslashes) moved to the
       # kindSanitizerModel("SQL injection") block below — they escape SQL quotes but leave <>/shell
       # metacharacters, so they must NOT barrier XSS/command/path.
@@ -152,8 +153,6 @@ extensions:
       - ["function", "count"]
       # NB: `settype` removed — it returns bool and mutates its arg BY REFERENCE, so a sanitizerModel row
       # (which barriers the bool RETURN, not the value) sanitizes nothing. Handled by SettypeBarrier in QL.
-      - ["function", "basename"]
-      - ["function", "realpath"]
       # NB: filter_var is NOT a blanket sanitizer — FILTER_VALIDATE_URL/EMAIL/IP return the input UNCHANGED
       # (validation only -> SSRF/injection FN) and FILTER_DEFAULT/UNSAFE_RAW is a no-op. It is a taint STEP
       # below; only the genuinely-neutralizing numeric filters barrier (FilterVarNumericBarrier in QL).
@@ -184,6 +183,17 @@ extensions:
       - ["method", "quote", "SQL injection"]              # $pdo->quote($x)
       - ["method", "escape", "SQL injection"]             # $db->escape($x)
       - ["method", "real_escape_string", "SQL injection"] # $mysqli->real_escape_string($x)
+      # COMMAND-context: escapeshellarg/escapeshellcmd neutralise shell metacharacters, NOT SQL/XSS/path.
+      - ["function", "escapeshellarg", "command injection"]
+      - ["function", "escapeshellcmd", "command injection"]
+      # PATH-context: basename/realpath strip `../`, barriering traversal / file-read / file-inclusion, but
+      # leave shell/SQL/HTML metacharacters (`system("… ".basename($x))` still injects).
+      - ["function", "basename", "path traversal"]
+      - ["function", "basename", "file read"]
+      - ["function", "basename", "file inclusion"]
+      - ["function", "realpath", "path traversal"]
+      - ["function", "realpath", "file read"]
+      - ["function", "realpath", "file inclusion"]
 
   # ---- HTML-context escapers: a barrier for XSS only, NOT for SQL/path/command --------------------
   # htmlspecialchars/htmlentities encode < > & " (' with ENT_QUOTES) for HTML/attribute context; strip_tags
@@ -247,6 +257,11 @@ extensions:
       - ["method", "quoteInto", -1, -1]
       - ["method", "quoteIdentifier", -1, -1]
       - ["method", "quoteIdentifiers", -1, -1]
+      # shell + path escapers: kind-scoped sanitizers -> carry taint to the OTHER-kind sinks (paired step).
+      - ["function", "escapeshellarg", -1, -1]
+      - ["function", "escapeshellcmd", -1, -1]
+      - ["function", "basename", -1, -1]
+      - ["function", "realpath", -1, -1]
       # HTML-context escapers + preg_quote carry taint (arg 0 -> return) so a downstream SQL/path/command
       # sink is still reached (they are weak-XSS barriers / non-sanitizers for those kinds — see above).
       - ["function", "htmlspecialchars", 0, -1]
