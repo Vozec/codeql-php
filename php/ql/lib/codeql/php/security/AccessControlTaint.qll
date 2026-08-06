@@ -17,35 +17,26 @@ private import codeql.php.ast.internal.TreeSitter
 private import codeql.php.dataflow.internal.DataFlowImplSpecific
 private import codeql.php.dataflow.internal.TaintTrackingPrivate as Base
 private import codeql.dataflow.TaintTracking
+private import codeql.php.security.FlowSources as FS
 import codeql.php.DataFlow
 
-/** Holds if `n` is a numeric COERCION result (`intval`/`absint`/`floatval` or an `(int)`/`(float)` cast).
- *  For IDOR these must NOT sanitize — the coerced value is still the attacker's chosen id. */
+/** Holds if `n` is a numeric COERCION result (`intval`/`absint`/`floatval` or an `(int)`/`(float)`/`(real)`
+ *  cast). For IDOR these must NOT sanitize — the coerced value is still the attacker's chosen id. */
 private predicate isNumericCoercion(DataFlow::Node n) {
-  exists(CastExpr c | c.getTypeName() = ["int", "integer", "float", "double"] and n.asExpr() = c)
+  exists(CastExpr c | c.getTypeName() = ["int", "integer", "float", "double", "real"] and n.asExpr() = c)
   or
   exists(FunctionCall fc | fc.getName() = ["intval", "absint", "floatval"] and n.asExpr() = fc)
 }
 
-/** Holds if `n` is a read sanitized ONLY by a NUMERIC validation guard (`is_numeric`/`is_int`/`ctype_digit`).
- *  Mirrors FlowSources::isGuardedRead but restricted to numeric validators, which don't stop IDOR. */
+/**
+ * Holds if `n` is a read sanitized ONLY by a NUMERIC validation guard (`is_numeric`/`is_int`/`ctype_digit`).
+ * Reuses the shared `isGuardedReadByName` — so it inherits the polarity / early-exit / `&&`-`||` / reassignment
+ * soundness — restricted to numeric validators (a whitelist guard like `in_array` legitimately stops IDOR and
+ * is NOT removed). Previously this was a stale copy of the OLD positive-then-only guard, so the dominant
+ * `if(!is_numeric($id)) return; delete($id);` IDOR idiom was silently suppressed.
+ */
 private predicate isNumericGuardedRead(DataFlow::Node n) {
-  exists(Php::IfStatement ifs, FunctionCall g, Expr checked, Expr use |
-    g.(Php::AstNode).getParent*() = ifs.getCondition() and
-    g.getName() = ["is_numeric", "is_int", "is_integer", "ctype_digit"] and
-    checked = g.getAnArgument() and
-    use.(Php::AstNode).getParent*() = ifs.getBody() and
-    use != checked and
-    n.asExpr() = use and
-    (
-      checked.(VariableAccess).getName() = use.(VariableAccess).getName()
-      or
-      exists(Php::SubscriptExpression a, Php::SubscriptExpression b |
-        a = checked and b = use and
-        a.getChild(0).(VariableAccess).getName() = b.getChild(0).(VariableAccess).getName()
-      )
-    )
-  )
+  FS::isGuardedReadByName(n, ["is_numeric", "is_int", "is_integer", "ctype_digit"])
 }
 
 /** The InputSig for the access-control taint engine: identical to the standard PHP taint engine, except the
@@ -54,7 +45,11 @@ private module PhpAcTaint implements InputSig<Location, PhpDataFlow> {
   predicate defaultTaintSanitizer(DataFlow::Node node) {
     Base::defaultTaintSanitizer(node) and
     not isNumericCoercion(node) and
-    not isNumericGuardedRead(node)
+    not isNumericGuardedRead(node) and
+    // scalar int/float/bool param, settype-coerced read, filter_var(VALIDATE_INT) — all correctly stop
+    // INJECTION but NOT IDOR (the value is still the attacker's chosen id). Without this the canonical
+    // `Route::get('/u/{id}', fn(int $id) => Model::destroy($id))` was missed (source node == barrier node).
+    not FS::isNumericValueBarrier(node)
   }
 
   predicate defaultAdditionalTaintStep(DataFlow::Node src, DataFlow::Node sink, string model) {

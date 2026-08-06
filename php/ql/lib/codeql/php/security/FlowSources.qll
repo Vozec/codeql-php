@@ -175,8 +175,25 @@ private predicate guardUnderLogicalConnective(Call g, Php::IfStatement ifs) {
  * controlling term (no `&&`/`||` connective — `guardUnderLogicalConnective`) and the value is NOT reassigned
  * between the guard and the read (`accessPathReassignedBetween`, in the early-exit arm).
  */
-predicate isGuardedRead(DataFlow::Node n) {
+predicate isGuardedRead(DataFlow::Node n) { isGuardedReadByName(n, _) }
+
+/** Gets the callee (short) name of a guard call, across function / static-method / instance-method forms. */
+private string guardCallName(Call g) {
+  result =
+    [
+      g.(FunctionCall).getName(), g.(StaticMethodCall).getMethodName(),
+      g.(MethodCall).getMethodName()
+    ]
+}
+
+/**
+ * As `isGuardedRead`, but also binds the guard's callee `guardName`. Lets a consumer (e.g. the IDOR taint
+ * engine) reuse the sound polarity/early-exit/connective/reassignment logic while restricting to a specific
+ * class of guards (numeric validators don't stop IDOR, so it removes ONLY those, keeping whitelist guards).
+ */
+predicate isGuardedReadByName(DataFlow::Node n, string guardName) {
   exists(Php::IfStatement ifs, Call g, Expr checked, Expr use, int neg |
+    guardName = guardCallName(g) and
     neg = guardNegationCount(g, ifs) and
     not guardUnderLogicalConnective(g, ifs) and
     checked = g.getAnArgument() and
@@ -1292,4 +1309,17 @@ private class SettypeBarrier extends Sanitizer {
       this.asExpr() = use
     )
   }
+}
+
+/**
+ * Holds if `n` is a NUMERIC-value barrier — a scalar `int`/`float`/`bool` parameter read, a `settype(...,'int')`
+ * -coerced read, or a `filter_var(...FILTER_VALIDATE_INT...)` result. These correctly stop INJECTION (a number
+ * carries no SQL/XSS/path payload) but must NOT stop IDOR / broken-access-control: the coerced value is still
+ * the attacker's chosen resource id. The access-control taint engine subtracts these (see AccessControlTaint.qll),
+ * exactly as it already subtracts `intval`/`(int)`/`is_numeric`.
+ */
+predicate isNumericValueBarrier(DataFlow::Node n) {
+  n instanceof ScalarParamBarrier or
+  n instanceof SettypeBarrier or
+  n instanceof FilterVarNumericBarrier
 }
