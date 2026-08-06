@@ -282,7 +282,8 @@ extensions:
       # each element; taint is preserved regardless of callback kind (string / variable / inline).
       - ["function", "array_map", -1, -1]
       - ["function", "array_filter", -1, -1]
-      - ["function", "array_walk", -1, -1]
+      # NB: array_walk removed — it returns a BOOLEAN (true) and mutates the array BY REFERENCE; a -1,-1
+      # return step taints the constant `true` (unsound). The by-ref mutation is modeled below ([array_walk,1,0]).
       - ["function", "array_reduce", -1, -1]
       # String -> array splitters: each part carries the input's taint.
       - ["function", "explode", -1, -1]

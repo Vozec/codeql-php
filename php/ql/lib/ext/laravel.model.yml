@@ -34,7 +34,6 @@ extensions:
       - ["Request", "get", "laravel-request"]
       - ["Request", "header", "laravel-request"]
       - ["Request", "cookie", "laravel-request"]
-      - ["Request", "boolean", "laravel-request"]
       - ["Request", "file", "laravel-request"]
       - ["Request", "input", "laravel-request"]
       - ["Request", "query", "laravel-request"]
@@ -45,10 +44,8 @@ extensions:
       - ["Request", "json", "laravel-request"]
       - ["Request", "string", "laravel-request"]
       - ["Request", "getContent", "laravel-request"]
-      - ["Request", "integer", "laravel-request"]
-      - ["Request", "float", "laravel-request"]
-      - ["Request", "date", "laravel-request"]
-      - ["Request", "enum", "laravel-request"]
+      # NB: integer/float/boolean/date/enum are TYPE-COERCING getters (return int/float/bool/Carbon/enum,
+      # non-injectable) — NOT sources (same reasoning as symfony InputBag::getInt). Removed.
       - ["Request", "collect", "laravel-request"]
       - ["Request", "segment", "laravel-request"]
       - ["Request", "segments", "laravel-request"]

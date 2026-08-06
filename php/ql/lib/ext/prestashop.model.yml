@@ -58,16 +58,18 @@ extensions:
     data:
       - ["function", "pSQL"]                                    # SQL-escape (PrestaShop)
       - ["function", "bqSQL"]                                   # backquote-escape (identifiers)
-      - ["staticmethod", "purifyHTML"]                         # Tools::purifyHTML (HTMLPurifier)
   # HTML-context escapers: neutralise HTML but NOT SQL/path -> weak-XSS + carry taint (esc_html pattern).
+  # purifyHTML (HTMLPurifier allow-list) leaves SQL quotes intact -> weak-XSS, not a full sanitizer.
   - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["staticmethod", "safeOutput"]                         # Tools::safeOutput — HTML-escape only
       - ["staticmethod", "htmlentitiesUTF8"]                   # Tools::htmlentitiesUTF8
+      - ["staticmethod", "purifyHTML"]                         # Tools::purifyHTML (HTMLPurifier)
   - addsTo: { pack: codeql/php-all, extensible: stepModel }
     data:
       - ["staticmethod", "safeOutput", 0, -1]
       - ["staticmethod", "htmlentitiesUTF8", 0, -1]
+      - ["staticmethod", "purifyHTML", 0, -1]
   # Db::getInstance()->escape() — the real SQL escaper behind pSQL. Class-scoped (generic name).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:

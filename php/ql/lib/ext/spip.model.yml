@@ -55,8 +55,14 @@ extensions:
       - ["function", "sql_getfetsel", 0, "SQL injection"] # $select    (:1785)
       - ["function", "sql_getfetsel", 1, "SQL injection"] # $from
       - ["function", "sql_getfetsel", 2, "SQL injection"] # $where
+      - ["function", "sql_getfetsel", 3, "SQL injection"] # $groupby
       - ["function", "sql_getfetsel", 4, "SQL injection"] # $orderby
-      - ["function", "sql_countsel", 1, "SQL injection"]  # $where — NB shifted, no $select (:375)
+      - ["function", "sql_getfetsel", 6, "SQL injection"] # $having
+      # sql_countsel($from,$where,$groupby,$having) — no $select; $from/$groupby/$having are injectable too.
+      - ["function", "sql_countsel", 0, "SQL injection"]  # $from      (:375)
+      - ["function", "sql_countsel", 1, "SQL injection"]  # $where
+      - ["function", "sql_countsel", 2, "SQL injection"]  # $groupby
+      - ["function", "sql_countsel", 3, "SQL injection"]  # $having
       - ["function", "sql_update", 1, "SQL injection"]    # $exp (raw SET) (:848)
       - ["function", "sql_update", 2, "SQL injection"]    # $where
       - ["function", "sql_updateq", 2, "SQL injection"]   # $where ($exp auto-quoted) (:903)

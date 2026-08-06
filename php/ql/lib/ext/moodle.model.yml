@@ -20,3 +20,9 @@ extensions:
       - ["method", "get_record_select", 1, "SQL injection"]
       - ["method", "count_records_select", 1, "SQL injection"]
       - ["method", "delete_records_select", 1, "SQL injection"]
+      # Sibling *_select methods with the same raw-$select WHERE contract (params in a separate array arg).
+      - ["method", "get_recordset_select", 1, "SQL injection"]   # $select
+      - ["method", "record_exists_select", 1, "SQL injection"]   # $select
+      - ["method", "get_field_select", 2, "SQL injection"]       # $table,$return,$select
+      - ["method", "get_fieldset_select", 2, "SQL injection"]    # $select
+      - ["method", "set_field_select", 3, "SQL injection"]       # raw WHERE on an UPDATE
