@@ -238,12 +238,20 @@ Method inferredMethod(MethodCall mc) {
   or
   // Virtual dispatch: the receiver's inferred type is a base class or interface (e.g. a parameter typed
   // `I $o`), but the concrete implementation lives on a subtype/implementor. Dispatch to any subtype's
-  // declared method of that name (recall-first — the runtime object may be any implementor).
+  // declared method of that name (recall-first — the runtime object may be any implementor), BUT capped at
+  // the same fan-out bound as the name-based fallback: a ubiquitous interface method (`handle`/`execute`/
+  // `process`) with many implementors would otherwise connect dozens of unrelated bodies (path explosion,
+  // Tier-2-H). Precise single-implementor dispatch — the common case — is unaffected.
   exists(ClassLike base, ClassLike sub |
     base = exprClass(mc.getReceiver()) and
     base = sub.getAnAncestor() and
     result = sub.getADeclaredMethod() and
-    result.getName() = methodNameOf(mc)
+    result.getName() = methodNameOf(mc) and
+    count(Method m |
+      exists(ClassLike s |
+        base = s.getAnAncestor() and m = s.getADeclaredMethod() and m.getName() = methodNameOf(mc)
+      )
+    ) <= 8
   )
 }
 

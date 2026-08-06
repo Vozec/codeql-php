@@ -180,7 +180,10 @@ class DataFlowCall instanceof Cfg::CfgNode {
       Ssa::variableAccessAt(bbw, iw, w) and
       a.getLhs() = w and
       fname = a.getRhs().(Php::String).getChild(_).(Php::StringContent).getValue() and
-      result.getName() = fname
+      result.getName() = fname and
+      // same fan-out cap as the plain name-fallback: a string-callable naming a ubiquitous function must
+      // not over-connect to every same-named definition (Tier-4).
+      nameFallbackAcceptable(fname)
     )
   }
 
@@ -818,7 +821,9 @@ predicate lambdaCreation(Node creation, LambdaCallKind kind, DataFlowCallable c)
       sc = creation.asExpr() and
       sc.getTargetName() = "Closure" and
       sc.getMethodName() = "fromCallable" and
-      c.getName() = sc.getArgument(0).(StringLiteral).getValue()
+      c.getName() = sc.getArgument(0).(StringLiteral).getValue() and
+      // same fan-out cap as the plain name-fallback (Tier-4).
+      nameFallbackAcceptable(sc.getArgument(0).(StringLiteral).getValue())
     )
     or
     // Array callable `[$obj, 'm']` / `['C', 'm']`: the callable is the resolved method. Stored in a
