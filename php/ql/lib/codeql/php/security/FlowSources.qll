@@ -1314,6 +1314,34 @@ private class SettypeBarrier extends Sanitizer {
 }
 
 /**
+ * The column/aggregate argument of a laravel query-builder method (`where`/`pluck`/`orderBy`/`max`/…) is
+ * modeled as a bare-method SQL sink for recall (the receiver's Builder type can't resolve without vendor
+ * extraction). This over-fires on the in-memory `Illuminate\Support\Collection`, which has the SAME method
+ * names. This barrier subtracts ONLY the cases where the receiver PROVABLY resolves to a Collection — an
+ * explicit `Collection`/`Enumerable` type-name, or a literal `collect(...)`. Because `exprClass` never
+ * resolves the (un-extracted) Collection class, this can only remove annotated/`collect()` false positives;
+ * an unannotated `DB::table()->where($col)` (the real SQLi shape) is untouched — recall-monotone (Tier-1-F).
+ */
+private class LaravelCollectionBarrier extends Sanitizer {
+  LaravelCollectionBarrier() {
+    exists(MethodCall c |
+      c.getMethodName() =
+        [
+          "where", "pluck", "orderBy", "orderByDesc", "groupBy", "having", "select", "max", "min", "avg",
+          "sum", "firstWhere"
+        ] and
+      (
+        TI::exprTypeName(c.getReceiver()) =
+          ["Collection", "SupportCollection", "EloquentCollection", "LazyCollection", "Enumerable"]
+        or
+        c.getReceiver().(FunctionCall).getName() = "collect"
+      ) and
+      this.asExpr() = c.getAnArgument()
+    )
+  }
+}
+
+/**
  * Holds if `n` is a NUMERIC-value barrier — a scalar `int`/`float`/`bool` parameter read, a `settype(...,'int')`
  * -coerced read, or a `filter_var(...FILTER_VALIDATE_INT...)` result. These correctly stop INJECTION (a number
  * carries no SQL/XSS/path payload) but must NOT stop IDOR / broken-access-control: the coerced value is still
