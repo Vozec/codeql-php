@@ -148,7 +148,22 @@ private AstNode callableBody(Callable c) {
 }
 
 /** A call inside callable `c`'s body (transitively). */
-private Call callIn(Callable c) { result.(Php::AstNode).getParent+() = callableBody(c) }
+private Call callIn(Callable c) {
+  result.(Php::AstNode).getParent+() = callableBody(c) and
+  // NEAREST-enclosing callable: a call inside a NESTED closure/function is NOT attributed to `c` (else a
+  // guard in a `register_shutdown_function(function(){ current_user_can(...); })` would satisfy hasGuard and
+  // suppress the unguarded action, and a sensitive action in a callback would mis-attribute to `c`).
+  not exists(Php::AstNode inner |
+    result.(Php::AstNode).getParent+() = inner and
+    inner.getParent+() = callableBody(c) and
+    (
+      inner instanceof Php::AnonymousFunction or
+      inner instanceof Php::ArrowFunction or
+      inner instanceof Php::FunctionDefinition or
+      inner instanceof Php::MethodDeclaration
+    )
+  )
+}
 
 /** A global function directly called from `c`'s body, resolved by name (function names are global in PHP,
  *  so this is precise). Method-call resolution is intentionally omitted here (needs receiver types). */

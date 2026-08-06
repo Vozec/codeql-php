@@ -280,6 +280,10 @@ DataFlowCallable viableCallable(DataFlowCall call) {
   // keeps this recall-first — an inferred-but-methodless receiver must not silently drop the edge (B.4).
   // The `nameFallbackAcceptable` gate additionally drops ubiquitous names whose name-only resolution
   // would just over-connect unrelated classes (the dominant source of cross-file false flow).
+  // NB: a function-only/method-only KIND gate here (even with the correct `exists(result.(Php::…))` cast,
+  // not `instanceof`) still regresses the corpus (200/201) — a legitimate corpus flow resolves name-fallback
+  // across the function/method boundary (e.g. a modeled global-style call). The cross-kind over-connection FP
+  // is real but a safe gate needs per-flow analysis, not a blanket kind pairing. Deferred (see PRECISION_AUDIT_v3 T1e).
   call.getName() = result.getName() and
   not exists(call.getTypedCallee()) and
   not exists(call.getStaticTypedCallee()) and
