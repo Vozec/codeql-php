@@ -148,18 +148,30 @@ private predicate readAfterInSameBlock(Php::IfStatement ifs, Expr use, Expr chec
   )
 }
 
-/**
- * Holds if the guard call `g` sits under a top-level logical connective (`&&`/`||`/`and`/`or`/`xor`) within
- * the `if` condition. In that case the guard is NOT the sole determinant of which branch is taken — with a
- * `||` the guard may be false in the then-branch, with an `&&` it may be false in the else/fall-through — so
- * the `!`-parity polarity model is unsound and the read must NOT be treated as guarded (recall-first).
- */
-private predicate guardUnderLogicalConnective(Call g, Php::IfStatement ifs) {
+/** Holds if `g` sits under a logical operator in `ops` within the `if` condition. */
+bindingset[ops]
+private predicate guardUnderConnective(Call g, Php::IfStatement ifs, string ops) {
   exists(BinaryOperation b |
-    b.getOperator() = ["&&", "||", "and", "or", "xor"] and
+    b.getOperator() = ops and
     g.(Php::AstNode).getParent+() = b and
     b.(Php::AstNode).getParent*() = ifs.getCondition()
   )
+}
+
+/**
+ * Holds if a logical connective makes the guard UNSOUND for the branch it would clear. The rule is
+ * POLARITY-DEPENDENT (De Morgan):
+ *  - positive guard, read in the THEN branch (entered when the condition is TRUE): an `||`/`or` sibling means
+ *    the guard may be false there → reject `||`/`or`/`xor`. An `&&` sibling is still guaranteed true → allowed.
+ *  - negated guard, read in the ELSE branch or the fall-through of a negated early-exit (entered when the
+ *    condition is FALSE): De Morgan flips it — an `&&`/`and` sibling means the guard may be false there →
+ *    reject `&&`/`and`/`xor`. An `||`/`or` sibling is fine.
+ */
+bindingset[neg]
+private predicate guardConnectiveUnsound(Call g, Php::IfStatement ifs, int neg) {
+  neg % 2 = 0 and guardUnderConnective(g, ifs, ["||", "or", "xor"])
+  or
+  neg % 2 = 1 and guardUnderConnective(g, ifs, ["&&", "and", "xor"])
 }
 
 /**
@@ -195,7 +207,7 @@ predicate isGuardedReadByName(DataFlow::Node n, string guardName) {
   exists(Php::IfStatement ifs, Call g, Expr checked, Expr use, int neg |
     guardName = guardCallName(g) and
     neg = guardNegationCount(g, ifs) and
-    not guardUnderLogicalConnective(g, ifs) and
+    not guardConnectiveUnsound(g, ifs, neg) and
     checked = g.getAnArgument() and
     sameAccessPath(checked, use) and
     use != checked and
@@ -1313,14 +1325,21 @@ private class SettypeBarrier extends Sanitizer {
   }
 }
 
+/** Holds if `e` is (a fluent chain rooted at) the Laravel global `collect(...)`, which unambiguously returns
+ *  an in-memory `Illuminate\Support\Collection` (NOT a query builder). */
+private predicate collectRooted(Expr e) {
+  e.(FunctionCall).getName() = "collect"
+  or
+  collectRooted(e.(MethodCall).getReceiver())
+}
+
 /**
- * The column/aggregate argument of a laravel query-builder method (`where`/`pluck`/`orderBy`/`max`/…) is
- * modeled as a bare-method SQL sink for recall (the receiver's Builder type can't resolve without vendor
- * extraction). This over-fires on the in-memory `Illuminate\Support\Collection`, which has the SAME method
- * names. This barrier subtracts ONLY the cases where the receiver PROVABLY resolves to a Collection — an
- * explicit `Collection`/`Enumerable` type-name, or a literal `collect(...)`. Because `exprClass` never
- * resolves the (un-extracted) Collection class, this can only remove annotated/`collect()` false positives;
- * an unannotated `DB::table()->where($col)` (the real SQLi shape) is untouched — recall-monotone (Tier-1-F).
+ * The column argument of a laravel query-builder method (`where`/`pluck`/`orderBy`/…) is a bare-method SQL sink
+ * for recall (the Builder type can't resolve without vendor extraction). It over-fires on the in-memory
+ * `Illuminate\Support\Collection`, which shares the method names. This barrier subtracts ONLY the case where
+ * the receiver is (a chain rooted at) the global `collect(...)` — the one form that is UNAMBIGUOUSLY a
+ * Collection. A bare short type-name (`Collection $q`) is NOT used: a custom `App\…\Collection` fluent DB
+ * wrapper shares the short name and its real column sink must not be suppressed. Barriers the column arg (0).
  */
 private class LaravelCollectionBarrier extends Sanitizer {
   LaravelCollectionBarrier() {
@@ -1330,13 +1349,8 @@ private class LaravelCollectionBarrier extends Sanitizer {
           "where", "pluck", "orderBy", "orderByDesc", "groupBy", "having", "select", "max", "min", "avg",
           "sum", "firstWhere"
         ] and
-      (
-        TI::exprTypeName(c.getReceiver()) =
-          ["Collection", "SupportCollection", "EloquentCollection", "LazyCollection", "Enumerable"]
-        or
-        c.getReceiver().(FunctionCall).getName() = "collect"
-      ) and
-      this.asExpr() = c.getAnArgument()
+      collectRooted(c.getReceiver()) and
+      this.asExpr() = c.getArgument(0)
     )
   }
 }
