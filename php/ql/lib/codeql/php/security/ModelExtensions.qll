@@ -287,7 +287,12 @@ private predicate paramRebound(Function f, string pname) {
     (
       lhs = any(Php::AssignmentExpression a).getLeft() or
       lhs = any(Php::AugmentedAssignmentExpression a).getLeft() or
-      lhs = any(Php::ReferenceAssignmentExpression a).getLeft()
+      lhs = any(Php::ReferenceAssignmentExpression a).getLeft() or
+      // also rebound via `foreach(… as $p)`, `list($p,…)=…`, `global $p` (recall-safe over-approximation:
+      // more rebinds -> fewer trivial-passthroughs -> more sanitizer models kept active).
+      lhs.(Php::AstNode).getParent() instanceof Php::ForeachStatement or
+      lhs.(Php::AstNode).getParent() instanceof Php::ListLiteral or
+      lhs.(Php::AstNode).getParent() instanceof Php::GlobalDeclaration
     )
   )
 }

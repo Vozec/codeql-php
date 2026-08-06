@@ -172,11 +172,17 @@ predicate isAuthorizationGuard(Call call) {
 /** Holds if `call` matches `sensitiveActionModel`, binding its `category`. */
 predicate isSensitiveAction(Call call, string category) {
   exists(string sk, string nm | sensitiveActionModel(sk, nm, _, category) |
-    sk = "function" and call.(FunctionCall).getName() = nm
-    or
-    sk = "method" and call.(MethodCall).getMethodName() = nm
-    or
-    sk = "staticmethod" and call.(StaticMethodCall).getMethodName() = nm
+    // Only state-change / privilege actions are MISSING-AUTHORIZATION candidates. The `sensitive-read`
+    // category is IDOR-disclosure-only (consumed via `sensitiveResourceArg`); including it here made an
+    // IDOR-authored row also double-fire missing-authorization on every call site.
+    category = ["state-change", "privilege"] and
+    (
+      sk = "function" and call.(FunctionCall).getName() = nm
+      or
+      sk = "method" and call.(MethodCall).getMethodName() = nm
+      or
+      sk = "staticmethod" and call.(StaticMethodCall).getMethodName() = nm
+    )
   )
 }
 
