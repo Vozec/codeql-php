@@ -1189,7 +1189,11 @@ private class TypedSanitizerStrong extends Sanitizer {
   TypedSanitizerStrong() {
     exists(MethodCall c, string cls |
       typedSanitizerModel(cls, c.getMethodName()) and
-      receiverIsClass(c.getReceiver(), cls) and
+      // EXACT class or written typehint only — deliberately NOT the ancestor arm that typed SINKS/SOURCES use.
+      // Broadening a SANITIZER to subclasses is the dangerous direction: a subclass of a generic sanitizer
+      // class (`Sanitizer`/`Connection`/`Db`) may OVERRIDE the method to a no-op, so barriering it would hide
+      // a real vuln (an FN). Sinks/sources broaden safely (a subclass that inherits the method really is one).
+      (TI::exprClass(c.getReceiver()).getName() = cls or TI::exprTypeName(c.getReceiver()) = cls) and
       this.asExpr() = c
     )
   }
