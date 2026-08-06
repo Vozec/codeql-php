@@ -115,6 +115,26 @@ private predicate orderedBlockChild(Php::AstNode blk, int i, Php::AstNode child)
   child = blk.(Php::Program).getChild(i)
 }
 
+/**
+ * Holds if `node` is inside `body` but NOT inside a nested callable (closure / arrow-fn / inner function /
+ * method) declared within it. Prevents a parameter/variable read from being attributed to the wrong callable
+ * when a nested lambda's own parameter SHADOWS the outer name (`function h(int $id){ array_map(function($id){
+ * … $id … }, $x); }` — the closure's `$id` is not the outer scalar param / route param).
+ */
+private predicate notInNestedCallable(Php::AstNode node, Php::AstNode body) {
+  node.getParent+() = body and
+  not exists(Php::AstNode inner |
+    node.getParent+() = inner and
+    inner.getParent+() = body and
+    (
+      inner instanceof Php::AnonymousFunction or
+      inner instanceof Php::ArrowFunction or
+      inner instanceof Php::FunctionDefinition or
+      inner instanceof Php::MethodDeclaration
+    )
+  )
+}
+
 /** Holds if the access path of `ref` is (re)assigned in a straight-line sibling statement of `blk` whose
  *  index is strictly between `lo` and `hi` — i.e. the value is re-tainted between a barrier and a later use. */
 bindingset[lo, hi]
@@ -796,8 +816,10 @@ private class SymfonyBagSource extends RemoteFlowSource {
       bag.getName().(Php::Name).getValue() =
         ["query", "request", "attributes", "cookies", "files"] and
       isRequestExpr(bag.getObject()) and
-      get.getName().(Php::Name).getValue() =
-        ["get", "all", "getInt", "getBoolean", "getAlpha", "getAlnum", "getDigits", "getString", "filter"] and
+      // NB: getInt/getBoolean/getAlpha/getAlnum/getDigits coerce or charset-restrict to a non-injectable
+      // value (they are SANITIZERS elsewhere, e.g. joomla/xoops getInt) — only the raw/free-form accessors
+      // are sources. Listing the coercing getters here was the exact FP the model-level fix (T1-6) removed.
+      get.getName().(Php::Name).getValue() = ["get", "all", "getString", "filter"] and
       this.asExpr() = get
     )
   }
@@ -1081,7 +1103,7 @@ private class RouteParamSource extends RemoteFlowSource {
       callable = routeCallable() and
       p = routeCallableParam(callable) and
       read.getName() = p.getName().getChild().getValue() and
-      read.(Php::AstNode).getParent+() = routeCallableBody(callable) and
+      notInNestedCallable(read, routeCallableBody(callable)) and
       this.asExpr() = read
     )
   }
@@ -1112,7 +1134,7 @@ private class AttributeRouteParamSource extends RemoteFlowSource {
       p = meth.getParameters().getChild(_) and
       not TI::hasClassParameterType(p) and
       read.getName() = p.getName().getChild().getValue() and
-      read.(Php::AstNode).getParent+() = meth.getBody() and
+      notInNestedCallable(read, meth.getBody()) and
       this.asExpr() = read
     )
   }
@@ -1284,7 +1306,7 @@ private class ScalarParamBarrier extends Sanitizer {
       isScalarNumericType(p.(Php::SimpleParameter).getType()) and
       name = p.getName() and
       use.getName() = name and
-      use.(Php::AstNode).getParent+() = fn.getBody() and
+      notInNestedCallable(use, fn.getBody()) and
       not paramReassigned(name, fn) and
       this.asExpr() = use
     )
