@@ -144,7 +144,10 @@ class DataFlowCall instanceof Cfg::CfgNode {
     exists(ClassLike cls |
       cls.getName() = c.(NewExpr).getClassName() and
       result = cls.getAMethod() and
-      result.(Method).getName() = "__construct"
+      result.(Method).getName() = "__construct" and
+      // short class name is namespace-blind; bound the fan-out so `new App\Logger($x)` does not route the
+      // argument into every unrelated class whose short name is `Logger`.
+      count(ClassLike c2 | c2.getName() = c.(NewExpr).getClassName()) <= nameFallbackMaxArity()
     )
   }
 

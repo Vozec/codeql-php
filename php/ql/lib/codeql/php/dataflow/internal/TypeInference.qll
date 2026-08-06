@@ -305,6 +305,18 @@ Method staticInferredMethod(StaticMethodCall sc) {
       sc.(Php::ScopedCallExpression).getScope().(Php::RelativeScope).toString() = ["self", "static"] and
       c = enclosingClass(sc)
       or
+      // Late static binding: `static::m()` dispatches to the RUNTIME class, which may be a subtype override
+      // (the template-method pattern). Add capped subtype dispatch so the override is not silently dropped.
+      sc.(Php::ScopedCallExpression).getScope().(Php::RelativeScope).toString() = "static" and
+      enclosingClass(sc) = c.getAnAncestor() and
+      count(Method m2 |
+        exists(ClassLike s2 |
+          enclosingClass(sc) = s2.getAnAncestor() and
+          m2 = s2.getADeclaredMethod() and
+          m2.getName() = sc.getMethodName()
+        )
+      ) <= 8
+      or
       sc.(Php::ScopedCallExpression).getScope().(Php::RelativeScope).toString() = "parent" and
       c = enclosingClass(sc).getASuperType()
       or

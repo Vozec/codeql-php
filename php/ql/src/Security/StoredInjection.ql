@@ -66,6 +66,10 @@ private module WriteConfig implements DataFlow::ConfigSig {
   predicate isSource(DataFlow::Node n) { n instanceof RemoteFlowSource }
 
   predicate isSink(DataFlow::Node n) { exists(Expr v | storeWrite(_, _, v) and n.asExpr() = v) }
+
+  // A key whose every write path is sanitised/validated is NOT a real second-order vector — without this
+  // barrier `userWritableKey` over-approximated and the read false-fired as a fully-tainted StoredSource.
+  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
 }
 
 private module WriteFlow = TaintTracking::Global<WriteConfig>;
