@@ -78,8 +78,14 @@ private Callable resolveHandler(AstNode arg) {
     result.(Method).getName() = m
   )
   or
-  // plain string function name `'my_ajax_handler'`
-  exists(string s | s = arg.(StringLiteral).getValue() and result.(Function).getName() = s)
+  // plain string function name `'my_ajax_handler'` — resolve only when the name is UNIQUE (namespace-blind
+  // short-name match otherwise turns `add_action('x','save')` into every function named `save`, inflating
+  // the entrypoint set and the reaches/callIn joins).
+  exists(string s |
+    s = arg.(StringLiteral).getValue() and
+    result.(Function).getName() = s and
+    count(Function g | g.getName() = s) = 1
+  )
 }
 
 /**

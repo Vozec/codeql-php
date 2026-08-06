@@ -188,11 +188,9 @@ private ClassLike enclosingClassOf(AstNode n) {
  * `$this->db = $wpdb; … $this->db->prepare(…)` — so a class-scoped sanitizer/sink still applies. Without
  * this, a whole DB-manager class of parameterised `$this->db->prepare()` queries reads as unsanitised.
  */
-private string propertyReceiverClassName(Php::MemberAccessExpression prop) {
-  exists(string f, ClassLike cls, AssignExpr a, Php::MemberAccessExpression w |
-    prop.getObject().(Php::VariableName).getChild().getValue() = "this" and
-    prop.getName().(Php::Name).getValue() = f and
-    enclosingClassOf(prop) = cls and
+/** Gets a class assigned to `$this->f` somewhere in class `cls`'s body. */
+private string assignedPropertyClass(ClassLike cls, string f) {
+  exists(AssignExpr a, Php::MemberAccessExpression w |
     a.getLhs() = w and
     w.getObject().(Php::VariableName).getChild().getValue() = "this" and
     w.getName().(Php::Name).getValue() = f and
@@ -201,6 +199,20 @@ private string propertyReceiverClassName(Php::MemberAccessExpression prop) {
     a.getRhs().(VariableAccess).getName() = "wpdb" and result = "wpdb"
     or
     result = a.getRhs().(NewExpr).getClassName()
+  )
+}
+
+private string propertyReceiverClassName(Php::MemberAccessExpression prop) {
+  exists(string f, ClassLike cls |
+    prop.getObject().(Php::VariableName).getChild().getValue() = "this" and
+    prop.getName().(Php::Name).getValue() = f and
+    enclosingClassOf(prop) = cls and
+    result = assignedPropertyClass(cls, f) and
+    // Resolve only when EXACTLY ONE class is assigned to `$this->f` (flow-insensitively). A property that
+    // is assigned MULTIPLE distinct classes (`$this->db = new Wpdb(); … $this->db = $userFactory;`) is not a
+    // definite receiver — treating its `->prepare()`/`->escape()` as a sanitizer would unsoundly suppress a
+    // real vuln. The WP idiom (`$this->db = $wpdb`) is a single assignment, so it still resolves.
+    count(string x | x = assignedPropertyClass(cls, f)) = 1
   )
 }
 
