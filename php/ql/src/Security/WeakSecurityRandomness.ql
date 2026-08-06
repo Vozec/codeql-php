@@ -30,7 +30,7 @@ class WeakRandomCall extends FunctionCall {
 /** Holds if `name` denotes a security-sensitive secret/token (strong indicators only). */
 bindingset[name]
 predicate isSecretName(string name) {
-  name.regexpMatch("(?i).*(token|secret|csrf|nonce|api_?key|passwd|password|secure_?key|session_?id).*")
+  name.regexpMatch("(?i).*(token|secret|csrf|nonce|api_?key|passwd|password|secure_?key|session_?id|salt|(reset|activation|verify|confirm|recovery)_?(key|code|token)).*")
 }
 
 /** Holds if expression `e` (typically a hash call) is used as a security secret. */
@@ -42,7 +42,10 @@ predicate inSecurityContext(Expr e) {
   )
   or
   // used as a cookie value: `setcookie($name, <e>, …)`
-  exists(FunctionCall c | c.getName() = "setcookie" and c.getArgument(1) = e)
+  exists(FunctionCall c | c.getName() = ["setcookie", "setrawcookie"] and c.getArgument(1) = e)
+  or
+  // used as the session id: `session_id($token)`
+  exists(FunctionCall c | c.getName() = "session_id" and c.getArgument(0) = e)
 }
 
 /**

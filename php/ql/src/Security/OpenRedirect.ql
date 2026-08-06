@@ -29,7 +29,9 @@ private predicate hostPinnedConcatOperand(DataFlow::Node n) {
     // The host must be TERMINATED by `/`, `?` or `#` inside the CONSTANT prefix, so appended input lands in
     // the path/query/fragment — not the host. Without the terminator `"https://good.com".$x` (x=".evil.com/")
     // yields `good.com.evil.com` and was wrongly cleared (a real open-redirect false negative).
-    ce.getLeftOperand().(StringLiteral).getValue().regexpMatch("(?s).*https?://[A-Za-z0-9._~%-]+[/?#].*")
+    // `:` is included so a host WITH A PORT (`https://intranet:8443/…`) still pins the host (else the greedy
+    // host run stopped at `:`, the terminator never matched, and the safe redirect was reported).
+    ce.getLeftOperand().(StringLiteral).getValue().regexpMatch("(?s).*https?://[A-Za-z0-9._~%:-]+[/?#].*")
   )
 }
 

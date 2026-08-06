@@ -44,6 +44,14 @@ private predicate benignConstStr(Expr e) {
   or
   // the boolean `true` (comparisons against `false`/`null` stay reportable)
   e.(TS::Php::Boolean).getValue().toLowerCase() = "true"
+  or
+  // a NEGATIVE non-zero numeric literal (`$attempts == -1`) — `-1` parses as unary-minus over `Integer 1`,
+  // and a hash/secret can't equal a fixed negative number via juggling.
+  exists(TS::Php::UnaryOpExpression u | u = e and u.getOperator().toString() = "-" |
+    exists(string v | v = u.getArgument().(TS::Php::Integer).getValue() or v = u.getArgument().(TS::Php::Float).getValue() |
+      not v.regexpMatch("0+([.]0+)?")
+    )
+  )
 }
 
 /** Holds if `e` is a hash-function result or a secret-looking variable/property. */
@@ -52,7 +60,9 @@ private predicate sensitive(Expr e) {
   or
   exists(string n |
     n = [e.(VariableAccess).getName(), e.(FieldAccess).getFieldName()] and
-    n.toLowerCase().regexpMatch(".*(pass|pwd|hash|token|secret|signature|hmac|digest|nonce).*")
+    // the secret term must start at a word boundary (start, or after a non-letter) so `$bypass`/`$compass`/
+    // `$subtokens` (substring matches) no longer trip it, while `password`/`csrf_token` still do.
+    n.toLowerCase().regexpMatch("(^|.*[^a-z])(pass|pwd|hash|token|secret|signature|hmac|digest|nonce).*")
   )
 }
 
