@@ -129,3 +129,48 @@ isn't seen as a sanitizer → parameterized query flagged SQLi.
 
 *Methodology: 9 static-analysis agents (queries, FlowSources, ModelExtensions+AccessControl, taint
 steps, dataflow engine, 39 model files ×2); 2 findings reproduced on a real CodeQL DB.*
+
+---
+
+## IMPLEMENTATION STATUS (9 verified batches — corpus held at 201/201, 0 un-annotated throughout)
+
+**Fixed & verified** (each with a targeted before/after probe + full corpus run):
+
+| Item | Batch | What landed |
+|------|-------|-------------|
+| Tier-3 (all 12) | 1 | dead/wrong/FP model rows: concrete Redirect→typedSink, unserialize -1→0, LDAP dead rows + `ldap_bind`, `encrypt`/`getResult`/`str_contains`/`quote` removed, loadHTML XXE, `$_ENV`, getInt sources, prestashop dedupe, `__toString` |
+| Tier-1-A | 2, 4 | core + per-CMS HTML escapers → weak-XSS + carry-taint step (magento/yii/cakephp/codeigniter/drupal/wp), escape-then-inject now caught |
+| Tier-1-B | 3 | polarity- & early-exit-aware `isGuardedRead` (FN + FP, both empirically confirmed) |
+| Tier-1-C | 5 | `functionDefinedInSource` gated to trivial-passthrough only (un-breaks whole-CMS scans) |
+| Tier-1-D | 5 | additive `TypedSanitizerStrong` via `receiverIsClass` (DI/factory receivers) |
+| Tier-2-H | 9 | subtype virtual-dispatch fan-out capped (+ string-callable / Closure::fromCallable caps) |
+| Tier-2-I | 5 | numeric-`sprintf` barrier |
+| Tier-2-J | 4 | mb_*/iconv/strstr/preg_filter carriers |
+| Tier-2-K | 6 | `filter_var` flag-aware (numeric-only barrier; else taint step) |
+| Tier-2-L | 4 | paired carry-taint steps for weak-XSS-without-step (suitecrm/mediawiki/processwire/concrete/textpattern/craftcms) |
+| Tier-2-M | 4 | drupal `escapeLike` → step |
+| Tier-4 (subset) | 6, 7, 9 | preg_replace `/e` delimiters, OpenRedirect host-terminator, TypeJuggling benign-literal FP, WeakRandom uniqid+direct-assign, string/FCC/Closure callable caps |
+| Tier-5 (subset) | 1, 4, 8 | array_map first-class callable, Yii `::$app` scope, Dolibarr GETPOST kind-awareness, settype CFG dominance |
+
+**Deliberately NOT changed** (constraint documented, would do harm):
+
+- **Tier-1-F (bare-method → typed sinks)** — the fork has **no `vendor/` extraction**, so factory/DI receiver
+  types don't resolve. The corpus PROVES a typed conversion regresses to FNs: the voyager column-SQLi
+  (`DB::table()->where($col)`) and all 3 template-injection tests (`$twig->render`, `Blade::render`) rely on
+  bare-name matching. The bare-method sinks + their FP cost (Collection::where, PDO::fetch) are a deliberate,
+  corpus-validated recall-first trade. Templating type-scoping fails the same way.
+- **Tier-1-E (access-control dominance)** — `AccessControl.qll` is a finely-tuned FP/FN balance (its comments
+  document approaches tried & rejected). The proper fix (CFG dominance + capability-argument matching + typed
+  guard models) is a delicate rework, and the corpus has **0 missing-authorization annotations** (only 2 IDOR),
+  so an FP/FN trade there can't be validated here. Switching `hasGuard` to same-callable would wrongly drop the
+  legitimate guard-in-caller suppression. Left intact rather than regress a tuned subsystem blind.
+- **Tier-2-G (POP-gadget source flood)** — a sound gate needs call-graph reachability from a *tainted*
+  `unserialize`; a blind global gate either still floods or drops real `__destruct`/`__wakeup` gadgets.
+- **Tier-2-N (named-arg taint)** — a call resolves to multiple callees with different parameter orders, so the
+  named-arg→parameter routing must be per-callee inside the engine's argument-passing (not a flat taint step);
+  a wrong step routes taint to the wrong parameter.
+- **Tier-4 array field-sensitivity** — deep `DataFlowPrivate` content-model change, unvalidatable for FPs here.
+- **Tier-4 StoredInjection→XSS** — needs a *separate* XSS-barriered flow config (folding `reflected XSS` into
+  the existing config would either re-introduce escape-then-inject (Batch 2 regression) or FP on escaped output).
+- **Tier-5 ScalarParam perf** — perf-only; no enclosing-callable API exists to replace `getParent+()`, and the
+  corpus shows no timeout. Not worth a behavior-risking rewrite.
