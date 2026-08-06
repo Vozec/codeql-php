@@ -1,0 +1,12 @@
+# Audit (Semgrep-style presence) queries for PHP. These are `@precision low @tags audit` — high-recall,
+# manual-triage findings that surface where a sensitive API is USED (dangerous function present, mass-
+# assignment, etc.), NOT a proven source→sink taint flow. They are deliberately kept OUT of the taint /
+# code-scanning suites (which gate on high precision + the `security` tag), so without this suite the whole
+# audit subsystem (`auditPresence`/`auditArg`/… + its model rows) never ran. Invoke it explicitly:
+#   codeql database analyze <db> php/ql/src/codeql-suites/php-audit.qls --format=sarif-latest -o out.sarif
+- description: Audit (presence / manual-triage) queries for PHP (cross-CMS)
+- queries: .
+  from: codeql/php-queries
+- include:
+    id:
+      - php/semgrep-audit
