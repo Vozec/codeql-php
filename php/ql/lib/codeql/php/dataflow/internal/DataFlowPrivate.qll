@@ -523,14 +523,17 @@ private Expr definitionReachingValue(Ssa::Definition def) {
     exists(Php::FunctionCallExpression call, Php::FunctionDefinition callee |
       call.(Php::AstNode).getParent+() = try.getBody() and
       callee.getName().getValue() = call.getFunction().(Php::Name).getValue() and
+      nameFallbackAcceptable(call.getFunction().(Php::Name).getValue()) and
       exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody()) and
       result = call
     )
     or
     // a method call in the try that can throw (`$service->risky()`) — same, callee resolved by method name
+    // (bounded by the same fan-out cap so a common method name doesn't pull throws from unrelated classes).
     exists(Php::MemberCallExpression call, Php::MethodDeclaration callee |
       call.(Php::AstNode).getParent+() = try.getBody() and
       callee.getName().getValue() = call.getName().(Php::Name).getValue() and
+      nameFallbackAcceptable(call.getName().(Php::Name).getValue()) and
       exists(Php::ThrowExpression thr | thr.(Php::AstNode).getParent+() = callee.getBody()) and
       result = call
     )

@@ -277,8 +277,14 @@ Method arrayCallableMethod(Php::ArrayCreationExpression arr) {
       // instance `[$obj, 'm']`
       result = exprClass(recv).getAMethod()
       or
-      // virtual dispatch: receiver typed as a base/interface, implementation on a subtype
-      exists(ClassLike sub | exprClass(recv) = sub.getAnAncestor() and result = sub.getADeclaredMethod())
+      // virtual dispatch: receiver typed as a base/interface, implementation on a subtype (capped at the
+      // same fan-out bound as inferredMethod, so a ubiquitous interface method doesn't connect dozens of bodies)
+      exists(ClassLike sub | exprClass(recv) = sub.getAnAncestor() and result = sub.getADeclaredMethod()) and
+      count(Method m2 |
+        exists(ClassLike s2 |
+          exprClass(recv) = s2.getAnAncestor() and m2 = s2.getADeclaredMethod() and m2.getName() = name
+        )
+      ) <= 8
       or
       // class-name string `['C', 'm']`
       exists(ClassLike c | c.getName() = recv.(StringLiteral).getValue() and result = c.getAMethod())

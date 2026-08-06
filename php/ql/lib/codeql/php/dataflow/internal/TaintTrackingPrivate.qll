@@ -147,6 +147,13 @@ private predicate methodNameNotTooAmbiguous(string name) {
   count(Php::MethodDeclaration m | m.getName().getValue() = name) <= 8
 }
 
+/** As `methodNameNotTooAmbiguous`, for global functions — bounds by-name resolution to at most 8 same-named
+ *  definitions, so a ubiquitous helper name does not route taint into dozens of unrelated function bodies. */
+bindingset[name]
+private predicate functionNameNotTooAmbiguous(string name) {
+  count(Php::FunctionDefinition f | f.getName().getValue() = name) <= 8
+}
+
 /**
  * Holds if `call` resolves to the function/method `callee`: by name for functions, and by inferred TYPE
  * for methods — falling back to name only when the receiver type is unknown. Gating the name fallback on
@@ -154,7 +161,8 @@ private predicate methodNameNotTooAmbiguous(string name) {
  * class (which would leak that class's by-ref writes into this call — a false positive).
  */
 private predicate resolvesToCallee(Call call, AstNode callee) {
-  callee.(Php::FunctionDefinition).getName().getValue() = call.(FunctionCall).getName()
+  callee.(Php::FunctionDefinition).getName().getValue() = call.(FunctionCall).getName() and
+  functionNameNotTooAmbiguous(call.(FunctionCall).getName())
   or
   callee = TI::inferredMethod(call)
   or
@@ -260,7 +268,13 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     // `andWhere`/`orWhere`/`having`/`orderBy`, Joomla/CakePHP `where`/`order`/`group` — CVE-2025-22207.)
     exists(Php::MemberCallExpression m |
       m.getName().(Php::Name).getValue() =
-        ["where", "andWhere", "orWhere", "having", "order", "orderBy", "group", "groupBy"] and
+        [
+          "where", "andWhere", "orWhere", "having", "order", "orderBy", "group", "groupBy",
+          // UPDATE/INSERT value-carrying clauses (Doctrine QueryBuilder `->update()->set('c',$v)`,
+          // `->insert()->values(...)`, `->setValue(...)`, `addSelect`, `join`/`innerJoin`) — omitting these
+          // dropped taint before the sink for the whole UPDATE/INSERT injection shape.
+          "set", "setValue", "values", "select", "addSelect", "join", "innerJoin", "leftJoin"
+        ] and
       nodeFrom.asExpr() = m.getArguments().getChild(_).(Php::Argument).getChild() and
       nodeTo.(PostUpdateNode).getPreUpdateNode().asExpr() = m.getObject()
     )
