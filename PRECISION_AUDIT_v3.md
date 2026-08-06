@@ -275,6 +275,13 @@ cross-cutting+dead-code), current tree, no DB builds. Cross-corroboration noted 
 | resolveHandler | 26 | string-handler entrypoint uniqueness cap |
 | T5-2 | 27 | XXE `xml_parse` (expat) unconditional sink |
 | stored cmd/path | 27 | StoredInjection second-order command/path/SSRF/LDAP sinks |
+| T5-1 | 28 | NEW php/stored-xss query (CWE-79) + shared StoredSources.qll |
+| T5-3 | 29 | php-audit.qls opt-in suite (un-blocks the audit subsystem) |
+
+**Still open (need sustained/structural work):** the per-kind `vulnKind` sanitizer column (Tier 6-1 — the
+highest-leverage remaining; resolves T1-4 + the escaper churn), array field-sensitivity (Tier 6-2), a careful
+redo of T1e (cross-kind resolution — the naive gate regressed the corpus), T1d (ancestor-arm typed sanitizer),
+T1g (collecting variadic), T3-2/T3-3 (needs-corpus AC), mass-assignment query (T5-4).
 
 **T1e (cross-kind name resolution) deferred** — a naive function-only/method-only gate on the viableCallable
 name-fallback regressed the corpus (200/201); the DataFlowCallable↔AST kind relation needs a more careful
