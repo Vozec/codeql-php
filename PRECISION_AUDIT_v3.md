@@ -278,7 +278,9 @@ cross-cutting+dead-code), current tree, no DB builds. Cross-corroboration noted 
 | T5-1 | 28 | NEW php/stored-xss query (CWE-79) + shared StoredSources.qll |
 | T5-3 | 29 | php-audit.qls opt-in suite (un-blocks the audit subsystem) |
 
-| Tier 6-1 | 30-31 | **per-kind `vulnKind` sanitizer column** — Stage 0 (plumbing, verified no-op) + Stage 1 (SQL escapers → kind-scoped + paired steps). Resolves T1-4 and the SQL-escaper-blocks-XSS/command FN class. |
+| Tier 6-1 | 30-32 | **per-kind `vulnKind` sanitizer column** — Stage 0 (plumbing, verified no-op) + Stage 1 (SQL escapers) + Stage 2 (shell→command, basename/realpath→path/file). Resolves T1-4 and the whole escaper-context-blindness FN class (SQL/command/path). |
+| T1g | 33 | collecting variadic param `...$parts` receives all trailing arguments |
+| T1d | 34 | TypedSanitizerStrong drops the ancestor arm (no subclass over-barriering) |
 
 **Still open:** the per-kind mechanism now EXISTS and Stage 1 (SQL) is done — extending it to shell escapers
 (`escapeshellarg`→command) and path escapers (`basename`/`realpath`→path/file-read/file-inclusion) is a
