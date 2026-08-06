@@ -142,11 +142,9 @@ extensions:
       # FULL sanitizers here would OVERRIDE that split (full sanitizer wins) and re-hide escape-then-SQLi.
       - ["function", "escapeshellarg"]
       - ["function", "escapeshellcmd"]
-      - ["function", "mysqli_real_escape_string"]
-      - ["function", "mysql_real_escape_string"]
-      - ["function", "pg_escape_string"]
-      - ["function", "pg_escape_literal"]
-      - ["function", "addslashes"]
+      # NB: the SQL escapers (mysqli/mysql_real_escape_string, pg_escape_*, addslashes) moved to the
+      # kindSanitizerModel("SQL injection") block below — they escape SQL quotes but leave <>/shell
+      # metacharacters, so they must NOT barrier XSS/command/path.
       - ["function", "intval"]
       - ["function", "floatval"]
       - ["function", "doubleval"]
@@ -169,10 +167,23 @@ extensions:
       - ["function", "md5"]
       - ["function", "sha1"]
       - ["function", "hash"]
-      # Method escapers on a driver handle (`$pdo->quote($x)`, `$mysqli->real_escape_string($x)`).
-      - ["method", "quote"]
-      - ["method", "escape"]
-      - ["method", "real_escape_string"]
+      # NB: the method SQL escapers (quote/escape/real_escape_string on a driver handle) moved to the
+      # kindSanitizerModel("SQL injection") block below (SQL-context only, and they no longer over-shadow the
+      # class-scoped typedSanitizerModel rows for the same names).
+
+  # ---- SQL-context escapers: barrier the SQL query ONLY (not XSS/command/path) --------------------------
+  # `real_escape_string`/`addslashes`/`quote`/`escape` escape SQL quotes but leave `<>`/`;`/`|`/`../` intact,
+  # so `echo $mysqli->real_escape_string($x)` (XSS) and `system(addslashes($x))` (command) must still fire.
+  - addsTo: { pack: codeql/php-all, extensible: kindSanitizerModel }
+    data:
+      - ["function", "mysqli_real_escape_string", "SQL injection"]
+      - ["function", "mysql_real_escape_string", "SQL injection"]
+      - ["function", "pg_escape_string", "SQL injection"]
+      - ["function", "pg_escape_literal", "SQL injection"]
+      - ["function", "addslashes", "SQL injection"]
+      - ["method", "quote", "SQL injection"]              # $pdo->quote($x)
+      - ["method", "escape", "SQL injection"]             # $db->escape($x)
+      - ["method", "real_escape_string", "SQL injection"] # $mysqli->real_escape_string($x)
 
   # ---- HTML-context escapers: a barrier for XSS only, NOT for SQL/path/command --------------------
   # htmlspecialchars/htmlentities encode < > & " (' with ENT_QUOTES) for HTML/attribute context; strip_tags
@@ -221,6 +232,21 @@ extensions:
       # (receiver -> return). Paired with the `new *Exception($msg)` message step in TaintTrackingPrivate.
       - ["method", "getMessage", -2, -1]
       - ["function", "strtoupper", -1, -1]
+      # SQL escapers are kind-scoped sanitizers (kindSanitizerModel "SQL injection" above) — they must CARRY
+      # taint (arg -> return) so the escaped value still reaches an XSS/command/path sink (the SQL query is
+      # barriered by KindSanitizer; these steps re-arm the OTHER kinds). Same pattern as weak-XSS + step.
+      - ["function", "mysqli_real_escape_string", -1, -1]
+      - ["function", "mysql_real_escape_string", -1, -1]
+      - ["function", "pg_escape_string", -1, -1]
+      - ["function", "pg_escape_literal", -1, -1]
+      - ["function", "addslashes", -1, -1]
+      - ["method", "quote", -1, -1]              # $pdo->quote / Connection::quote / Mysql::quote / …
+      - ["method", "escape", -1, -1]             # $db->escape / Db::escape / DatabaseDriver::escape
+      - ["method", "real_escape_string", -1, -1]
+      - ["method", "quoteName", -1, -1]
+      - ["method", "quoteInto", -1, -1]
+      - ["method", "quoteIdentifier", -1, -1]
+      - ["method", "quoteIdentifiers", -1, -1]
       # HTML-context escapers + preg_quote carry taint (arg 0 -> return) so a downstream SQL/path/command
       # sink is still reached (they are weak-XSS barriers / non-sanitizers for those kinds — see above).
       - ["function", "htmlspecialchars", 0, -1]

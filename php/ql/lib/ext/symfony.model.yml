@@ -91,16 +91,15 @@ extensions:
       - ["method", "mirror", 0, "path traversal"]
       # RedirectResponse target URL setter (distinctive; __construct is too generic to model).
       - ["method", "setTargetUrl", 0, "open redirect"]
-  - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
+  # NB: bare `["staticmethod","escape"]` (a full sanitizer) was REMOVED — it globally overrode Drupal's
+  # deliberate weak-XSS+step `Html::escape` split. quoteIdentifier is a SQL identifier escaper -> SQL-kind only.
+  - addsTo: { pack: codeql/php-all, extensible: kindSanitizerModel }
     data:
-      # NB: bare `["staticmethod","escape"]` (a full sanitizer) was REMOVED — it globally overrode Drupal's
-      # deliberate weak-XSS+step `Html::escape` split (a full-sanitizer bare row wins over a weak-XSS bare
-      # row of the same name), re-hiding escape-then-SQLi. Drupal's weak-XSS `escape` covers all escape() calls.
-      - ["method", "quoteIdentifier"]                          # Doctrine Connection::quoteIdentifier
+      - ["method", "quoteIdentifier", "SQL injection"]        # Doctrine Connection::quoteIdentifier
   # Doctrine DBAL string/identifier quoting — SQL-escape; scope quote to Connection (generic name).
-  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+  - addsTo: { pack: codeql/php-all, extensible: typedKindSanitizerModel }
     data:
-      - ["Connection", "quote"]
+      - ["Connection", "quote", "SQL injection"]
   # Attribute routing: `#[Route('/u/{id}')] public function show(int $id)` — the scalar action params
   # are URL placeholders (user input). The attribute short-name is the data row.
   - addsTo: { pack: codeql/php-all, extensible: routeAttributeModel }

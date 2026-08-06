@@ -99,10 +99,11 @@ extensions:
       - ["method", "escapeQuote", 0, -1]
       - ["method", "escapeXssInUrl", 0, -1]
   # SQL quoting — scope to the DB adapter (quote/quoteInto are generic names).
-  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+  # SQL escapers -> SQL-kind only.
+  - addsTo: { pack: codeql/php-all, extensible: typedKindSanitizerModel }
     data:
-      - ["Mysql", "quote"]
-      - ["Mysql", "quoteInto"]
-      - ["Mysql", "quoteIdentifier"]
-      - ["AdapterInterface", "quote"]
-      - ["AdapterInterface", "quoteInto"]
+      - ["Mysql", "quote", "SQL injection"]
+      - ["Mysql", "quoteInto", "SQL injection"]
+      - ["Mysql", "quoteIdentifier", "SQL injection"]
+      - ["AdapterInterface", "quote", "SQL injection"]
+      - ["AdapterInterface", "quoteInto", "SQL injection"]

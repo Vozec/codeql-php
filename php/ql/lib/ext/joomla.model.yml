@@ -99,11 +99,12 @@ extensions:
       - ["method", "cleanText", 0, -1]
       - ["staticmethod", "cleanText", 0, -1]
   # SQL escaping — scope quote/escape/quoteName to the DB driver (generic names).
-  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+  # SQL escapers -> SQL-kind only (must not barrier XSS/command on a resolved DatabaseDriver receiver).
+  - addsTo: { pack: codeql/php-all, extensible: typedKindSanitizerModel }
     data:
-      - ["DatabaseDriver", "quote"]
-      - ["DatabaseDriver", "escape"]
-      - ["DatabaseDriver", "quoteName"]
-      - ["JDatabaseDriver", "quote"]
-      - ["JDatabaseDriver", "escape"]
-      - ["JDatabaseDriver", "quoteName"]
+      - ["DatabaseDriver", "quote", "SQL injection"]
+      - ["DatabaseDriver", "escape", "SQL injection"]
+      - ["DatabaseDriver", "quoteName", "SQL injection"]
+      - ["JDatabaseDriver", "quote", "SQL injection"]
+      - ["JDatabaseDriver", "escape", "SQL injection"]
+      - ["JDatabaseDriver", "quoteName", "SQL injection"]

@@ -90,16 +90,20 @@ extensions:
       - ["method", "quoteStr"]
       - ["method", "fullQuoteStr"]
   # v13+ DBAL binding/quoting — the canonical safe patterns; class-scoped to avoid blanket FNs.
+  # Parameterizers return a PLACEHOLDER (`:dcValueN`) — full sanitizer (the placeholder can't be echoed).
   - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
     data:
       - ["QueryBuilder", "createNamedParameter"]
       - ["QueryBuilder", "createPositionalParameter"]
-      - ["QueryBuilder", "quote"]
-      - ["QueryBuilder", "quoteIdentifier"]
-      - ["QueryBuilder", "quoteIdentifiers"]
-      - ["Connection", "quote"]
-      - ["Connection", "quoteIdentifier"]
-      - ["Connection", "quoteIdentifiers"]
+  # Identifier/value escapers -> SQL-kind only.
+  - addsTo: { pack: codeql/php-all, extensible: typedKindSanitizerModel }
+    data:
+      - ["QueryBuilder", "quote", "SQL injection"]
+      - ["QueryBuilder", "quoteIdentifier", "SQL injection"]
+      - ["QueryBuilder", "quoteIdentifiers", "SQL injection"]
+      - ["Connection", "quote", "SQL injection"]
+      - ["Connection", "quoteIdentifier", "SQL injection"]
+      - ["Connection", "quoteIdentifiers", "SQL injection"]
 
   # escapeLikeWildcards escapes only `% _` for LIKE, NOT quotes (the esc_like case): a value
   # concatenated into a LIKE clause without binding is still SQLi -> carry taint, do NOT sanitize.

@@ -71,10 +71,11 @@ extensions:
       - ["staticmethod", "htmlentitiesUTF8", 0, -1]
       - ["staticmethod", "purifyHTML", 0, -1]
   # Db::getInstance()->escape() — the real SQL escaper behind pSQL. Class-scoped (generic name).
-  - addsTo: { pack: codeql/php-all, extensible: typedSanitizerModel }
+  # SQL escapers -> SQL-kind only (they must not barrier XSS/command/path on a Db-typed receiver).
+  - addsTo: { pack: codeql/php-all, extensible: typedKindSanitizerModel }
     data:
-      - ["Db", "escape"]                                       # Db.php:789
-      - ["DbCore", "escape"]
+      - ["Db", "escape", "SQL injection"]                      # Db.php:789
+      - ["DbCore", "escape", "SQL injection"]
 
   # ---- Validator GUARDS: `if (Validate::isX($v)) { …$v… }` (static-method guards, distinctive names).
   #      Consumed via isGuardedRead's static-method support. classes/Validate.php.
