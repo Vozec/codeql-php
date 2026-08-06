@@ -67,9 +67,21 @@ private module WriteConfig implements DataFlow::ConfigSig {
 
   predicate isSink(DataFlow::Node n) { exists(Expr v | storeWrite(_, _, v) and n.asExpr() = v) }
 
-  // A key whose every write path is sanitised/validated is NOT a real second-order vector — without this
-  // barrier `userWritableKey` over-approximated and the read false-fired as a fully-tainted StoredSource.
-  predicate isBarrier(DataFlow::Node n) { n instanceof Sanitizer }
+  // A key whose write value is coerced to a NUMBER is not a real second-order vector for ANY read-sink
+  // kind. The barrier is restricted to kind-AGNOSTIC numeric coercions (scalar-param/settype/filter_var,
+  // numeric casts, intval) — NOT the whole `Sanitizer` class: an SQL escaper on the write path must NOT
+  // mark the key safe for a code-injection / XSS read (that was a cross-kind false negative).
+  predicate isBarrier(DataFlow::Node n) {
+    isNumericValueBarrier(n)
+    or
+    exists(CastExpr c |
+      c.getTypeName() = ["int", "integer", "float", "double", "real", "bool", "boolean"] and n.asExpr() = c
+    )
+    or
+    exists(FunctionCall fc |
+      fc.getName() = ["intval", "absint", "floatval", "doubleval"] and n.asExpr() = fc
+    )
+  }
 }
 
 private module WriteFlow = TaintTracking::Global<WriteConfig>;

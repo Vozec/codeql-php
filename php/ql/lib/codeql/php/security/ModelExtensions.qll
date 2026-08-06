@@ -311,28 +311,55 @@ private predicate directlyInBody(Php::AstNode node, Function f) {
   )
 }
 
-/** Holds if `r` (a return in `f`) returns one of `f`'s parameters unchanged. */
-private predicate returnsUnmodifiedParam(ReturnStmt r, Function f) {
+/**
+ * Holds if `e` is (transitively) an UNMODIFIED parameter of `f`: a direct parameter read, a cast of one
+ * (`(string)$p`), or a local variable assigned exactly once from such a value (`$t = $p; … return $t;`).
+ * This follows the one-hop copies/casts a no-op decoy uses to evade a literal `return $param` match.
+ */
+private predicate passthroughValue(Expr e, Function f) {
   exists(string pname |
     pname = f.getAParameter().getName() and
-    r.getValue().(VariableAccess).getName() = pname and
+    e.(VariableAccess).getName() = pname and
     not paramRebound(f, pname)
+  )
+  or
+  passthroughValue(e.(CastExpr).getOperand(), f)
+  or
+  exists(string tname, AssignExpr a |
+    e.(VariableAccess).getName() = tname and
+    directlyInBody(a, f) and
+    a.getLhs().(VariableAccess).getName() = tname and
+    passthroughValue(a.getRhs(), f) and
+    // $tname must be a single, never-augmented/rebound copy for the value to still be the parameter.
+    count(AssignExpr a2 | directlyInBody(a2, f) and a2.getLhs().(VariableAccess).getName() = tname) = 1 and
+    not exists(Php::AugmentedAssignmentExpression aa |
+      aa.(Php::AstNode).getParent*() = f.getBody() and
+      aa.getLeft().(VariableAccess).getName() = tname
+    )
   )
 }
 
+/** Holds if `r` returns one of `f`'s parameters unchanged (possibly via a copy/cast). */
+private predicate returnsUnmodifiedParam(ReturnStmt r, Function f) { passthroughValue(r.getValue(), f) }
+
+/** Holds if `r` returns a compile-time constant literal — a NEUTRAL return (an early-out `return '';`/
+ *  `return null;` guard), not "real work" that would prove the function transforms its input. */
+private predicate returnsConstantLiteral(ReturnStmt r) { r.getValue() instanceof Literal }
+
 /**
- * Holds if `f` is a TRIVIAL PASS-THROUGH: EVERY `return` in its own body yields a parameter unchanged (and
- * there is at least one such return). Such a function neutralises nothing on any path, so a same-named
- * sanitizer model is a LIE for this codebase and must be distrusted. Crucially, a real framework sanitizer
- * with an early-out guard — `function esc_sql($v){ if(!is_scalar($v)) return $v; … return $escaped; }` —
- * has a non-pass-through return (`return $escaped`), so it is NOT trivial and its model is KEPT (the fix
- * that closed the wp2shell FP would otherwise re-open, since the early-out `return $v` alone used to match).
+ * Holds if `f` is a TRIVIAL PASS-THROUGH: it has at least one pass-through return and NO return does "real
+ * work" — where "real work" = returns something that is neither an unmodified parameter NOR a constant
+ * literal. Constant-return guard arms (`if($x==='') return '';`) are neutral, so a main-path no-op
+ * (`… return $x;`) is still caught, while a real sanitizer (`… return $escaped;`) has a real-work return and
+ * keeps its model. Copies/casts are followed (`$t=$x; return $t;`), closing the decoy-evasion FN.
  */
 private predicate isTrivialPassthrough(Function f) {
-  // at least one pass-through return that belongs to f (not a nested closure)…
   exists(ReturnStmt r | directlyInBody(r, f) and returnsUnmodifiedParam(r, f)) and
-  // …and NO return that belongs to f does real work (returns anything but an unmodified parameter).
-  not exists(ReturnStmt r | directlyInBody(r, f) and not returnsUnmodifiedParam(r, f))
+  not exists(ReturnStmt r |
+    directlyInBody(r, f) and
+    not returnsUnmodifiedParam(r, f) and
+    not returnsConstantLiteral(r)
+  )
 }
 
 /**
