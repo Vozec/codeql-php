@@ -286,8 +286,9 @@ Method arrayCallableMethod(Php::ArrayCreationExpression arr) {
         )
       ) <= 8
       or
-      // class-name string `['C', 'm']`
-      exists(ClassLike c | c.getName() = recv.(StringLiteral).getValue() and result = c.getAMethod())
+      // class-name string `['C', 'm']` (short class name — bound the fan-out, like the other arms)
+      exists(ClassLike c | c.getName() = recv.(StringLiteral).getValue() and result = c.getAMethod()) and
+      count(ClassLike c3 | c3.getName() = recv.(StringLiteral).getValue()) <= 8
     )
   )
 }

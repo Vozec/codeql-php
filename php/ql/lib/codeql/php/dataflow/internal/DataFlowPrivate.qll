@@ -206,7 +206,9 @@ class DataFlowCall instanceof Cfg::CfgNode {
       a.getRhs() = nw and
       cls.getName() = nw.getClassName() and
       result = cls.getAMethod() and
-      result.(Method).getName() = "__invoke"
+      result.(Method).getName() = "__invoke" and
+      // short class name is namespace-blind; bound the fan-out (same cap as getConstructCallee).
+      count(ClassLike c2 | c2.getName() = nw.getClassName()) <= nameFallbackMaxArity()
     )
   }
 
