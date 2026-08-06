@@ -115,13 +115,50 @@ private predicate orderedBlockChild(Php::AstNode blk, int i, Php::AstNode child)
   child = blk.(Php::Program).getChild(i)
 }
 
-/** Holds if `use` is (inside) a statement that comes AFTER `ifs` in the same straight-line block. */
-private predicate readAfterInSameBlock(Php::IfStatement ifs, Expr use) {
+/** Holds if the access path of `ref` is (re)assigned in a straight-line sibling statement of `blk` whose
+ *  index is strictly between `lo` and `hi` — i.e. the value is re-tainted between a barrier and a later use. */
+bindingset[lo, hi]
+private predicate accessPathReassignedBetween(Php::AstNode blk, int lo, int hi, Expr ref) {
+  exists(int k, Php::AstNode midStmt, Expr lhs |
+    orderedBlockChild(blk, k, midStmt) and
+    lo < k and
+    k < hi and
+    lhs.(Php::AstNode).getParent*() = midStmt and
+    (
+      lhs = any(Php::AssignmentExpression a).getLeft() or
+      lhs = any(Php::AugmentedAssignmentExpression a).getLeft() or
+      lhs = any(Php::ReferenceAssignmentExpression a).getLeft()
+    ) and
+    sameAccessPath(lhs, ref)
+  )
+}
+
+/**
+ * Holds if `use` is (inside) a statement that comes AFTER `ifs` in the same straight-line block, with NO
+ * reassignment of `checked`'s access path in between (a reassignment re-taints the value, so an early-exit
+ * guard on the OLD value no longer protects the read).
+ */
+private predicate readAfterInSameBlock(Php::IfStatement ifs, Expr use, Expr checked) {
   exists(Php::AstNode blk, int i, int j, Php::AstNode afterStmt |
     orderedBlockChild(blk, i, ifs) and
     orderedBlockChild(blk, j, afterStmt) and
     j > i and
-    use.(Php::AstNode).getParent*() = afterStmt
+    use.(Php::AstNode).getParent*() = afterStmt and
+    not accessPathReassignedBetween(blk, i, j, checked)
+  )
+}
+
+/**
+ * Holds if the guard call `g` sits under a top-level logical connective (`&&`/`||`/`and`/`or`/`xor`) within
+ * the `if` condition. In that case the guard is NOT the sole determinant of which branch is taken — with a
+ * `||` the guard may be false in the then-branch, with an `&&` it may be false in the else/fall-through — so
+ * the `!`-parity polarity model is unsound and the read must NOT be treated as guarded (recall-first).
+ */
+private predicate guardUnderLogicalConnective(Call g, Php::IfStatement ifs) {
+  exists(BinaryOperation b |
+    b.getOperator() = ["&&", "||", "and", "or", "xor"] and
+    g.(Php::AstNode).getParent+() = b and
+    b.(Php::AstNode).getParent*() = ifs.getCondition()
   )
 }
 
@@ -134,11 +171,14 @@ private predicate readAfterInSameBlock(Php::IfStatement ifs, Expr use) {
  * The two previously-mishandled cases — a negated guard with the read in the THEN branch (false NEGATIVE:
  * `if(!ctype_digit($id)){query($id);}`) and a negated early-exit read reported as unguarded (false
  * POSITIVE: `if(!g($x))return; sink($x);`) — are now correct. A CUSTOM/unknown guard is still NOT matched,
- * so its path stays reported (recall-first); `&&`/`||` structure is folded into the `!`-parity count.
+ * so its path stays reported (recall-first). SOUNDNESS: the read is cleared ONLY when the guard is the sole
+ * controlling term (no `&&`/`||` connective — `guardUnderLogicalConnective`) and the value is NOT reassigned
+ * between the guard and the read (`accessPathReassignedBetween`, in the early-exit arm).
  */
 predicate isGuardedRead(DataFlow::Node n) {
   exists(Php::IfStatement ifs, Call g, Expr checked, Expr use, int neg |
     neg = guardNegationCount(g, ifs) and
+    not guardUnderLogicalConnective(g, ifs) and
     checked = g.getAnArgument() and
     sameAccessPath(checked, use) and
     use != checked and
@@ -150,11 +190,12 @@ predicate isGuardedRead(DataFlow::Node n) {
       // negative polarity (odd `!`s): read guarded in the ELSE branch
       neg % 2 = 1 and use.(Php::AstNode).getParent*() = ifs.getAlternative(_)
       or
-      // negated early-exit `if (!g($x)) return;` — the fall-through past the `if` is guarded
+      // negated early-exit `if (!g($x)) return;` — the fall-through past the `if` is guarded (unless the
+      // value is reassigned in between, which `readAfterInSameBlock` rejects).
       neg % 2 = 1 and
       ifBodyExits(ifs) and
       not exists(ifs.getAlternative(_)) and
-      readAfterInSameBlock(ifs, use)
+      readAfterInSameBlock(ifs, use, checked)
     )
   )
 }
@@ -1243,7 +1284,10 @@ private class SettypeBarrier extends Sanitizer {
         // the use may be nested arbitrarily deep under a later sibling statement (still dominated).
         orderedBlockChild(blk, j, useStmt) and
         useStmt = use.(Php::AstNode).getParent*() and
-        i < j
+        i < j and
+        // …and the variable must NOT be re-tainted between the settype and the use (`settype($x,'int');
+        // $x = $_GET['x']; sink($x)` must still fire).
+        not accessPathReassignedBetween(blk, i, j, st.getArgument(0))
       ) and
       this.asExpr() = use
     )
