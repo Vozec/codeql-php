@@ -129,6 +129,11 @@ extensions:
       - ["method", "xpath", -1, "xpath injection"]
       # unsafe deserialization
       - ["function", "unserialize", 0, "unsafe deserialization"]   # arg0 only; arg1 is the (safe) options array
+      # variable injection / mass assignment: extract($arr) creates locals from the array's KEYS; a
+      # request-controlled array overwrites existing variables (auth flags, config). import_request_variables
+      # imports GPC directly; mb_parse_str/parse_str($str) with NO result-array arg dumps into locals too.
+      - ["function", "extract", 0, "variable injection"]
+      - ["function", "import_request_variables", 0, "variable injection"]
 
   # ---- Sanitizers: built-in encoders / escapers / validators (value-returning) ----------------
   - addsTo:
