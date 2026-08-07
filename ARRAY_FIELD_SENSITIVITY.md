@@ -41,7 +41,15 @@ PROVE the value is constant:
    - no augmented / reference assign to this cell or an ancestor;
    - no DYNAMIC-key / append / non-constant-chain write to the same root (`$d[$x]=…`, `$d[]=…`) — a dynamic
      segment could alias the cell;
-   - the root is not iterated by-reference (`foreach($d as &$v)`) nor rebound via `global $d`.
+   - the root is not iterated by-reference (`foreach($d as &$v)`) nor rebound via `global $d`;
+   - **no ancestor (up to the root array) is passed DIRECTLY as a call argument** — the callee could take
+     it by reference and mutate an element (`parse_str($q,$d)`, `sort($d)`, a user `function f(&$a)`), a
+     taint the engine DOES model. Found by the arr6 harness: without this guard the barrier suppressed the
+     `parse_str`/whole-array-by-ref FNs. The sink passes the value inside a larger expression
+     (`query("…".$d['k'])`), so its argument is that expression, not the bare cell — it doesn't trip this.
+
+`isConstLiteral` also recognises constant BINARY expressions (`'pre'.'fix'`, `60*60`) so a constant-concat
+table name is provably constant (arr5 K1/K2); sound because every operand is itself proven constant.
 
 Because it only ever REMOVES a flow it has proven safe, an unseen taint source just leaves the flow in
 place → **no false negative**. The corpus (201 CVEs) is the recall guardrail.
@@ -58,7 +66,18 @@ Key helpers (all in `FlowSources.qll`): `strictSubscriptKey` (rejects interpolat
   augmented-sibling all suppressed (3/3).
 - `cve/run.sh`: 201/201, 0 un-annotated.
 
+## Adversarial validation (6 harnesses, ~40 cases)
+`scratchpad/arr`..`arr6`, each cross-checked barrier-ON vs barrier-OFF to separate barrier-induced FNs from
+pre-existing engine gaps. Confirmed SOUND (no barrier-induced FN) on: augmented `.=`/`+=` to the same cell,
+nested same-cell taint, ancestor-tainted parent, dynamic sibling at a nested level, ternary/switch-branch
+taint, cross-function scope gating, numeric-string vs int key equivalence, `$d += $_GET`, `array_merge`
+reassign, `parse_str`/`sort`/user-by-ref whole-array mutation. Precision (correctly suppressed): int-key
+const sibling, 3-level nested const sibling, augmented-on-sibling, const concat/arithmetic, both-branch-const.
+Engine gaps found (NOT barrier FNs — don't fire even with the barrier off): taint through `list()`/array
+DESTRUCTURING into an element, reverse reference-aliasing (`$r=&$c['k']; $r=$t`), single-element (not whole
+array) passed by-ref.
+
 ## Residual (accepted, recall-first)
 Flow-insensitive: if a key gets both a constant and a (dead/overwritten) tainted write, the flow is kept
-(residual FP, never a FN). Interprocedural by-ref mutation via a plain call arg is not modelled as a taint
-write — but such a case simply keeps the flow (the barrier declines to fire), so still no FN.
+(residual FP, never a FN). Passing the whole array to a read-only function still disables the barrier
+(residual FP via the by-ref guard) — the sound trade to kill the `parse_str` FN class.

@@ -1518,6 +1518,15 @@ private predicate isConstLiteral(Expr e) {
   forall(Php::ArrayElementInitializer el | el = e.(Php::ArrayCreationExpression).getChild(_) |
     forall(Expr part | part = el.getChild(_) | isConstLiteral(part))
   )
+  or
+  // A binary expression built ENTIRELY from constant operands is itself constant and deterministic
+  // (`'pre' . 'fix'`, `60 * 60`) — sound because both operands are proven constant, so it can never
+  // carry taint. Covers the string-concat "build a constant table name" idiom.
+  exists(Php::BinaryExpression b | b = e |
+    b.getOperator() = [".", "+", "-", "*", "/", "%"] and
+    isConstLiteral(b.getLeft()) and
+    isConstLiteral(b.getRight())
+  )
 }
 
 /** Gets the left-hand side of any write (plain / augmented / reference assignment). */
@@ -1566,6 +1575,14 @@ private predicate cellPossiblyTainted(Expr r) {
     g.getChild(_).(Php::VariableName).getChild().getValue() = chainRoot(r).getName() and
     enclosingCallableOrProgram(g) = enclosingCallableOrProgram(chainRoot(r))
   )
+  or
+  // An ancestor of this cell (up to and including the root array) is passed DIRECTLY as a call argument.
+  // The callee may take it BY REFERENCE and mutate an element (`parse_str($q, $d)`, `sort($d)`, a user
+  // `function f(&$a){ $a['k']=… }`) — a taint the engine DOES model but this syntactic analysis cannot
+  // see. Backing off keeps such flows (recall-first). The sink itself passes the value inside a larger
+  // expression (`query("…" . $d['k'])`), whose argument is that expression, not the bare cell, so it does
+  // not trip this.
+  exists(Php::Argument arg | sameConstChain(arg.getChild(), ancestorOrSelf(r)))
 }
 
 /**
