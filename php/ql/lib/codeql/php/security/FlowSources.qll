@@ -1357,10 +1357,13 @@ private predicate phpbbNumericDefault(Expr def) {
   )
   or
   def instanceof Php::ArrayCreationExpression and
-  forall(Php::AstNode child |
-    child = def.(Php::ArrayCreationExpression).getChild(_).(Php::ArrayElementInitializer).getChild(_)
-  |
-    phpbbNumericDefault(child)
+  // phpBB's recursive_set_var coerces each element's VALUE to the type of the DEFAULT element's VALUE
+  // — NOT the key. So a numeric-VALUE default (`array(0)`, `array('' => 0)`, `array('id' => 0)`) yields
+  // an all-numeric-valued result, SQL-safe when a VALUE is read (`$arr[$k]`, the acp_icons pattern). The
+  // key stays request-derived, but phpBB's key consumers (`array_keys(...)` -> sql_in_set) escape it. For
+  // each element take the VALUE = the highest-index child (`k => v` has children [k,v]; a bare `v` has [v]).
+  forall(Php::ArrayElementInitializer el | el = def.(Php::ArrayCreationExpression).getChild(_) |
+    exists(int maxi | maxi = max(int j | exists(el.getChild(j))) | phpbbNumericDefault(el.getChild(maxi)))
   )
 }
 
@@ -1373,6 +1376,7 @@ private class PhpbbVariableNumericBarrier extends Sanitizer {
     )
   }
 }
+
 
 /**
  * Holds if `ty` is a scalar NUMERIC/BOOLEAN parameter type — `int`/`float`/`bool`, or their nullable
