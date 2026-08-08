@@ -1397,6 +1397,45 @@ private predicate producesNumericValue(Expr e) {
     m.getMethodName() = ["variable", "untrimmed_variable", "request_var"] and
     producesNumericValue(m.getArgument(1))
   )
+  or
+  // NUMERIC DB-COLUMN: a DB-ROW access `$row['<key>']` at a conventionally-INTEGER column name (`*_id`,
+  // `*_ids`, `*_time`, `*_count`, bare `id`). A value read from an integer column of a DB row is numeric.
+  // CRITICALLY GATED BY DB-PROVENANCE (allowlist, not denylist): the base must be a variable assigned from
+  // a DB fetch (`sql_fetchrow`/`sql_fetchfield`/`sql_fetchrowset`/`fetch`/`fetchArray`/`fetch_assoc`/…) — so
+  // a REQUEST array with the same key (`$this->request->get['order_id']`, OpenCart/AbanteCart unauth SQLi)
+  // is NOT barriered. The key-name alone cannot tell a DB row from request input (the 201-CVE corpus proved
+  // a superglobal-only gate hides 4 real SQLi), so the provenance gate is mandatory. Targets phpBB
+  // `$row['forum_id']` / `$data['topic_id']` fetched rows — the dominant real-framework FP class.
+  exists(Php::SubscriptExpression sub, string key |
+    e = sub and
+    key = strictSubscriptKey(sub) and
+    key.regexpMatch("(?i).*(_id|_ids|_time|_count)|^id$") and
+    dbFetchDerivedBase(sub.getChild(0))
+  )
+}
+
+/** A DB-fetch method whose result is a trusted row/scalar (integer columns are ints, not attacker input). */
+private predicate dbFetchMethodName(string name) {
+  name =
+    [
+      "sql_fetchrow", "sql_fetchfield", "sql_fetchrowset", "fetch", "fetchArray", "fetchAssoc",
+      "fetch_assoc", "fetch_array", "fetchRow", "fetch_row", "fetchOne", "fetchAssociative"
+    ]
+}
+
+/** Holds if `base` originates from a DB fetch — either it IS such a call, or a local variable assigned
+ *  from one somewhere in its enclosing callable. Flow-INSENSITIVE (any fetch assignment to `$v` marks
+ *  every `$v[...]` in the function), so a `$v` later re-assigned from request could in principle be
+ *  over-barriered (a theoretical FN) — accepted because the value is a DB integer column in practice and
+ *  the 201-CVE corpus stays 201/201 (whereas a key-name-only gate lost 4 real request-array SQLi). */
+private predicate dbFetchDerivedBase(Expr base) {
+  dbFetchMethodName(base.(MethodCall).getMethodName())
+  or
+  exists(AssignExpr a, string v |
+    v = base.(VariableAccess).getName() and
+    a.getLhs().(VariableAccess).getName() = v and
+    dbFetchMethodName(a.getRhs().(MethodCall).getMethodName())
+  )
 }
 
 /** A node whose expression provably evaluates to a number — a general injection barrier (a number carries
