@@ -657,10 +657,26 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
     node1.(PostUpdateNode).getPreUpdateNode().asExpr() = base and
     Ssa::variableAccessAt(bbs, is, base) and
     storeDef.definesAt(v, bbs, is) and
-    Ssa::Impl::ssaDefReachesRead(v, storeDef, bbr, ir) and
+    ssaDefReachesReadThroughPhi(v, storeDef, bbr, ir) and
     Ssa::variableAccessAt(bbr, ir, read) and
     read != base and
     node2.asExpr() = read
+  )
+}
+
+/**
+ * Holds if SSA def `d` of `v` reaches the read at `(bbr, ir)` DIRECTLY, or through a chain of φ nodes it
+ * feeds — so a field store in ONE branch (`if (…) { $o->f = $src; }`) still carries its content to a use
+ * of `$o` after the join (the φ). Plain `ssaDefReachesRead` stops at the φ (the read uses the φ def, not the
+ * branch def), which dropped conditional object-field taint.
+ */
+private predicate ssaDefReachesReadThroughPhi(
+  Ssa::LocalVariable v, Ssa::Definition d, Ssa::Cfg::BasicBlock bbr, int ir
+) {
+  Ssa::Impl::ssaDefReachesRead(v, d, bbr, ir)
+  or
+  exists(Ssa::Definition phi |
+    Ssa::Impl::phiHasInputFromBlock(phi, d, _) and ssaDefReachesReadThroughPhi(v, phi, bbr, ir)
   )
 }
 
