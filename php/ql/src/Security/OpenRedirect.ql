@@ -15,23 +15,39 @@ import codeql.php.DataFlow
 import codeql.php.TaintTracking
 import codeql.php.Concepts
 import codeql.php.security.FlowSources
+private import codeql.php.ast.internal.TreeSitter as TS
 
 /**
- * Holds when `n` is an operand of a string concatenation whose destination host is already pinned by
- * a constant absolute-URL prefix to its left — e.g. `header("Location: https://site.tld" . $userPath)`.
- * Appending user input to a fixed `scheme://host` base only controls the path, not the target host, so
- * it is not an open redirect. Requires a *constant* scheme+host literal, so it does NOT clear the
- * genuinely-unsafe cases where the prefix is a bare `"Location: "` or a spoofable value (`$_SERVER['HTTP_HOST']`).
+ * Holds if constant URL prefix `s` PINS the destination host: it contains `scheme://host` terminated by
+ * `/`, `?` or `#`, so anything appended lands in the path/query/fragment, not the host. The terminator is
+ * required — `"https://good.com".$x` (x=".evil.com/") yields `good.com.evil.com` and must NOT be cleared.
+ * `:` is kept in the host run so a host WITH A PORT (`https://intranet:8443/…`) still pins.
+ */
+bindingset[s]
+private predicate pinsHost(string s) {
+  s.regexpMatch("(?s).*https?://[A-Za-z0-9._~%:-]+[/?#].*")
+}
+
+/**
+ * Holds when `n` is user input appended to a fixed `scheme://host/` base, so it controls only the path —
+ * not an open redirect. Two syntaxes:
+ *  - concatenation: `header("Location: https://site.tld/" . $userPath)`;
+ *  - interpolation: `header("Location: https://site.tld/{$userPath}")` — the constant text before the
+ *    interpolation must pin the host with NO earlier interpolation (else the host itself is dynamic).
+ * A *constant* scheme+host is required, so a bare `"Location: "` prefix or a spoofable `$_SERVER['HTTP_HOST']`
+ * host is NOT cleared.
  */
 private predicate hostPinnedConcatOperand(DataFlow::Node n) {
-  exists(ConcatExpr ce |
-    ce.getRightOperand() = n.asExpr() and
-    // The host must be TERMINATED by `/`, `?` or `#` inside the CONSTANT prefix, so appended input lands in
-    // the path/query/fragment — not the host. Without the terminator `"https://good.com".$x` (x=".evil.com/")
-    // yields `good.com.evil.com` and was wrongly cleared (a real open-redirect false negative).
-    // `:` is included so a host WITH A PORT (`https://intranet:8443/…`) still pins the host (else the greedy
-    // host run stopped at `:`, the terminator never matched, and the safe redirect was reported).
-    ce.getLeftOperand().(StringLiteral).getValue().regexpMatch("(?s).*https?://[A-Za-z0-9._~%:-]+[/?#].*")
+  exists(ConcatExpr ce | ce.getRightOperand() = n.asExpr() and pinsHost(ce.getLeftOperand().(StringLiteral).getValue()))
+  or
+  exists(TS::Php::EncapsedString enc, int i, int j |
+    n.asExpr() = enc.getChild(i) and
+    j < i and
+    pinsHost(enc.getChild(j).(TS::Php::StringContent).getValue()) and
+    // no interpolated expression sits between the pinning constant and `n` — otherwise the host is dynamic.
+    not exists(int k, TS::Php::AstNode mid |
+      mid = enc.getChild(k) and j < k and k < i and not mid instanceof TS::Php::StringContent
+    )
   )
 }
 

@@ -54,16 +54,42 @@ private predicate benignConstStr(Expr e) {
   )
 }
 
-/** Holds if `e` is a hash-function result or a secret-looking variable/property. */
+/**
+ * Holds if `n` denotes a secret. The secret term must start at a word boundary (start, or after a
+ * non-letter) so `$bypass`/`$compass`/`$subtokens` (substring matches) no longer trip it, while
+ * `password`/`csrf_token`/`api_key` still do. `key` is included ONLY in compound secret forms
+ * (`api_key`, `secret_key`, `private_key`, `access_key`) — never bare, which would flood on `$key`,
+ * `$foreign_key`, `$array_key`, etc.
+ */
+bindingset[n]
+private predicate secretName(string n) {
+  n.toLowerCase()
+      .regexpMatch("(^|.*[^a-z])(pass|pwd|hash|token|secret|signature|hmac|digest|nonce|apikey|api_key|secret_key|private_key|access_key).*")
+}
+
+/** The CONSTANT non-interpolated key of a subscript `$a['k']` / `$a[0]`, so `$_GET['token']` is sensitive. */
+private string constSubscriptKey(Expr e) {
+  result = e.(TS::Php::SubscriptExpression).getChild(1).(TS::Php::Integer).getValue()
+  or
+  exists(TS::Php::SubscriptExpression sub | sub = e |
+    sub.getChild(1) instanceof TS::Php::String and
+    not exists(TS::Php::AstNode ch |
+      ch = sub.getChild(1).(TS::Php::String).getChild(_) and not ch instanceof TS::Php::StringContent
+    ) and
+    result =
+      concat(int i, string t |
+        t = sub.getChild(1).(TS::Php::String).getChild(i).(TS::Php::StringContent).getValue() | t order by i
+      )
+  )
+}
+
+/** Holds if `e` is a hash-function result or a secret-looking variable/property/array element. */
 private predicate sensitive(Expr e) {
   exists(FunctionCall c | c = e and hashFunction(c.getName()))
   or
-  exists(string n |
-    n = [e.(VariableAccess).getName(), e.(FieldAccess).getFieldName()] and
-    // the secret term must start at a word boundary (start, or after a non-letter) so `$bypass`/`$compass`/
-    // `$subtokens` (substring matches) no longer trip it, while `password`/`csrf_token` still do.
-    n.toLowerCase().regexpMatch("(^|.*[^a-z])(pass|pwd|hash|token|secret|signature|hmac|digest|nonce).*")
-  )
+  secretName([e.(VariableAccess).getName(), e.(FieldAccess).getFieldName()])
+  or
+  secretName(constSubscriptKey(e))
 }
 
 from ComparisonExpr b

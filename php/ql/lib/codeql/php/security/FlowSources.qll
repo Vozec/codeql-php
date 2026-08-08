@@ -1252,17 +1252,29 @@ private class FilterVarNumericBarrier extends Sanitizer {
  * barrier for all classes. The canonical safe `sprintf("… id=%d", $_GET['id'])` was flagged because
  * `sprintf` is a generic taint STEP; this narrows that step out when the format is numeric-only (Tier-2-I).
  */
+/**
+ * Holds if `c` is an `(v)sprintf`/`(v)printf` whose CONSTANT format has at least one numeric conversion and
+ * NO string/char (`%s`/`%c`) conversion — so every substituted argument is coerced to a number and carries no
+ * injectable payload. The flag run allows a custom-pad token `%'<c>` (`'.`) so an out-of-flag pad char like
+ * `%'@10s` does not hide the following `s` (P0-I). `%%` escape ignored.
+ */
+private predicate numericOnlyFormatCall(FunctionCall c) {
+  c.getName() = ["sprintf", "printf", "vsprintf", "vprintf"] and
+  exists(string fmt | fmt = constStringText(c.getArgument(0)) |
+    fmt.regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[bdiouxXeEfFgG].*") and
+    not fmt.regexpReplaceAll("%%", "").regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[sc].*")
+  )
+}
+
 private class SprintfNumericBarrier extends Sanitizer {
   SprintfNumericBarrier() {
-    exists(FunctionCall c, string fmt |
-      c.getName() = ["sprintf", "printf", "vsprintf", "vprintf"] and
-      fmt = constStringText(c.getArgument(0)) and
-      this.asExpr() = c and
-      // at least one numeric conversion …
-      fmt.regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[bdiouxXeEfFgG].*") and
-      // … and NO string/char conversion. The flag run allows a custom-pad token `%'<c>` (`'.`) so an
-      // out-of-flag pad char like `%'@10s` does not hide the following `s` (P0-I). `%%` escape ignored.
-      not fmt.regexpReplaceAll("%%", "").regexpMatch(".*%(?:'.|[-+ 0# .,0-9*$])*[sc].*")
+    exists(FunctionCall c | numericOnlyFormatCall(c) |
+      // `(v)sprintf` RETURNS the string, so the result node is the barrier (it flows onward to a sink).
+      this.asExpr() = c
+      or
+      // `(v)printf` OUTPUTS directly and is itself an XSS sink at arg -1, so the sink is each VALUE argument
+      // — barrier those (positions ≥ 1; the format is arg 0). Harmless on sprintf (its args aren't sinks).
+      this.asExpr() = c.getArgument(any(int i | i >= 1))
     )
   }
 }
