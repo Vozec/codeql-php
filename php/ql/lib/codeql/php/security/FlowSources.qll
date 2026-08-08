@@ -1593,7 +1593,12 @@ private predicate chainPassedAsArg(string key, Php::AstNode scope) {
  * rebind.
  */
 private predicate rootHasWildWrite(Php::AstNode scope, string name) {
-  exists(Php::SubscriptExpression lhs | lhs = anyWriteLhs() and not fullConstChain(lhs) |
+  exists(Php::SubscriptExpression lhs |
+    lhs = anyWriteLhs() and not fullConstChain(lhs) and
+    // a DYNAMIC key (`$d[$x]=…`) has an index child and can alias any key; a pure APPEND (`$d[]=…`, no
+    // index child) writes only the next INTEGER index and is handled by `rootHasAppendWrite` below.
+    exists(lhs.getChild(1))
+  |
     name = chainRoot(lhs).getName() and not isSuperglobalName(name) and scope = enclosingCallableOrProgram(chainRoot(lhs))
   )
   or
@@ -1605,6 +1610,14 @@ private predicate rootHasWildWrite(Php::AstNode scope, string name) {
   or
   exists(Php::GlobalDeclaration g, Php::VariableName vn | vn = g.getChild(_) |
     name = vn.getChild().getValue() and scope = enclosingCallableOrProgram(g)
+  )
+}
+
+/** (scope, name) of every root array with a pure APPEND write (`$d[] = …`, no index child) — it writes the
+ *  next INTEGER index, so it can alias only an integer-keyed read, never a string key. */
+private predicate rootHasAppendWrite(Php::AstNode scope, string name) {
+  exists(Php::SubscriptExpression lhs | lhs = anyWriteLhs() and not exists(lhs.getChild(1)) |
+    name = chainRoot(lhs).getName() and not isSuperglobalName(name) and scope = enclosingCallableOrProgram(chainRoot(lhs))
   )
 }
 
@@ -1655,9 +1668,17 @@ private predicate cellPossiblyTainted(Expr r) {
   // (`query("…".$d['k'])`), whose argument is that expression, not the bare cell, so it does not trip this.
   exists(Expr anc | anc = ancestorOrSelf(r) and chainPassedAsArg(constChainKey(anc), constChainScope(anc)))
   or
-  // The root array has a WILD write (dynamic-key/append/non-const-chain subscript write, by-ref foreach, or
+  // The root array has a WILD write (dynamic-key/non-const-chain subscript write, by-ref foreach, or
   // `global` rebind) that could alias this cell.
   exists(Php::AstNode scope, string name | rootIdentOf(r, scope, name) and rootHasWildWrite(scope, name))
+  or
+  // A pure APPEND `$d[] = …` on the root can alias only an INTEGER-keyed read (`$d[0]`) — never a string
+  // key (`$d['table']`). Back off only when this read's outermost key is numeric.
+  exists(Php::AstNode scope, string name |
+    rootIdentOf(r, scope, name) and
+    rootHasAppendWrite(scope, name) and
+    strictSubscriptKey(r.(Php::SubscriptExpression)).regexpMatch("[0-9]+")
+  )
 }
 
 /**
