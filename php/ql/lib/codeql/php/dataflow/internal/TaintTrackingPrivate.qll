@@ -261,7 +261,21 @@ predicate defaultAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nod
     exists(AstNode parent |
       structuralPropagator(parent) and
       nodeFrom.getAstNode() = parent.(Php::AstNode).getAFieldOrChild() and
-      nodeTo.getAstNode() = parent
+      nodeTo.getAstNode() = parent and
+      // Object field-sensitivity: do NOT let the OBJECT `$this` node-taint its member access
+      // `$this->field`. `$this->field` reads are served field-sensitively by the `TFieldContent`
+      // read step; the generic `$o -> $o->f` amplifier is only needed when the object is node-tainted
+      // content-free (a genuine SOURCE object like `$record->color` or a cast literal `(object)[...]->k`,
+      // which are NOT `$this`). Allowing it on `$this` re-taints EVERY sibling field of a session/service
+      // object from a single tainted field and bypasses per-field sanitizers (the phpBB `$this->browser`
+      // → `$this->data['user_id']` flood past the `(int)` cast). Excluded only for the `$this` receiver.
+      not (
+        nodeFrom.asExpr().(VariableAccess).getName() = "this" and
+        (
+          parent.(Php::MemberAccessExpression).getObject() = nodeFrom.getAstNode() or
+          parent.(Php::NullsafeMemberAccessExpression).getObject() = nodeFrom.getAstNode()
+        )
+      )
     )
     or
     // Subscript `$a[i]`: only the array base propagates to the result, NOT the index (a tainted
