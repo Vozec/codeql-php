@@ -1333,6 +1333,79 @@ private class NumericCastSanitizer extends Sanitizer {
   }
 }
 
+/** A builtin that ALWAYS returns an int/float/bool — no string/array can escape it. Curated for soundness
+ *  (excludes `max`/`min` which pass strings through, `dechex`/`gettype` which return strings). */
+private predicate numericBuiltin(string name) {
+  name =
+    [
+      "count", "sizeof", "strlen", "mb_strlen", "iconv_strlen", "intval", "floatval", "doubleval",
+      "abs", "ceil", "floor", "round", "intdiv", "fmod", "time", "mktime", "gmmktime", "strtotime",
+      "mt_rand", "rand", "random_int", "mt_getrandmax", "getrandmax", "ip2long", "crc32", "ord",
+      "hexdec", "octdec", "bindec", "array_sum", "array_product", "substr_count", "similar_text",
+      "levenshtein", "strcmp", "strncmp", "strcasecmp", "strncasecmp", "preg_match", "preg_match_all",
+      "checkdate", "memory_get_usage", "filesize", "fmod", "pow", "gmp_intval", "bccomp"
+    ]
+}
+
+/**
+ * TypeFlow (forward, shape-based): holds if `e` provably EVALUATES to an int/float/bool, hence carries no
+ * SQL/HTML/path/command payload. A single sound rule that SUBSUMES the ad-hoc numeric barriers and — because
+ * a data-flow barrier stops taint at the node and the engine propagates the CLEAN value onward — needs no
+ * type LATTICE with flow: identifying the numeric-PRODUCING expressions is enough. The result type of an
+ * operator is fixed by the OPERATOR (arithmetic → numeric, comparison/logical → bool, concat `.` → string),
+ * independent of operands, so this never depends on inferring an operand's type. Recurses through parens,
+ * ternary (both branches numeric), and phpBB's type-coercing `variable($n, $numericDefault)` (which settype's
+ * its result to the default's type — extends the literal-only PhpbbVariableNumericBarrier to `(int)$x` /
+ * `count($y)` / arithmetic defaults). Does NOT cross the DB-fetch wall (`variable('x', $row['id'])` — a
+ * non-provable default stays tainted, recall-first).
+ */
+private predicate producesNumericValue(Expr e) {
+  // int/float/bool literals
+  e instanceof Php::Integer or
+  e instanceof Php::Float or
+  e instanceof Php::Boolean
+  or
+  // numeric/bool casts
+  e.(CastExpr).getTypeName() = ["int", "integer", "float", "double", "real", "bool", "boolean"]
+  or
+  // arithmetic / bitwise binary ops → numeric; comparison / logical → bool. Concat `.` (string) EXCLUDED.
+  e.(BinaryOperation).getOperator() =
+    [
+      "+", "-", "*", "/", "%", "**", "&", "|", "^", "<<", ">>", "==", "===", "!=", "!==", "<>", "<", ">",
+      "<=", ">=", "<=>", "&&", "||", "and", "or", "xor"
+    ]
+  or
+  // unary numeric (`-$x`,`+$x`,`~$x`) / logical (`!$x`) → numeric/bool
+  e.(Php::UnaryOpExpression).getOperator().toString() = ["-", "+", "~", "!"]
+  or
+  // builtins that always return a number
+  exists(FunctionCall c | c = e and numericBuiltin(c.getName()))
+  or
+  // parenthesised value
+  producesNumericValue(e.(Php::ParenthesizedExpression).getChild())
+  or
+  // ternary: both branches numeric (elvis `?:` → condition is the value)
+  exists(Php::ConditionalExpression t | t = e |
+    producesNumericValue(t.getBody()) and producesNumericValue(t.getAlternative())
+    or
+    not exists(t.getBody()) and producesNumericValue(t.getCondition())
+  )
+  or
+  // phpBB type-coercing accessor with a provably-numeric default
+  exists(MethodCall m |
+    m = e and
+    m.getMethodName() = ["variable", "untrimmed_variable", "request_var"] and
+    producesNumericValue(m.getArgument(1))
+  )
+}
+
+/** A node whose expression provably evaluates to a number — a general injection barrier (a number carries
+ *  no payload). Joins `isNumericValueBarrier` so ACCESS-CONTROL still sees it (a numeric id is still the
+ *  attacker's chosen resource → IDOR must NOT be suppressed). */
+private class NumericValueSanitizer extends Sanitizer {
+  NumericValueSanitizer() { producesNumericValue(this.asExpr()) }
+}
+
 /**
  * phpBB `$request->variable($name, $default)` TYPE-COERCES its result to the TYPE of `$default`
  * (`type_cast_helper::recursive_set_var` → `settype`). A NUMERIC / bool default — `variable('id', 0)`,
@@ -1495,7 +1568,8 @@ predicate isNumericValueBarrier(DataFlow::Node n) {
   n instanceof ScalarParamBarrier or
   n instanceof SettypeBarrier or
   n instanceof FilterVarNumericBarrier or
-  n instanceof PhpbbVariableNumericBarrier
+  n instanceof PhpbbVariableNumericBarrier or
+  n instanceof NumericValueSanitizer
 }
 
 // --- Constant sibling-key barrier (field-sensitive arrays, recursive) ---------------------------
