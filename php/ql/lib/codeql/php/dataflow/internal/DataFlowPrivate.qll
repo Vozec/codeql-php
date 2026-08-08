@@ -477,9 +477,18 @@ private predicate simpleAssignment(VariableAccess target, Expr rhs) {
   or
   exists(Php::ReferenceAssignmentExpression a | a.getLeft() = target and a.getRight() = rhs)
   or
-  // Nested element/property update at any depth (`$o->a[2]->b = v`) re-defines the root variable.
+  // Nested element/property update re-defines the root variable — ARRAY-subscript writes only (see the
+  // field-sensitivity note in `simpleAssignment`'s array arm). Pure object-field writes (`$o->f=v`) are
+  // handled field-sensitively by `TFieldContent`; see `objectFieldStoreStep`.
   exists(AssignExpr a |
-    Ssa::isNestedAccess(a.getLhs()) and target = Ssa::rootVariableOfAccess(a.getLhs()) and rhs = a.getRhs()
+    Ssa::isNestedAccess(a.getLhs()) and
+    target = Ssa::rootVariableOfAccess(a.getLhs()) and
+    rhs = a.getRhs() and
+    (
+      a.getLhs() instanceof Php::SubscriptExpression
+      or
+      exists(Php::SubscriptExpression s | s.(Php::AstNode).getParent+() = a.getLhs())
+    )
   )
 }
 
@@ -604,6 +613,27 @@ predicate simpleLocalFlowStep(Node node1, Node node2, string model) {
     // CFG order: r1 strictly before r2 (same block earlier index, or an earlier block).
     (bb1 = bb2 and i1 < i2 or bb1.getASuccessor+() = bb2) and
     node2.asExpr() = r2
+  )
+  or
+  // Field/element STORE-BASE carry-forward: `$o->f = v` (or `$a[k]=v`) makes its base `$o`/`$a` an
+  // uncertain SSA (re)definition WHOSE VALUE is the store's POST-UPDATE (the object with the new field
+  // content). Flow that post-update to the reads the STORE'S OWN def reaches, so the stored `TFieldContent`
+  // survives to a later `$o->f` read of a LOCAL object variable — the field-sensitive replacement for the
+  // whole-object node re-taint (which the SSA def-value step, above, no longer provides for object fields).
+  // The pre-existing step above binds the def the base READS (correct for a call-arg mutation); this binds
+  // the def the base CREATES (correct for a store), so a fresh `$o = new C(); $o->f = v; … $o->f` connects.
+  model = "" and
+  exists(
+    Ssa::LocalVariable v, Ssa::Definition storeDef, Ssa::Cfg::BasicBlock bbs, int is,
+    VariableAccess base, Ssa::Cfg::BasicBlock bbr, int ir, VariableAccess read
+  |
+    node1.(PostUpdateNode).getPreUpdateNode().asExpr() = base and
+    Ssa::variableAccessAt(bbs, is, base) and
+    storeDef.definesAt(v, bbs, is) and
+    Ssa::Impl::ssaDefReachesRead(v, storeDef, bbr, ir) and
+    Ssa::variableAccessAt(bbr, ir, read) and
+    read != base and
+    node2.asExpr() = read
   )
 }
 
