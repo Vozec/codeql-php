@@ -100,6 +100,23 @@ class DataFlowCallable instanceof Cfg::CfgScope {
     )
   }
 
+  /**
+   * Gets the minimum number of positional arguments a call must pass to invoke this callable — i.e. the
+   * count of REQUIRED formal parameters (those with no default value and not variadic). A call passing
+   * fewer arguments cannot resolve here, so the by-NAME fallback uses this to drop arity-incompatible
+   * over-connections (e.g. `$jsonResponse->send($data)` — 1 arg — must NOT route into
+   * `message::send(service_collection $messenger, $contact)` — 2 required — and taint the DI collection).
+   */
+  int getMinArity() {
+    result =
+      count(int i, AstNode p |
+        p = formalParametersOf(this).getChild(i) and
+        not p instanceof Php::VariadicParameter and
+        not exists(p.(Php::SimpleParameter).getDefaultValue()) and
+        not exists(p.(Php::PropertyPromotionParameter).getDefaultValue())
+      )
+  }
+
   int totalorder() { none() }
 }
 
@@ -124,6 +141,10 @@ class DataFlowCall instanceof Cfg::CfgNode {
   }
 
   DataFlowCallable getEnclosingCallable() { result = super.getScope() }
+
+  /** Gets the number of POSITIONAL arguments this call passes (used with `getMinArity` to drop
+   *  arity-incompatible by-name resolutions). */
+  int getNumberOfPositionalArguments() { result = count(int i | i >= 0 and exists(c.getArgument(i))) }
 
   /** Gets the CFG node of this call's `pos`th argument (`pos = -1` is the `$o->m()` receiver). */
   Cfg::CfgNode getArgumentCfgNode(int pos) {
@@ -287,7 +308,12 @@ DataFlowCallable viableCallable(DataFlowCall call) {
   call.getName() = result.getName() and
   not exists(call.getTypedCallee()) and
   not exists(call.getStaticTypedCallee()) and
-  nameFallbackAcceptable(call.getName())
+  nameFallbackAcceptable(call.getName()) and
+  // ARITY GATE: the call must pass enough positional arguments to actually invoke this callee. A call
+  // resolving by NAME alone must not connect to a same-named method it could never call — the shape that
+  // routed `$jsonResponse->send($data)` (1 arg) into `message::send(service_collection, $contact)` (2
+  // required), tainting a DI service_collection and flooding phpBB's config/service-collection amplifier.
+  call.getNumberOfPositionalArguments() >= result.getMinArity()
   or
   result = call.getInlineCallee()
   or
