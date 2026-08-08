@@ -1662,6 +1662,15 @@ private predicate cellPossiblyTainted(Expr r) {
   // (`$d['table']=$x`, `$e['sub']=$x`, `$d=$_GET`, `$d['table'].=$x`, `$d=&$ref`).
   exists(Expr anc | anc = ancestorOrSelf(r) and chainTaintAssigned(constChainKey(anc), constChainScope(anc)))
   or
+  // A tainting write to a DESCENDANT of this cell (`$d['k'][0]=$x` mutates a character / sub-element of
+  // `$d['k']`, tainting the whole `$d['k']` that a wholesale read consumes). The length-prefixed encoding
+  // makes a descendant's key START WITH this cell's key, without matching a sibling (`$d['ka']`).
+  exists(string dkey |
+    chainTaintAssigned(dkey, constChainScope(r)) and
+    dkey != constChainKey(r) and
+    dkey.prefix(constChainKey(r).length()) = constChainKey(r)
+  )
+  or
   // An ancestor is passed DIRECTLY as a call argument — the callee may take it by reference and mutate an
   // element (`parse_str($q,$d)`, `sort($d)`, a user `function f(&$a){ $a['k']=… }`), a taint the engine
   // DOES model but this syntactic analysis cannot see. The sink passes the value inside a larger expression
