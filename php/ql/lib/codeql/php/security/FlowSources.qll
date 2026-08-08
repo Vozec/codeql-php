@@ -1486,17 +1486,10 @@ private string constChainKey(Expr e) {
   )
 }
 
-/** Functional: the innermost enclosing callable / program of a chain expression (its variable scope). */
+/** Functional: the innermost enclosing callable / program of a chain expression (its variable scope). Two
+ *  chains are "the same cell" iff they share both `constChainKey` and `constChainScope` — the guard sets
+ *  below index on exactly that pair, replacing what was an all-pairs `sameConstChain` relation. */
 private Php::AstNode constChainScope(Expr e) { result = enclosingCallableOrProgram(e) }
-
-/**
- * Holds if `a` and `b` are the SAME constant-key access chain — identical key sequence rooted at the same
- * local variable in the same scope. RECURSIVE via `constChainKey`: `$e['sub']['table']` matches another
- * `$e['sub']['table']`, neither matches `$e['sub']['name']`. Both sides functional → no cartesian blow-up.
- */
-private predicate sameConstChain(Expr a, Expr b) {
-  constChainKey(a) = constChainKey(b) and constChainScope(a) = constChainScope(b)
-}
 
 /** Holds if `e` is a fully constant-key chain rooted at a non-superglobal local variable. */
 private predicate fullConstChain(Expr e) { exists(constChainKey(e)) }
@@ -1515,11 +1508,56 @@ private VariableAccess chainRoot(Expr e) {
   result = chainRoot(e.(Php::SubscriptExpression).getChild(0))
 }
 
-/** Holds if `a` and `b` denote the same local (non-superglobal) variable in the same scope. */
-private predicate sameRootVarScope(VariableAccess a, VariableAccess b) {
-  a.getName() = b.getName() and
-  not isSuperglobalName(a.getName()) and
-  enclosingCallableOrProgram(a) = enclosingCallableOrProgram(b)
+/**
+ * The (scope, name) identity of a chain's ROOT variable, once per root occurrence. Precomputing membership
+ * in the guard sets below by this identity — instead of joining every write against every read — is the
+ * perf lever: the whole `cellPossiblyTainted` becomes hash lookups keyed by `(constChainKey, constChainScope)`
+ * or `(scope, name)`, evaluated once, rather than per-candidate cartesian joins.
+ */
+private predicate rootIdentOf(Expr chain, Php::AstNode scope, string name) {
+  exists(VariableAccess root | root = chainRoot(chain) |
+    name = root.getName() and not isSuperglobalName(name) and scope = enclosingCallableOrProgram(root)
+  )
+}
+
+/** (key, scope) of every cell assigned a CONSTANT literal — the barrier's necessary precondition set. */
+private predicate chainConstAssigned(string key, Php::AstNode scope) {
+  exists(AssignExpr w | isConstLiteral(w.getRhs()) and key = constChainKey(w.getLhs()) and scope = constChainScope(w.getLhs()))
+}
+
+/** (key, scope) of every cell/ancestor assigned a NON-constant value (plain / augmented / reference). */
+private predicate chainTaintAssigned(string key, Php::AstNode scope) {
+  exists(AssignExpr w | not isConstLiteral(w.getRhs()) and key = constChainKey(w.getLhs()) and scope = constChainScope(w.getLhs()))
+  or
+  exists(Php::AugmentedAssignmentExpression w | key = constChainKey(w.getLeft()) and scope = constChainScope(w.getLeft()))
+  or
+  exists(Php::ReferenceAssignmentExpression w | key = constChainKey(w.getRight()) and scope = constChainScope(w.getRight()))
+}
+
+/** (key, scope) of every constant-key chain passed DIRECTLY as a call argument (by-ref mutation risk). */
+private predicate chainPassedAsArg(string key, Php::AstNode scope) {
+  exists(Php::Argument arg | key = constChainKey(arg.getChild()) and scope = constChainScope(arg.getChild()))
+}
+
+/**
+ * (scope, name) of every root array with a WILD write that could taint an arbitrary cell: a dynamic-key /
+ * append / non-constant-chain subscript write (`$d[$x]=…`, `$d[]=…`), a by-reference foreach, or a `global`
+ * rebind.
+ */
+private predicate rootHasWildWrite(Php::AstNode scope, string name) {
+  exists(Php::SubscriptExpression lhs | lhs = anyWriteLhs() and not fullConstChain(lhs) |
+    name = chainRoot(lhs).getName() and not isSuperglobalName(name) and scope = enclosingCallableOrProgram(chainRoot(lhs))
+  )
+  or
+  exists(Php::ForeachStatement fe, Php::ByRef ref | ref = fe.getChild(_) |
+    name = fe.getChild(0).(VariableAccess).getName() and
+    not isSuperglobalName(name) and
+    scope = enclosingCallableOrProgram(fe.getChild(0))
+  )
+  or
+  exists(Php::GlobalDeclaration g, Php::VariableName vn | vn = g.getChild(_) |
+    name = vn.getChild().getValue() and scope = enclosingCallableOrProgram(g)
+  )
 }
 
 /** Holds if `e` is a CONSTANT literal: a scalar (int/float/bool/null/non-interpolated string) or an array
@@ -1554,51 +1592,34 @@ private Expr anyWriteLhs() {
 
 /**
  * Holds if the constant-key cell read by `r` could be tainted by SOME write in scope — the analysis is
- * conservative (recall-first): if any of these hold, `r` is NOT barriered.
+ * conservative (recall-first): if any of these hold, `r` is NOT barriered. All checks are membership tests
+ * against the precomputed guard sets, evaluated once, keyed by `(constChainKey, constChainScope)` of an
+ * ancestor of `r` or by `(scope, name)` of its root — no per-candidate join over writes.
  */
 private predicate cellPossiblyTainted(Expr r) {
-  // A NON-constant plain assignment to this exact cell or one of its ancestors (`$d['table']=$x`,
-  // `$e['sub']=$x`, `$d=$_GET`).
-  exists(AssignExpr w, Expr target |
-    target = ancestorOrSelf(r) and sameConstChain(w.getLhs(), target) and not isConstLiteral(w.getRhs())
-  )
+  // A non-constant / augmented / reference assignment to this exact cell or one of its ANCESTORS
+  // (`$d['table']=$x`, `$e['sub']=$x`, `$d=$_GET`, `$d['table'].=$x`, `$d=&$ref`).
+  exists(Expr anc | anc = ancestorOrSelf(r) and chainTaintAssigned(constChainKey(anc), constChainScope(anc)))
   or
-  // An augmented / reference assignment to this cell or an ancestor (`$d['table'].=$x`, `$d=&$ref`).
-  exists(Php::AugmentedAssignmentExpression w, Expr target |
-    target = ancestorOrSelf(r) and sameConstChain(w.getLeft(), target)
-  )
+  // An ancestor is passed DIRECTLY as a call argument — the callee may take it by reference and mutate an
+  // element (`parse_str($q,$d)`, `sort($d)`, a user `function f(&$a){ $a['k']=… }`), a taint the engine
+  // DOES model but this syntactic analysis cannot see. The sink passes the value inside a larger expression
+  // (`query("…".$d['k'])`), whose argument is that expression, not the bare cell, so it does not trip this.
+  exists(Expr anc | anc = ancestorOrSelf(r) and chainPassedAsArg(constChainKey(anc), constChainScope(anc)))
   or
-  exists(Php::ReferenceAssignmentExpression w, Expr target |
-    target = ancestorOrSelf(r) and sameConstChain(w.getRight(), target)
-  )
-  or
-  // A DYNAMIC-key / append / non-constant-chain write to the SAME root array (`$d[$x]=…`, `$d[]=…`,
-  // `$d[$x]['table']=…`) — a dynamic segment could alias this cell.
-  exists(Php::SubscriptExpression lhs |
-    lhs = anyWriteLhs() and
-    sameRootVarScope(chainRoot(lhs), chainRoot(r)) and
-    not fullConstChain(lhs)
-  )
-  or
-  // The root array is iterated BY REFERENCE (`foreach($d as &$v){ $v = … }`) — the alias mutates elements.
-  exists(Php::ForeachStatement fe, Php::ByRef ref |
-    ref = fe.getChild(_) and
-    sameRootVarScope(fe.getChild(0).(VariableAccess), chainRoot(r))
-  )
-  or
-  // The root is rebound via `global $d;` — its content comes from an unknown outer scope.
-  exists(Php::GlobalDeclaration g |
-    g.getChild(_).(Php::VariableName).getChild().getValue() = chainRoot(r).getName() and
-    enclosingCallableOrProgram(g) = enclosingCallableOrProgram(chainRoot(r))
-  )
-  or
-  // An ancestor of this cell (up to and including the root array) is passed DIRECTLY as a call argument.
-  // The callee may take it BY REFERENCE and mutate an element (`parse_str($q, $d)`, `sort($d)`, a user
-  // `function f(&$a){ $a['k']=… }`) — a taint the engine DOES model but this syntactic analysis cannot
-  // see. Backing off keeps such flows (recall-first). The sink itself passes the value inside a larger
-  // expression (`query("…" . $d['k'])`), whose argument is that expression, not the bare cell, so it does
-  // not trip this.
-  exists(Php::Argument arg | sameConstChain(arg.getChild(), ancestorOrSelf(r)))
+  // The root array has a WILD write (dynamic-key/append/non-const-chain subscript write, by-ref foreach, or
+  // `global` rebind) that could alias this cell.
+  exists(Php::AstNode scope, string name | rootIdentOf(r, scope, name) and rootHasWildWrite(scope, name))
+}
+
+/**
+ * A constant-key subscript READ whose exact cell is also assigned a CONSTANT literal somewhere in scope.
+ * This is the necessary precondition of the barrier, and it is HIGHLY SELECTIVE (only a small fraction of
+ * constant-key reads have a matching constant write), so making it the driver means the taint-freedom check
+ * (`cellPossiblyTainted`) runs only for these few reads instead of every constant-key read in the program.
+ */
+private predicate provenConstWrittenRead(Php::SubscriptExpression r) {
+  fullConstChain(r) and chainConstAssigned(constChainKey(r), constChainScope(r))
 }
 
 /**
@@ -1610,10 +1631,7 @@ private class ConstantSiblingKeyBarrier extends Sanitizer {
   ConstantSiblingKeyBarrier() {
     exists(Php::SubscriptExpression r |
       this.asExpr() = r and
-      fullConstChain(r) and
-      // proven: this exact cell is assigned a constant literal somewhere in scope
-      exists(AssignExpr w | sameConstChain(w.getLhs(), r) and isConstLiteral(w.getRhs())) and
-      // and nothing in scope could taint it
+      provenConstWrittenRead(r) and
       not cellPossiblyTainted(r)
     )
   }

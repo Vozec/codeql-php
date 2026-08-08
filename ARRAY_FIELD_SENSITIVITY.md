@@ -54,9 +54,36 @@ table name is provably constant (arr5 K1/K2); sound because every operand is its
 Because it only ever REMOVES a flow it has proven safe, an unseen taint source just leaves the flow in
 place → **no false negative**. The corpus (201 CVEs) is the recall guardrail.
 
-Key helpers (all in `FlowSources.qll`): `strictSubscriptKey` (rejects interpolated keys),
-`sameConstChain` (recursive, scope-gated, superglobal-excluded), `ancestorOrSelf`, `chainRoot`,
-`isConstLiteral` (scalars + all-constant array literals so `[]`/`['a'=>1]` count), `enclosingCallableOrProgram`.
+Key helpers (all in `FlowSources.qll`): `strictSubscriptKey` (rejects interpolated keys), `constChainKey` +
+`constChainScope` (the functional-key pair — see Performance), `sameConstChain`, `ancestorOrSelf`,
+`chainRoot`, `isConstLiteral` (scalars + all-constant array literals + constant binary exprs so `[]`,
+`['a'=>1]`, `'pre'.'fix'` count), `enclosingCallableOrProgram`.
+
+## Performance — must stay O(N), not O(chains²)
+Two rounds of measurement on real frameworks (isolated barrier-set probe, real-disk DBs, capped heap):
+
+1. **Kill the pairwise relation.** The first cut defined `sameConstChain(a,b)` as a recursive BINARY relation;
+   the optimizer materialised every matching PAIR of constant-key chains and re-ran `enclosingCallableOrProgram`
+   (a `getParent+` closure) + `strictSubscriptKey` (a `concat`) inside that product — **>6.5 min, never
+   converged, OOM on drupal (~10k files)**. Fix: FUNCTIONAL keys computed once per expression — `constChainKey(e)`
+   (length-prefixed, collision-free string of root var + key sequence) and `constChainScope(e)` (innermost
+   enclosing callable). "Same cell" = equal key AND equal scope, an equi-join, not a cartesian product.
+2. **Precompute the guard sets, don't join per-candidate.** `cellPossiblyTainted` still walked every write/arg
+   on a read's root, and `sameRootVarScope` was a second pairwise relation. Fix: precompute, ONCE, the guard
+   sets keyed by `(constChainKey, constChainScope)` — `chainConstAssigned` / `chainTaintAssigned` /
+   `chainPassedAsArg` — and by `(scope, name)` — `rootHasWildWrite`. Each candidate then does hash lookups on
+   its ancestors' keys instead of a join. The highly-selective `provenConstWrittenRead` (a cell that has a
+   constant-literal write) drives evaluation, so the taint-freedom check runs only for the few reads that can
+   possibly be barriered.
+
+Isolated-probe scaling, drupal (10k) / magento (25k), identical barrier sets (3366 / 402 cells) throughout:
+`>390s→OOM  →  177s / 84s (functional keys)  →  24s / 42s (precomputed sets)`. Flat/sub-linear in file count.
+As a dataflow `Sanitizer` the barrier can only PRUNE flow paths, so its only marginal cost over the base
+engine is this one-time ~25-40s barrier-set computation — negligible against the fork's multi-minute
+interprocedural dataflow. NOTE for benchmarking: build DBs on real disk (NOT tmpfs `/tmp`) and cap the JVM
+heap (`-J-Xmx8g`) — CodeQL otherwise defaults `-Xmx` to ~70% of RAM, which with tmpfs DBs and leftover/
+concurrent `codeql` JVMs OOM-kills the machine (an infra artifact, unrelated to barrier complexity; kill
+stragglers by their java PID, not just the `sh` wrapper).
 
 ## Validation
 - `scratchpad/arr` (FP + basic FN): `$d['table']`/nested `$e['sub']['table']` FPs suppressed; same-key
