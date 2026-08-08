@@ -40,7 +40,6 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: stepModel }
     data:
       - ["method", "sql_build_query", 1, -1]                # driver.php:787 assembles SQL from arg1
-      - ["method", "sql_in_set", 0, -1]                     # driver.php:620 — FIELD (arg0) concatenated raw
       - ["function", "utf8_htmlspecialchars", 0, -1]        # HTML-escape only -> carry taint to SQL/path
       - ["function", "censor_text", 0, -1]                  # word-censor, NOT security -> carry taint
 
@@ -48,6 +47,19 @@ extensions:
   - addsTo: { pack: codeql/php-all, extensible: sanitizerModel }
     data:
       - ["method", "sql_escape"]                            # driver_interface.php:446
+      # sql_in_set (driver.php:620) and sql_build_array (driver.php:572) are the phpBB DB-layer query
+      # builders. They return `FIELD/KEY . <values>` where EVERY value is escaped through
+      # _sql_validate_value (string->sql_escape, else->numeric). The only raw parts are the FIELD/KEYS,
+      # which are compile-time column-name constants at every call site. Their bodies are EXTRACTED, and
+      # CodeQL leaks a tainted VALUE to the result three type-insensitive ways: the `is_array($var) &&
+      # is_string($var[0])` INSERT_SELECT branch (`$values[]=$var[0]` raw), the `array_map([$this,
+      # '_sql_validate_value'],$array)` dynamic callback (invisible to a direct-call barrier), and the
+      # `$var[0]` char-subscript of a tainted string. All three are runtime-safe for the scalar values
+      # real callers pass. Barrier the builder RESULT: it neutralises the escaped-VALUE FP wholesale
+      # (acp_attachments delete_files, captcha sql_build_array, every sql_in_set). Real phpBB SQLi is RAW
+      # string concatenation into sql_query, never through these builders. sql_escape stays the primitive.
+      - ["method", "sql_in_set"]                            # driver.php:620
+      - ["method", "sql_build_array"]                       # driver.php:572
   - addsTo: { pack: codeql/php-all, extensible: weakXssSanitizerModel }
     data:
       - ["function", "utf8_htmlspecialchars"]               # HTML-escape only
