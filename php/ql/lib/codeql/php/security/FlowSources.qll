@@ -1179,6 +1179,36 @@ private class GuardBarrier extends Sanitizer {
 }
 
 /**
+ * Holds if `cond` proves `checked` is whitelisted: `in_array($checked, <constant array>)` (a CONSTANT
+ * whitelist — a dynamic 2nd arg could be attacker-influenced, so it is not accepted), or a named
+ * sanitizer-guard validator applied to `$checked`.
+ */
+private predicate whitelistGuardCond(Expr cond, Expr checked) {
+  exists(FunctionCall c |
+    c = cond and c.getName() = "in_array" and checked = c.getArgument(0) and isConstLiteral(c.getArgument(1))
+  )
+  or
+  isSanitizerGuardCall(cond) and checked = cond.(Call).getAnArgument()
+}
+
+/**
+ * The THEN branch of a whitelist TERNARY — `in_array($x, [...]) ? $x : $default` — is reached only when the
+ * guard holds, so the value used there is whitelisted-safe. Mirrors `GuardBarrier` for the ternary form the
+ * `if`-based `isGuardedRead` does not cover (a documented FP). Positive polarity only (guard true ⇒ THEN),
+ * same-access-path, so it clears ONLY the proven-safe branch value.
+ */
+private class TernaryWhitelistBarrier extends Sanitizer {
+  TernaryWhitelistBarrier() {
+    exists(Php::ConditionalExpression ce, Expr checked, Expr use |
+      whitelistGuardCond(ce.getCondition(), checked) and
+      use.(Php::AstNode).getParent*() = ce.getBody() and
+      sameAccessPath(checked, use) and
+      this.asExpr() = use
+    )
+  }
+}
+
+/**
  * A `typedSanitizerModel` method call resolved through the STRONG receiver predicate (`receiverIsClass` —
  * type inference + ancestors + typehint), the same one typed sinks/sources use. ModelExtensions already
  * has a `TypedSanitizer` keyed on the weaker literal/`new`/`$wpdb` resolution; this additive class also
