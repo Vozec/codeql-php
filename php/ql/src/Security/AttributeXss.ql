@@ -82,10 +82,21 @@ private string constEmittedBefore(Expr v) {
   exists(ConcatExpr ce | ce.getRightOperand() = v and result = rightmostConstText(ce.getLeftOperand()))
 }
 
-/** Holds if constant `s` leaves an HTML attribute quote OPEN — `… name='…` or `… name="…` with no closing
- *  quote after it — so whatever follows lands inside that quoted attribute value. */
+/**
+ * Holds if constant `s` leaves an HTML attribute value position OPEN, so whatever follows lands inside an
+ * attribute. Two forms:
+ *  - inside an unclosed tag at an attribute value: `<a title=`, `<input value='`, `<img src="` — the opening
+ *    quote is OPTIONAL because a double-quote written in a double-quoted PHP string (`"<a title=\""`) is an
+ *    escape sequence that `getValue()` drops, so `<a title=` is all that remains;
+ *  - a bare `…='` / `…="` when the tag open sits in an earlier constant chunk.
+ * The `<[^<>]*` run cannot cross a `>` , so a body-text `=` (`<p>Total = 5`) is not matched.
+ */
 bindingset[s]
-private predicate opensAttributeQuote(string s) { s.regexpMatch("(?s).*=\\s*[\"'][^\"']*$") }
+private predicate opensAttributeQuote(string s) {
+  s.regexpMatch("(?s).*<[a-zA-Z][^<>]*[\\s'\"][a-zA-Z0-9_:-]+\\s*=\\s*[\"']?[^\"'<>]*$")
+  or
+  s.regexpMatch("(?s).*=\\s*[\"'][^\"'<>]*$")
+}
 
 /** Holds if `v` is emitted (echo / print / printf / `<?= ?>`) as HTML output. */
 private predicate inHtmlOutput(Expr v) {

@@ -26,7 +26,9 @@ private import codeql.php.ast.internal.TreeSitter as TS
 private predicate safeDeserialization(FunctionCall c) {
   c.getName() = "unserialize" and
   exists(TS::Php::ArrayElementInitializer el, TS::Php::String key |
-    el.getParent+() = c.getArgument(1) and
+    // DIRECT element of the top-level options array — a nested `['options'=>['allowed_classes'=>false]]`
+    // is ignored by PHP (top-level `allowed_classes` defaults to true), so it must NOT clear the sink.
+    el = c.getArgument(1).(TS::Php::ArrayCreationExpression).getChild(_) and
     key = el.getChild(_) and
     key.getChild(_).(TS::Php::StringContent).getValue() = "allowed_classes"
   |

@@ -1199,11 +1199,17 @@ private predicate whitelistGuardCond(Expr cond, Expr checked) {
  */
 private class TernaryWhitelistBarrier extends Sanitizer {
   TernaryWhitelistBarrier() {
-    exists(Php::ConditionalExpression ce, Expr checked, Expr use |
-      whitelistGuardCond(ce.getCondition(), checked) and
-      use.(Php::AstNode).getParent*() = ce.getBody() and
-      sameAccessPath(checked, use) and
-      this.asExpr() = use
+    exists(Php::ConditionalExpression ce, Expr checked, Expr use | this.asExpr() = use and sameAccessPath(checked, use) |
+      // positive polarity: `guard($x) ? $x : default` — the THEN value is whitelisted.
+      whitelistGuardCond(ce.getCondition(), checked) and use.(Php::AstNode).getParent*() = ce.getBody()
+      or
+      // negated polarity: `!guard($x) ? default : $x` — the ELSE value is whitelisted.
+      exists(Php::UnaryOpExpression notOp |
+        notOp = ce.getCondition() and
+        notOp.getOperator().toString() = "!" and
+        whitelistGuardCond(notOp.getArgument(), checked) and
+        use.(Php::AstNode).getParent*() = ce.getAlternative()
+      )
     )
   }
 }
