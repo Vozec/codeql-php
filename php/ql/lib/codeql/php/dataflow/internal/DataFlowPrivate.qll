@@ -477,18 +477,19 @@ private predicate simpleAssignment(VariableAccess target, Expr rhs) {
   or
   exists(Php::ReferenceAssignmentExpression a | a.getLeft() = target and a.getRight() = rhs)
   or
-  // Nested element/property update re-defines the root variable — ARRAY-subscript writes only (see the
-  // field-sensitivity note in `simpleAssignment`'s array arm). Pure object-field writes (`$o->f=v`) are
-  // handled field-sensitively by `TFieldContent`; see `objectFieldStoreStep`.
+  // Nested element/property update re-defines the root variable — but ONLY when the root variable is used
+  // DIRECTLY AS AN ARRAY (its immediate access is a subscript: `$a[k]=v`, `$a[k]->f=v`). Array taint is
+  // field-insensitive and whole-container consumers read the root, so it must carry the value (the sibling-
+  // key FP is handled by `ConstantSiblingKeyBarrier`). When the root is an OBJECT reached through a field
+  // first (`$o->f=v`, `$this->config[$k]=v`, `$o->a->b=v`), node-tainting the whole `$o` would flood every
+  // sibling-field read and every place `$o` flows (the phpbb `$this->config[$k]` container amplifier); those
+  // are left to the precise `TFieldContent` model. A tainted SOURCE object stays whole-tainted (it is a
+  // source node, not a field write), so `$request->x` reads are unaffected.
   exists(AssignExpr a |
     Ssa::isNestedAccess(a.getLhs()) and
     target = Ssa::rootVariableOfAccess(a.getLhs()) and
     rhs = a.getRhs() and
-    (
-      a.getLhs() instanceof Php::SubscriptExpression
-      or
-      exists(Php::SubscriptExpression s | s.(Php::AstNode).getParent+() = a.getLhs())
-    )
+    exists(Php::SubscriptExpression s | s.getChild(0) = target)
   )
 }
 
