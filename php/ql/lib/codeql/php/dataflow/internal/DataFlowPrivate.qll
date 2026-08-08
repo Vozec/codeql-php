@@ -435,7 +435,11 @@ predicate typeStrongerThan(DataFlowType t1, DataFlowType t2) { none() }
 
 newtype TContent =
   TArrayContent() or
-  TFieldContent(string name) { name = any(Php::MemberAccessExpression m).getName().(Php::Name).getValue() }
+  TFieldContent(string name) {
+    name = any(Php::MemberAccessExpression m).getName().(Php::Name).getValue()
+    or
+    name = any(Php::NullsafeMemberAccessExpression m).getName().(Php::Name).getValue()
+  }
 
 class Content extends TContent {
   string toString() {
@@ -793,6 +797,14 @@ predicate readStep(Node node1, ContentSet c, Node node2) {
   )
   or
   exists(Php::MemberAccessExpression m, string f |
+    node1.asExpr() = m.getObject() and
+    node2.asExpr() = m and
+    f = m.getName().(Php::Name).getValue() and
+    c = TFieldContent(f)
+  )
+  or
+  // Nullsafe read `$o?->f` — same object-field content as `$o->f` (only the null-guard differs).
+  exists(Php::NullsafeMemberAccessExpression m, string f |
     node1.asExpr() = m.getObject() and
     node2.asExpr() = m and
     f = m.getName().(Php::Name).getValue() and
