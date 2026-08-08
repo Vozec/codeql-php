@@ -1469,21 +1469,37 @@ private string strictSubscriptKey(Php::SubscriptExpression sub) {
 }
 
 /**
- * Holds if `a` and `b` are constant-key access chains — same root variable (same name, same scope, not a
- * superglobal) and an identical constant-key sequence. RECURSIVE: `$e['sub']['table']` matches another
- * `$e['sub']['table']` and neither matches `$e['sub']['name']`.
+ * Gets a FUNCTIONAL key string for a constant-key access chain rooted at a non-superglobal local variable
+ * (`$e['sub']['table']` → `"1:e3:sub5:table"`), or no result if `e` is not such a chain. One row per
+ * expression — comparing keys by equality replaces an all-pairs `sameConstChain` relation (which the
+ * optimizer materialised as O(chains²) and blew up on large frameworks). Each segment is LENGTH-PREFIXED
+ * (`<len>:<seg>`), a prefix-free encoding, so distinct chains never collide (`$d['a b']` = `"1:d3:a b"` vs
+ * `$d['a']['b']` = `"1:d1:a1:b"`).
+ */
+private string constChainKey(Expr e) {
+  exists(string n | n = e.(VariableAccess).getName() and not isSuperglobalName(n) |
+    result = n.length().toString() + ":" + n
+  )
+  or
+  exists(string k | k = strictSubscriptKey(e.(Php::SubscriptExpression)) |
+    result = constChainKey(e.(Php::SubscriptExpression).getChild(0)) + k.length().toString() + ":" + k
+  )
+}
+
+/** Functional: the innermost enclosing callable / program of a chain expression (its variable scope). */
+private Php::AstNode constChainScope(Expr e) { result = enclosingCallableOrProgram(e) }
+
+/**
+ * Holds if `a` and `b` are the SAME constant-key access chain — identical key sequence rooted at the same
+ * local variable in the same scope. RECURSIVE via `constChainKey`: `$e['sub']['table']` matches another
+ * `$e['sub']['table']`, neither matches `$e['sub']['name']`. Both sides functional → no cartesian blow-up.
  */
 private predicate sameConstChain(Expr a, Expr b) {
-  a.(VariableAccess).getName() = b.(VariableAccess).getName() and
-  not isSuperglobalName(a.(VariableAccess).getName()) and
-  enclosingCallableOrProgram(a) = enclosingCallableOrProgram(b)
-  or
-  strictSubscriptKey(a.(Php::SubscriptExpression)) = strictSubscriptKey(b.(Php::SubscriptExpression)) and
-  sameConstChain(a.(Php::SubscriptExpression).getChild(0), b.(Php::SubscriptExpression).getChild(0))
+  constChainKey(a) = constChainKey(b) and constChainScope(a) = constChainScope(b)
 }
 
 /** Holds if `e` is a fully constant-key chain rooted at a non-superglobal local variable. */
-private predicate fullConstChain(Expr e) { sameConstChain(e, e) }
+private predicate fullConstChain(Expr e) { exists(constChainKey(e)) }
 
 /** Gets `r` itself or any of its base sub-chains (`$e['sub']['table']` → itself, `$e['sub']`, `$e`). */
 private Expr ancestorOrSelf(Expr r) {
