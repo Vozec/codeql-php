@@ -1334,6 +1334,30 @@ private class NumericCastSanitizer extends Sanitizer {
 }
 
 /**
+ * phpBB `$request->variable($name, $default)` TYPE-COERCES its result to the TYPE of `$default`
+ * (`type_cast_helper::recursive_set_var` → `settype`). A NUMERIC / bool default — `variable('id', 0)`,
+ * `variable('page', 1)`, `variable('x', false)` — yields an int/float/bool, so no injection payload
+ * survives. The STRING-default form (`variable('sort', 'asc')`) stays a source: that is the real
+ * ORDER-BY SQLi class. Like a `(int)` cast this stops INJECTION but not IDOR (the number is still the
+ * attacker's chosen id), so it also joins `isNumericValueBarrier`.
+ */
+private class PhpbbVariableNumericBarrier extends Sanitizer {
+  PhpbbVariableNumericBarrier() {
+    exists(MethodCall c, Expr def |
+      c.getMethodName() = ["variable", "untrimmed_variable"] and this.asExpr() = c and def = c.getArgument(1)
+    |
+      def instanceof Php::Integer or def instanceof Php::Float or def instanceof Php::Boolean
+      or
+      exists(Php::UnaryOpExpression u |
+        u = def and
+        u.getOperator().toString() = "-" and
+        (u.getArgument() instanceof Php::Integer or u.getArgument() instanceof Php::Float)
+      )
+    )
+  }
+}
+
+/**
  * Holds if `ty` is a scalar NUMERIC/BOOLEAN parameter type — `int`/`float`/`bool`, or their nullable
  * `?int` form (`OptionalType` wrapping the primitive). Deliberately NOT `string`/`array`/`mixed` or a
  * `UnionType`/`NamedType`: those can still carry an injection payload.
@@ -1449,7 +1473,8 @@ private class LaravelCollectionBarrier extends Sanitizer {
 predicate isNumericValueBarrier(DataFlow::Node n) {
   n instanceof ScalarParamBarrier or
   n instanceof SettypeBarrier or
-  n instanceof FilterVarNumericBarrier
+  n instanceof FilterVarNumericBarrier or
+  n instanceof PhpbbVariableNumericBarrier
 }
 
 // --- Constant sibling-key barrier (field-sensitive arrays, recursive) ---------------------------
