@@ -1341,18 +1341,35 @@ private class NumericCastSanitizer extends Sanitizer {
  * ORDER-BY SQLi class. Like a `(int)` cast this stops INJECTION but not IDOR (the number is still the
  * attacker's chosen id), so it also joins `isNumericValueBarrier`.
  */
+/**
+ * Holds if `def` is a NUMERIC/bool type-template for phpBB's `variable()`: a scalar int/float/bool (incl.
+ * negative), OR an ARRAY whose every element is itself numeric (`array(0)`, `[1,2]`, or empty `array()`) —
+ * `recursive_set_var` coerces each element of the result to the default's element type, so an all-numeric
+ * default yields an all-numeric (SQL-safe) array. The pervasive `variable('ids', array(0))` idiom.
+ */
+private predicate phpbbNumericDefault(Expr def) {
+  def instanceof Php::Integer or def instanceof Php::Float or def instanceof Php::Boolean
+  or
+  exists(Php::UnaryOpExpression u |
+    u = def and
+    u.getOperator().toString() = "-" and
+    (u.getArgument() instanceof Php::Integer or u.getArgument() instanceof Php::Float)
+  )
+  or
+  def instanceof Php::ArrayCreationExpression and
+  forall(Php::AstNode child |
+    child = def.(Php::ArrayCreationExpression).getChild(_).(Php::ArrayElementInitializer).getChild(_)
+  |
+    phpbbNumericDefault(child)
+  )
+}
+
 private class PhpbbVariableNumericBarrier extends Sanitizer {
   PhpbbVariableNumericBarrier() {
-    exists(MethodCall c, Expr def |
-      c.getMethodName() = ["variable", "untrimmed_variable"] and this.asExpr() = c and def = c.getArgument(1)
-    |
-      def instanceof Php::Integer or def instanceof Php::Float or def instanceof Php::Boolean
-      or
-      exists(Php::UnaryOpExpression u |
-        u = def and
-        u.getOperator().toString() = "-" and
-        (u.getArgument() instanceof Php::Integer or u.getArgument() instanceof Php::Float)
-      )
+    exists(MethodCall c |
+      c.getMethodName() = ["variable", "untrimmed_variable"] and
+      this.asExpr() = c and
+      phpbbNumericDefault(c.getArgument(1))
     )
   }
 }
