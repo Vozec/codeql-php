@@ -1436,6 +1436,23 @@ private predicate dbFetchDerivedBase(Expr base) {
     a.getLhs().(VariableAccess).getName() = v and
     dbFetchMethodName(a.getRhs().(MethodCall).getMethodName())
   )
+  or
+  // Object FIELD populated from a DB fetch: `$x->data = $db->sql_fetchrow(...)` ANYWHERE in the analysed
+  // PHP (e.g. phpBB session/user rows set in session.php, read as `$user->data['user_id']` elsewhere).
+  // Matched by field name across the codebase (over-approx, corpus-gated). EXCLUDES request-object fields
+  // (`->get`/`->post`/…) — those are never fetch-assigned, so the OpenCart/AbanteCart `$this->request->
+  // get['order_id']` SQLi stay detected. Uses only PHP source, no external schema.
+  exists(string field |
+    field = base.(Php::MemberAccessExpression).getName().(Php::Name).getValue() and
+    not field =
+      ["get", "post", "request", "cookie", "query", "server", "files", "input", "env", "attributes",
+        "headers", "params", "session"] and
+    exists(AssignExpr a, Php::MemberAccessExpression lhs |
+      a.getLhs() = lhs and
+      lhs.getName().(Php::Name).getValue() = field and
+      dbFetchMethodName(a.getRhs().(MethodCall).getMethodName())
+    )
+  )
 }
 
 /** A node whose expression provably evaluates to a number — a general injection barrier (a number carries
