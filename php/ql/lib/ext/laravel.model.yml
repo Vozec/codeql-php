@@ -21,7 +21,11 @@ extensions:
       # ->json() on ANY object (PDO/mysqli/$wpdb->query(), Collection->all(), Response->json())
       # a request source — the dominant false-positive source observed on the CMS corpus
       # (154/156 taint findings rooted at a PDO ->query()). Keep only the distinctive names.
-      - ["method", "route", "laravel-route-parameter"]         # $request->route('id')
+      # `route` REMOVED as an untyped method source: the bare name collides with URL-GENERATION
+      # `->route('name', [...])` helpers (e.g. phpbb `$controller_helper->route(...)` — 134 spurious
+      # sources → 1082 false-positive SQLi). `$request->route('id')` (a route-param read) is still covered
+      # by the receiver-tainted STEP row `["method","route",-2,-1]` in the stepModel block below, and by
+      # the route-handler closure params — same rationale as the input/query/all removals above.
       - ["staticmethod", "input", "laravel-request"]           # Request::input() — distinctive
       # `Request::all()` / `Request::get()` removed: the bare static names collide with the far
       # more common `Model::all()` (Eloquent) and `Cache::get()`/`Config::get()` facades → FP

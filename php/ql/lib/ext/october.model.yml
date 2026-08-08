@@ -8,8 +8,10 @@ extensions:
       - ["function", "input", "october-request"]        # global input() helper
       - ["function", "post", "october-request"]         # global post() helper (33 uses)
       - ["method", "param", "october-request"]           # $this->param('id') — Cms\Controller::param
-      - ["method", "getParameter", "october-request"]    # Router.php:211
-      - ["method", "getParameters", "october-request"]   # Router.php:193
+      # NOTE: `getParameter`/`getParameters` (Cms\Classes\Router) were REMOVED — as bare method names they
+      # collide with the Symfony DEPENDENCY-INJECTION container `$container->getParameter('x')`, which phpbb
+      # and every Symfony-based app use pervasively, producing a flood of false-positive sources (1088 spurious
+      # SQLi in phpbb alone). October's router params are reached via `param()` (kept) and `input()`.
   - addsTo: { pack: codeql/php-all, extensible: typedSourceModel }
     data:
       - ["Input", "get", "october-request"]

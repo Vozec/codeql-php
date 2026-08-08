@@ -661,6 +661,16 @@ predicate jumpStep(Node node1, Node node2) {
     // ordinary local dataflow, not a cross-scope global alias, so it must NOT get a (SSA-order-blind)
     // jump step (that would cross-link every same-named top-level variable — a false positive).
     (inFunctionGlobal(w, gname) or inFunctionGlobal(r, gname)) and
+    // A TOP-LEVEL `$g` (not a `global $g` import) is global only within its OWN script's execution, so it
+    // must not cross-link to `global $g` in an UNRELATED file: a standalone entry-point (e.g. a CLI build
+    // script) that happens to assign a top-level `$template` would otherwise flow to every `global $template`
+    // in the codebase (observed: 1090 phpbb false positives from one build-script line). Two genuine
+    // `global $g` imports may still alias across files; a top-level endpoint is confined to its own file.
+    (
+      inFunctionGlobal(w, gname) and inFunctionGlobal(r, gname)
+      or
+      w.getLocation().getFile() = r.getLocation().getFile()
+    ) and
     node1.asExpr() = a.getRhs() and
     node2.asExpr() = r
   )
