@@ -1414,6 +1414,46 @@ private predicate producesNumericValue(Expr e) {
   )
 }
 
+/**
+ * A read of the query PARAMETER inside a DB-driver query-execution method (`sql_query`/`sql_query_limit`/
+ * `_sql_query`/`_sql_query_limit` — arg 0 is the SQL). These methods only EXECUTE an already-assembled
+ * query; the query's safety is the CALLER's responsibility and the caller's `$db->sql_query($sql)` call is
+ * itself the modeled sink (flagged at the application call site). So the driver-internal forward
+ * (`mysqli_query($conn, $query)`, `$this->sql_query($query)`) is a redundant duplicate — barrier the
+ * driver-body query param. RECALL-SAFE: the real injection is always flagged at the application call site,
+ * never only inside the driver plumbing. Pure PHP-source analysis.
+ */
+private class DriverQueryParamBarrier extends Sanitizer {
+  DriverQueryParamBarrier() {
+    exists(Php::MethodDeclaration enc, string pname |
+      enc.getName().getValue() = ["sql_query", "sql_query_limit", "_sql_query", "_sql_query_limit"] and
+      pname = enc.getParameters().getChild(0).(Php::SimpleParameter).getName().getChild().getValue() and
+      this.asExpr().(VariableAccess).getName() = pname and
+      this.asExpr().(Php::AstNode).getParent+() = enc.getBody()
+    )
+  }
+}
+
+/**
+ * The result of `array_intersect($safe, $tainted)` where one argument is a DB-metadata call listing the
+ * REAL schema (`sql_list_tables`/`get_table_status`) — the intersection is a subset of the actual table
+ * names, so every element is a genuine identifier, not free attacker input (phpBB backup/extractor tools:
+ * `$tables = array_intersect($db_tools->sql_list_tables(), $request->variable('table', array('')))`). A
+ * whitelist-by-intersection; the safe set is authoritative DB metadata, so the result is safe.
+ */
+private class DbTableWhitelistBarrier extends Sanitizer {
+  DbTableWhitelistBarrier() {
+    exists(FunctionCall c |
+      c.getName() = ["array_intersect", "array_intersect_key", "array_intersect_assoc"] and
+      this.asExpr() = c and
+      exists(MethodCall meta |
+        meta = c.getAnArgument() and
+        meta.getMethodName() = ["sql_list_tables", "get_table_status"]
+      )
+    )
+  }
+}
+
 /** A DB-fetch method whose result is a trusted row/scalar (integer columns are ints, not attacker input). */
 private predicate dbFetchMethodName(string name) {
   name =
