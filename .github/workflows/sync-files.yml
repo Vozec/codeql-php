@@ -5,10 +5,26 @@ on:
     branches:
       - main
       - 'rc/*'
+    paths:
+      - ".github/workflows/sync-files.yml"
+      - "config/identical-files.json"
+      - "config/dbscheme-fragments.json"
+      - "config/sync-files.py"
+      - "config/sync-dbscheme-fragments.py"
+      - "php/php.dbscheme"
+      - "php/ql/lib/php.dbscheme"
   pull_request:
     branches:
       - main
       - 'rc/*'
+    paths:
+      - ".github/workflows/sync-files.yml"
+      - "config/identical-files.json"
+      - "config/dbscheme-fragments.json"
+      - "config/sync-files.py"
+      - "config/sync-dbscheme-fragments.py"
+      - "php/php.dbscheme"
+      - "php/ql/lib/php.dbscheme"
 
 permissions:
   contents: read
